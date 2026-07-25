@@ -292,7 +292,7 @@ export function TrustSection() {
             confirmado.
           </p>
           <Button
-            render={<Link href="/vender/cadastro" />}
+            render={<Link href="/vender" />}
             className="self-start"
           >
             Começar meu cadastro de vendedor

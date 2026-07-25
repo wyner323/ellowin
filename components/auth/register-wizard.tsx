@@ -28,6 +28,7 @@ import {
   isValidFullName,
   isValidPassword,
   isValidPhone,
+  onlyDigits,
   passwordScore,
 } from "@/lib/validation"
 
@@ -159,7 +160,7 @@ export function RegisterWizard() {
               label="Celular"
               type="tel"
               value={formatPhone(form.phone)}
-              onChange={(v) => set("phone", v)}
+              onChange={(v) => set("phone", onlyDigits(v).slice(0, 11))}
               placeholder="(11) 90000-0000"
               autoComplete="tel"
               valid={isValidPhone(form.phone)}
@@ -174,7 +175,7 @@ export function RegisterWizard() {
               id="cpf"
               label="CPF"
               value={formatCpf(form.cpf)}
-              onChange={(v) => set("cpf", v)}
+              onChange={(v) => set("cpf", onlyDigits(v).slice(0, 11))}
               placeholder="000.000.000-00"
               inputMode="numeric"
               valid={cpfValid}
@@ -191,7 +192,7 @@ export function RegisterWizard() {
               id="birthDate"
               label="Data de nascimento"
               value={formatBirthDate(form.birthDate)}
-              onChange={(v) => set("birthDate", v)}
+              onChange={(v) => set("birthDate", formatBirthDate(v))}
               placeholder="dd/mm/aaaa"
               inputMode="numeric"
               valid={isValidBirthDate(form.birthDate)}

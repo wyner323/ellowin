@@ -120,7 +120,7 @@ export default async function CatalogPage({
               Conclua o cadastro de vendedor com CPF válido e email confirmado
               para publicar seu primeiro anúncio.
             </p>
-            <Button render={<Link href="/vender/cadastro" />}>
+            <Button render={<Link href="/vender" />}>
               Cadastrar como vendedor
             </Button>
           </div>
