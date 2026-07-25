@@ -11,7 +11,7 @@ const institucional = [
 const conta = [
   { label: 'Criar conta', href: '/cadastro' },
   { label: 'Entrar', href: '/entrar' },
-  { label: 'Verificações', href: '/conta/verificacao' },
+  { label: 'Verificações', href: '/conta#verificacoes' },
 ]
 
 export function SiteFooter() {
