@@ -31,6 +31,7 @@ export function VerificationPanel({
   const [open, setOpen] = useState(false)
   const [code, setCode] = useState("")
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null)
+  const [demoCode, setDemoCode] = useState<string | null>(null)
   const [sending, startSend] = useTransition()
   const [verifying, startVerify] = useTransition()
 
@@ -39,6 +40,7 @@ export function VerificationPanel({
     startSend(async () => {
       const result = await sendPhoneCode()
       setFeedback({ ok: result.ok, text: result.error ?? result.message ?? "" })
+      setDemoCode(result.demoCode ?? null)
       if (result.ok) setOpen(true)
     })
   }
@@ -98,6 +100,16 @@ export function VerificationPanel({
           <p className="text-sm text-muted-foreground">
             Digite o código de 6 dígitos enviado para confirmar o telefone.
           </p>
+          {demoCode && (
+            <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/50 px-4 py-3">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Modo demonstração
+              </span>
+              <span className="font-mono text-2xl font-semibold tracking-[0.35em] text-foreground">
+                {demoCode}
+              </span>
+            </div>
+          )}
           <OtpInput value={code} onChange={setCode} disabled={verifying} />
           <div className="flex gap-3">
             <Button size="sm" onClick={verify} disabled={code.length !== 6 || verifying}>

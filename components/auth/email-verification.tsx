@@ -18,6 +18,7 @@ export function EmailVerification({
   const [code, setCode] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [demoCode, setDemoCode] = useState<string | null>(null)
   const [verifying, startVerify] = useTransition()
   const [resending, startResend] = useTransition()
 
@@ -46,6 +47,7 @@ export function EmailVerification({
         return
       }
       setCode("")
+      setDemoCode(result.demoCode ?? null)
       setNotice(result.message ?? "Código reenviado.")
     })
   }
@@ -81,6 +83,17 @@ export function EmailVerification({
           <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
           {notice}
         </p>
+      )}
+
+      {demoCode && (
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/50 px-4 py-3">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Modo demonstração
+          </span>
+          <span className="font-mono text-2xl font-semibold tracking-[0.35em] text-foreground">
+            {demoCode}
+          </span>
+        </div>
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row">

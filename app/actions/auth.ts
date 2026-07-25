@@ -22,6 +22,12 @@ export type ActionResult = {
   error?: string
   field?: string
   message?: string
+  /**
+   * Preenchido apenas quando o provedor de email não está disponível: o código
+   * é exibido na própria tela para que o fluxo de verificação possa ser
+   * concluído em modo demonstração.
+   */
+  demoCode?: string
 }
 
 const OTP_TTL_MINUTES = 10
@@ -148,13 +154,16 @@ async function issueOtp(
   userId: string,
   channel: "email" | "phone",
   destination: string,
-) {
+): Promise<{ sent: boolean; error?: string; code: string }> {
   const code = generateCode()
   const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000)
 
   await db.insert(otpCode).values({ userId, channel, destination, code, expiresAt })
 
-  if (channel === "email") return sendEmailOtp(destination, code)
+  if (channel === "email") {
+    const result = await sendEmailOtp(destination, code)
+    return { ...result, code }
+  }
 
   // Código de telefone vai para o email confirmado (não há provedor de SMS aqui).
   const [row] = await db
@@ -163,7 +172,8 @@ async function issueOtp(
     .where(eq(user.id, userId))
     .limit(1)
 
-  return sendPhoneOtpByEmail(row?.email ?? destination, code, destination)
+  const result = await sendPhoneOtpByEmail(row?.email ?? destination, code, destination)
+  return { ...result, code }
 }
 
 export async function resendEmailCode(): Promise<ActionResult> {
@@ -175,8 +185,10 @@ export async function resendEmailCode(): Promise<ActionResult> {
   const result = await issueOtp(session.user.id, "email", session.user.email)
   if (!result.sent)
     return {
-      ok: false,
-      error: `Não foi possível enviar o email: ${result.error}`,
+      ok: true,
+      demoCode: result.code,
+      message:
+        "O envio de email não está disponível, então o código aparece aqui em modo demonstração.",
     }
 
   return { ok: true, message: "Enviamos um novo código para o seu email." }
@@ -197,7 +209,12 @@ export async function sendPhoneCode(): Promise<ActionResult> {
 
   const result = await issueOtp(userId, "phone", p.phone)
   if (!result.sent)
-    return { ok: false, error: `Falha no envio: ${result.error}` }
+    return {
+      ok: true,
+      demoCode: result.code,
+      message:
+        "O envio de email não está disponível, então o código aparece aqui em modo demonstração.",
+    }
 
   return {
     ok: true,
