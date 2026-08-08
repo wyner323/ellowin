@@ -204,42 +204,48 @@ export async function releaseEscrowToSeller(
     description: string
   },
 ) {
+  // Bruto menos taxa tem que ser exatamente o líquido gravado no pedido. Se não
+  // fechar, algo divergiu entre o cálculo da compra e o da liberação.
+  if (args.amountCents - args.feeCents !== args.sellerNetCents) {
+    throw new Error("Divergência entre valor bruto, taxa e líquido do pedido")
+  }
+
+  // O comprador NÃO recebe lançamento aqui: o débito dele já foi registrado
+  // como "custodia" no momento da compra. Só zeramos a custódia — lançar de
+  // novo faria o extrato somar o mesmo valor duas vezes.
   const buyerWallet = await lockWallet(client, args.buyerId)
   const held = Math.max(0, buyerWallet.heldCents - args.amountCents)
 
   await setBalances(client, args.buyerId, buyerWallet.availableCents, held)
+
+  // Do lado do vendedor entra o valor BRUTO e sai a taxa em seguida, para que a
+  // soma dos lançamentos seja igual à variação real do saldo.
+  const sellerWallet = await lockWallet(client, args.sellerId)
+  const grossAvailable = sellerWallet.availableCents + args.amountCents
+
+  await setBalances(client, args.sellerId, grossAvailable, sellerWallet.heldCents)
   await writeEntry(client, {
-    userId: args.buyerId,
-    kind: "compra",
-    amountCents: -args.amountCents,
-    balanceAfterCents: buyerWallet.availableCents,
+    userId: args.sellerId,
+    kind: "venda",
+    amountCents: args.amountCents,
+    balanceAfterCents: grossAvailable,
     orderId: args.orderId,
     description: args.description,
   })
 
-  const sellerWallet = await lockWallet(client, args.sellerId)
-  const sellerAvailable = sellerWallet.availableCents + args.sellerNetCents
+  if (args.feeCents <= 0) return grossAvailable
+
+  const sellerAvailable = grossAvailable - args.feeCents
 
   await setBalances(client, args.sellerId, sellerAvailable, sellerWallet.heldCents)
   await writeEntry(client, {
     userId: args.sellerId,
-    kind: "venda",
-    amountCents: args.sellerNetCents,
+    kind: "taxa",
+    amountCents: -args.feeCents,
     balanceAfterCents: sellerAvailable,
     orderId: args.orderId,
-    description: args.description,
+    description: "Taxa da plataforma",
   })
-
-  if (args.feeCents > 0) {
-    await writeEntry(client, {
-      userId: args.sellerId,
-      kind: "taxa",
-      amountCents: -args.feeCents,
-      balanceAfterCents: sellerAvailable,
-      orderId: args.orderId,
-      description: "Taxa da plataforma",
-    })
-  }
 
   return sellerAvailable
 }

@@ -1,4 +1,6 @@
+import { headers } from 'next/headers'
 import Link from 'next/link'
+import { auth } from '@/lib/auth'
 import { categories } from '@/lib/catalog'
 import { EllowinLogo } from '@/components/ellowin-logo'
 
@@ -8,13 +10,21 @@ const institucional = [
   { label: 'Central de segurança', href: '/#seguranca' },
 ]
 
-const conta = [
+const contaDeslogada = [
   { label: 'Criar conta', href: '/cadastro' },
   { label: 'Entrar', href: '/entrar' },
+]
+
+const contaLogada = [
+  { label: 'Minhas compras', href: '/pedidos' },
+  { label: 'Carteira', href: '/carteira' },
   { label: 'Verificações', href: '/conta#verificacoes' },
 ]
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  const conta = session?.user ? contaLogada : contaDeslogada
+
   return (
     <footer className="border-t border-border bg-muted/40">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12">
@@ -79,9 +89,8 @@ export function SiteFooter() {
         </div>
 
         <p className="border-t border-border pt-6 text-xs leading-relaxed text-muted-foreground">
-          Ellowin é um ambiente de demonstração. Os anúncios exibidos são
-          fictícios e servem apenas para testar o fluxo de cadastro e
-          verificação.
+          Ellowin é um ambiente de demonstração. Os anúncios e as lojas são
+          fictícios e os pagamentos usam saldo simulado, sem cobrança real.
         </p>
       </div>
     </footer>

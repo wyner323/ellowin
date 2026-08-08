@@ -97,7 +97,9 @@ export function OpenDisputeForm({
           disabled={pending}
         />
         <p className="text-xs text-muted-foreground">
-          {description.trim().length}/20 caracteres mínimos
+          {description.trim().length < 20
+            ? `Faltam ${20 - description.trim().length} caracteres para o mínimo de 20.`
+            : `${description.trim().length} caracteres.`}
         </p>
       </div>
 
