@@ -5,14 +5,15 @@ import {
   Fingerprint,
   Headphones,
   Lock,
-  Star,
   TrendingUp,
   Wallet,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { ProductCard } from '@/components/marketplace/product-card'
 import { categories, formatBRL, games, listings } from '@/lib/catalog'
+import { getStorefrontCards } from '@/lib/marketplace'
 
 export function Hero() {
   return (
@@ -152,7 +153,10 @@ export function GameStrip() {
   )
 }
 
-export function FeaturedListings() {
+export async function FeaturedListings() {
+  // Produtos reais do banco na frente, anúncios de demonstração completando.
+  const cards = await getStorefrontCards()
+
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-14">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -169,60 +173,11 @@ export function FeaturedListings() {
       </div>
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {listings.slice(0, 8).map((listing) => (
-          <ListingCard key={listing.id} listing={listing} />
+        {cards.slice(0, 8).map((card) => (
+          <ProductCard key={card.key} card={card} />
         ))}
       </div>
     </section>
-  )
-}
-
-export function ListingCard({
-  listing,
-}: {
-  listing: (typeof listings)[number]
-}) {
-  return (
-    <article className="flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary">
-      <div className="flex items-center justify-between">
-        <Badge variant="outline" className="text-xs">
-          {listing.game}
-        </Badge>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Star
-            className="size-3.5 fill-chart-4 text-chart-4"
-            aria-hidden="true"
-          />
-          {listing.seller.rating.toFixed(1)}
-        </span>
-      </div>
-
-      <h3 className="mt-3 text-sm leading-snug font-medium text-pretty">
-        {listing.title}
-      </h3>
-
-      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <BadgeCheck className="size-3.5 text-primary" aria-hidden="true" />
-        {listing.seller.name} · Nível {listing.seller.level} ·{' '}
-        {listing.seller.sales.toLocaleString('pt-BR')} vendas
-      </p>
-
-      <div className="mt-4 flex items-end justify-between gap-2 border-t border-border pt-3">
-        <div className="flex flex-col">
-          {listing.originalPrice ? (
-            <span className="text-xs text-muted-foreground line-through">
-              {formatBRL(listing.originalPrice)}
-            </span>
-          ) : null}
-          <span className="font-display text-lg font-bold">
-            {formatBRL(listing.price)}
-          </span>
-        </div>
-        <span className="pb-1 text-xs text-muted-foreground">
-          {listing.delivery}
-        </span>
-      </div>
-    </article>
   )
 }
 

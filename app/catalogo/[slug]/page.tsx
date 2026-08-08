@@ -5,19 +5,11 @@ import type { Metadata } from 'next'
 import { ChevronRight } from 'lucide-react'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
-import { ListingCard } from '@/components/home-sections'
+import { ProductCard } from '@/components/marketplace/product-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  categories,
-  formatBRL,
-  getCategory,
-  listingsByCategory,
-} from '@/lib/catalog'
-
-export function generateStaticParams() {
-  return categories.map((category) => ({ slug: category.slug }))
-}
+import { categories, formatBRL, getCategory } from '@/lib/catalog'
+import { getStorefrontCards } from '@/lib/marketplace'
 
 export async function generateMetadata({
   params,
@@ -42,7 +34,9 @@ export default async function CatalogPage({
   const category = getCategory(slug)
   if (!category) notFound()
 
-  const items = listingsByCategory(slug)
+  // Produtos cadastrados no banco vêm primeiro; os anúncios fixos completam a
+  // vitrine e ficam marcados como demonstração.
+  const items = await getStorefrontCards({ categorySlug: slug })
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -102,13 +96,13 @@ export default async function CatalogPage({
 
           {items.length > 0 ? (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {items.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
+              {items.map((card) => (
+                <ProductCard key={card.key} card={card} />
               ))}
             </div>
           ) : (
             <p className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-              Nenhum anúncio de demonstração nesta categoria ainda.
+              Nenhum anúncio nesta categoria ainda.
             </p>
           )}
 

@@ -3,9 +3,9 @@ import Link from "next/link"
 import { SearchX } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
-import { ListingCard } from "@/components/home-sections"
+import { ProductCard } from "@/components/marketplace/product-card"
 import { Button } from "@/components/ui/button"
-import { listings } from "@/lib/catalog"
+import { getStorefrontCards } from "@/lib/marketplace"
 
 export const metadata: Metadata = {
   title: "Busca",
@@ -18,16 +18,9 @@ export default async function BuscaPage({
   searchParams: Promise<{ q?: string }>
 }) {
   const { q = "" } = await searchParams
-  const term = q.trim().toLowerCase()
+  const term = q.trim()
 
-  const results = term
-    ? listings.filter((listing) =>
-        [listing.title, listing.game, listing.seller.name]
-          .join(" ")
-          .toLowerCase()
-          .includes(term),
-      )
-    : listings
+  const results = await getStorefrontCards(term ? { query: term } : {})
 
   return (
     <>
@@ -57,8 +50,8 @@ export default async function BuscaPage({
           </div>
         ) : (
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {results.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
+            {results.map((card) => (
+              <ProductCard key={card.key} card={card} />
             ))}
           </div>
         )}

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -67,12 +68,15 @@ export function UserMenu({
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="truncate text-sm font-medium">{name}</span>
-          <span className="truncate text-xs font-normal text-muted-foreground">
-            {email}
-          </span>
-        </DropdownMenuLabel>
+        {/* O GroupLabel do Base UI só funciona dentro de um Group. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex flex-col gap-0.5">
+            <span className="truncate text-sm font-medium">{name}</span>
+            <span className="truncate text-xs font-normal text-muted-foreground">
+              {email}
+            </span>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href="/conta" />}>
           <LayoutDashboard className="size-4" />
