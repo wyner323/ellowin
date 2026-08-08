@@ -48,6 +48,14 @@ export default async function PedidoPage({
     !detail.dispute &&
     ["aguardando_entrega", "entregue"].includes(detail.status)
 
+  // Só mostra o bloco de ações quando existe algo para fazer — um card "Ações"
+  // vazio aparecia para o vendedor depois de registrar a entrega.
+  const hasActions =
+    canOpenDispute ||
+    (viewer.isSeller && detail.status === "aguardando_entrega") ||
+    (viewer.isBuyer && detail.status === "entregue") ||
+    (detail.status === "aguardando_entrega" && (viewer.isBuyer || viewer.isSeller))
+
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
@@ -69,7 +77,10 @@ export default async function PedidoPage({
           <header className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">Pedido #{detail.id}</span>
-              <OrderStatusBadge status={detail.status} />
+              <OrderStatusBadge
+                status={detail.status}
+                role={viewer.isSeller ? "vendedor" : "comprador"}
+              />
             </div>
 
             <div className="flex flex-wrap items-end justify-between gap-4">
@@ -95,7 +106,7 @@ export default async function PedidoPage({
             ) : null}
           </header>
 
-          {detail.status === "aguardando_entrega" ? (
+          {["aguardando_entrega", "entregue", "em_disputa"].includes(detail.status) ? (
             <p className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
               {formatCents(detail.amountCents)} estão retidos em custódia. O vendedor
@@ -129,7 +140,7 @@ export default async function PedidoPage({
             </section>
           ) : null}
 
-          {viewer.isBuyer || viewer.isSeller ? (
+          {hasActions ? (
             <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
               <h2 className="text-sm font-semibold">Ações</h2>
               <OrderActions

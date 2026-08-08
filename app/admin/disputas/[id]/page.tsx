@@ -5,7 +5,7 @@ import { DisputeChat } from "@/components/disputes/dispute-chat"
 import { ResolveDispute } from "@/components/disputes/resolve-dispute"
 import { SlaBadge, SlaPanel } from "@/components/disputes/sla-panel"
 import { Button } from "@/components/ui/button"
-import { DISPUTE_REASONS } from "@/app/actions/disputes"
+import { DISPUTE_REASONS } from "@/lib/disputes"
 import { formatCents } from "@/lib/money"
 import {
   DISPUTE_STATUS_LABEL,

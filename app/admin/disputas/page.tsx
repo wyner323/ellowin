@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { ChevronRight, Inbox } from "lucide-react"
 import { SlaBadge } from "@/components/disputes/sla-panel"
-import { DISPUTE_REASONS } from "@/app/actions/disputes"
+import { DISPUTE_REASONS } from "@/lib/disputes"
 import { formatCents } from "@/lib/money"
 import { DISPUTE_STATUS_LABEL, getDisputeQueue } from "@/lib/orders"
 import { sweepDisputeSla } from "@/lib/sla"

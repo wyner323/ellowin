@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2, ShieldAlert } from "lucide-react"
-import { DISPUTE_REASONS, openDispute } from "@/app/actions/disputes"
+import { openDispute } from "@/app/actions/disputes"
+import { DISPUTE_REASONS } from "@/lib/disputes"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {

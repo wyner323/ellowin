@@ -11,14 +11,6 @@ import { disputeDeadlines } from "@/lib/sla"
 import { refundEscrow, releaseEscrowToSeller, withTransaction } from "@/lib/wallet"
 import type { ActionResult } from "@/app/actions/auth"
 
-export const DISPUTE_REASONS = [
-  { value: "nao_entregue", label: "Não recebi o produto" },
-  { value: "diferente", label: "O produto é diferente do anunciado" },
-  { value: "nao_funciona", label: "O produto não funciona / conta recuperada" },
-  { value: "cobranca", label: "Problema de cobrança" },
-  { value: "outro", label: "Outro motivo" },
-] as const
-
 /**
  * Abertura de disputa pelo comprador.
  *

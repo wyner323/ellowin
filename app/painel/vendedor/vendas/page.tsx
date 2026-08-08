@@ -76,7 +76,7 @@ export default async function VendasPage() {
                         <span className="text-xs text-muted-foreground">
                           Pedido #{o.id}
                         </span>
-                        <OrderStatusBadge status={o.status} />
+                        <OrderStatusBadge status={o.status} role="vendedor" />
                       </div>
                       <span className="truncate font-medium">{o.productTitle}</span>
                       <span className="truncate text-xs text-muted-foreground">

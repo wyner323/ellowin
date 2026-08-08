@@ -44,6 +44,14 @@ export default async function PainelVendedorPage() {
     (d) => d.status === "aberta" || d.status === "em_analise",
   )
 
+  // A custódia fica na carteira do comprador até a liberação, então o valor a
+  // receber do vendedor vem dos pedidos ainda não concluídos, não do seu saldo.
+  const escrowCents = orders
+    .filter((o) =>
+      ["aguardando_entrega", "entregue", "em_disputa"].includes(o.status),
+    )
+    .reduce((total, o) => total + o.sellerNetCents, 0)
+
   const cards = [
     {
       label: "Saldo disponível",
@@ -52,9 +60,9 @@ export default async function PainelVendedorPage() {
       icon: TrendingUp,
     },
     {
-      label: "Em custódia",
-      value: formatCents(wallet.heldCents),
-      hint: "Aguardando confirmação",
+      label: "A receber",
+      value: formatCents(escrowCents),
+      hint: "Em custódia até a confirmação",
       icon: Store,
     },
     {
