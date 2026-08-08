@@ -101,7 +101,9 @@ export function VariantPicker({
                 <span className="text-xs text-muted-foreground">
                   {disabled
                     ? "Esgotado"
-                    : `${variant.stock} ${variant.stock === 1 ? "unidade" : "unidades"} disponíveis`}
+                    : variant.stock === 1
+                      ? "1 unidade disponível"
+                      : `${variant.stock} unidades disponíveis`}
                   {variant.deliveryNote ? ` · ${variant.deliveryNote}` : ""}
                 </span>
               </span>

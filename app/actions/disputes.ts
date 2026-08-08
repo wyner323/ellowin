@@ -4,20 +4,13 @@ import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { dispute, order } from "@/lib/db/schema"
+import { DISPUTE_REASONS } from "@/lib/disputes"
 import { formatCents } from "@/lib/money"
 import { getStaff } from "@/lib/roles"
 import { getUserId } from "@/lib/session"
 import { disputeDeadlines } from "@/lib/sla"
 import { refundEscrow, releaseEscrowToSeller, withTransaction } from "@/lib/wallet"
 import type { ActionResult } from "@/app/actions/auth"
-
-export const DISPUTE_REASONS = [
-  { value: "nao_entregue", label: "Não recebi o produto" },
-  { value: "diferente", label: "O produto é diferente do anunciado" },
-  { value: "nao_funciona", label: "O produto não funciona / conta recuperada" },
-  { value: "cobranca", label: "Problema de cobrança" },
-  { value: "outro", label: "Outro motivo" },
-] as const
 
 /**
  * Abertura de disputa pelo comprador.
