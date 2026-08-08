@@ -1,8 +1,12 @@
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { Search, ShieldCheck } from 'lucide-react'
+import { eq } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { categories } from '@/lib/catalog'
+import { db } from '@/lib/db'
+import { sellerApplication } from '@/lib/db/schema'
+import { getStaff } from '@/lib/roles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EllowinLogo } from '@/components/ellowin-logo'
@@ -10,6 +14,19 @@ import { UserMenu } from '@/components/user-menu'
 
 export async function SiteHeader() {
   const session = await auth.api.getSession({ headers: await headers() })
+
+  // Só consultamos cargo e loja quando há sessão, para não pesar as páginas
+  // públicas com duas queries por render.
+  const [staff, application] = session?.user
+    ? await Promise.all([
+        getStaff(),
+        db
+          .select({ status: sellerApplication.status })
+          .from(sellerApplication)
+          .where(eq(sellerApplication.userId, session.user.id))
+          .limit(1),
+      ])
+    : [null, []]
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
@@ -48,7 +65,15 @@ export async function SiteHeader() {
           {session?.user ? (
             <>
               <Button
-                render={<Link href="/vender" />}
+                render={
+                  <Link
+                    href={
+                      application[0]?.status === 'aprovado'
+                        ? '/painel/vendedor'
+                        : '/vender'
+                    }
+                  />
+                }
                 variant="ghost"
                 size="sm"
                 className="hidden sm:flex"
@@ -58,6 +83,8 @@ export async function SiteHeader() {
               <UserMenu
                 name={session.user.name}
                 email={session.user.email}
+                isSeller={application[0]?.status === 'aprovado'}
+                isStaff={Boolean(staff)}
               />
             </>
           ) : (

@@ -2,7 +2,15 @@
 
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, LogOut, Store, User } from 'lucide-react'
+import {
+  LayoutDashboard,
+  LogOut,
+  ShieldCheck,
+  ShoppingBag,
+  Store,
+  User,
+  Wallet,
+} from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,7 +22,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-export function UserMenu({ name, email }: { name: string; email: string }) {
+export function UserMenu({
+  name,
+  email,
+  isSeller = false,
+  isStaff = false,
+}: {
+  name: string
+  email: string
+  isSeller?: boolean
+  isStaff?: boolean
+}) {
   const router = useRouter()
 
   const initials = name
@@ -60,14 +78,28 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
           <LayoutDashboard className="size-4" />
           Minha conta
         </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/pedidos" />}>
+          <ShoppingBag className="size-4" />
+          Minhas compras
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/carteira" />}>
+          <Wallet className="size-4" />
+          Carteira
+        </DropdownMenuItem>
         <DropdownMenuItem render={<Link href="/conta#verificacoes" />}>
           <User className="size-4" />
           Verificações
         </DropdownMenuItem>
-        <DropdownMenuItem render={<Link href="/vender" />}>
+        <DropdownMenuItem render={<Link href={isSeller ? '/painel/vendedor' : '/vender'} />}>
           <Store className="size-4" />
           Painel de vendedor
         </DropdownMenuItem>
+        {isStaff ? (
+          <DropdownMenuItem render={<Link href="/admin/disputas" />}>
+            <ShieldCheck className="size-4" />
+            Moderação
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="size-4" />
