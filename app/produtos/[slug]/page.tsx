@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { VariantPicker } from "@/components/product/variant-picker"
+import { ProductGallery } from "@/components/product/product-gallery"
 import { Badge } from "@/components/ui/badge"
 import { getCategory } from "@/lib/catalog"
 import { getProductBySlug } from "@/lib/marketplace"
@@ -70,6 +71,10 @@ export default async function ProductPage({
 
           <div className="grid gap-8 lg:grid-cols-[1fr_22rem]">
             <div className="flex flex-col gap-8">
+              {item.images.length > 0 ? (
+                <ProductGallery images={item.images} title={item.title} />
+              ) : null}
+
               <header className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{item.game ?? "Digital"}</Badge>

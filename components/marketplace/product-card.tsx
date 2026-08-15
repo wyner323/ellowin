@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 import { BadgeCheck } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { StarRating } from "@/components/marketplace/star-rating"
@@ -10,11 +11,23 @@ import { formatCents } from "@/lib/money"
  *
  * Anúncios reais viram link para a página do produto; os de demonstração
  * ficam estáticos e marcados como tal, para ninguém tentar comprar algo que
- * não existe no banco.
+ * não existe no banco. A capa é otimizada pelo Next (AVIF/WebP responsivo).
  */
 export function ProductCard({ card }: { card: StorefrontCard }) {
+  const cover = (
+    <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+      <Image
+        src={card.imageUrl || "/placeholder.svg"}
+        alt={card.title}
+        fill
+        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
+        className="object-cover transition-transform duration-300 group-hover:scale-105"
+      />
+    </div>
+  )
+
   const body = (
-    <>
+    <div className="flex flex-1 flex-col p-4">
       <div className="flex items-center justify-between gap-2">
         <Badge variant="outline" className="text-xs">
           {card.game ?? "Digital"}
@@ -38,7 +51,7 @@ export function ProductCard({ card }: { card: StorefrontCard }) {
         </span>
       </p>
 
-      <div className="mt-4 flex items-end justify-between gap-2 border-t border-border pt-3">
+      <div className="mt-auto flex items-end justify-between gap-2 border-t border-border pt-3">
         <div className="flex flex-col">
           <span className="text-xs text-muted-foreground">a partir de</span>
           <span className="font-display text-lg font-bold">
@@ -49,22 +62,24 @@ export function ProductCard({ card }: { card: StorefrontCard }) {
           {card.delivery}
         </span>
       </div>
-    </>
+    </div>
   )
 
   if (card.href) {
     return (
       <Link
         href={card.href}
-        className="flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary"
+        className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary"
       >
+        {cover}
         {body}
       </Link>
     )
   }
 
   return (
-    <article className="flex flex-col rounded-xl border border-border bg-card p-4 opacity-90">
+    <article className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card opacity-90">
+      {cover}
       {body}
     </article>
   )

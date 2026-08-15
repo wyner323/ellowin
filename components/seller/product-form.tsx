@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { ProductImageUploader } from "@/components/seller/product-image-uploader"
 
 const CATEGORIES = [
   { value: "contas", label: "Contas de jogos" },
@@ -44,6 +45,7 @@ export function ProductForm({
     description: string
     deliveryType: string
     deliveryTime: string
+    images?: string[]
     variants: {
       id: number
       label: string
@@ -63,6 +65,7 @@ export function ProductForm({
   const [description, setDescription] = useState(product?.description ?? "")
   const [deliveryType, setDeliveryType] = useState(product?.deliveryType ?? "manual")
   const [deliveryTime, setDeliveryTime] = useState(product?.deliveryTime ?? "até 24h")
+  const [images, setImages] = useState<string[]>(product?.images ?? [])
 
   const [rows, setRows] = useState<Row[]>(
     product?.variants.filter((v) => v.active).length
@@ -98,6 +101,7 @@ export function ProductForm({
         description,
         deliveryType,
         deliveryTime,
+        images,
         variants: rows,
       }
 
@@ -206,6 +210,17 @@ export function ProductForm({
             />
           </div>
         </div>
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-sm font-semibold">Fotos do anúncio</h2>
+          <p className="text-xs text-muted-foreground">
+            Anúncios com imagem chamam mais atenção na vitrine. Opcional.
+          </p>
+        </div>
+
+        <ProductImageUploader value={images} onChange={setImages} disabled={pending} />
       </section>
 
       <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">

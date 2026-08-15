@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Lock, Send } from "lucide-react"
-import { postDisputeMessage } from "@/app/actions/disputes"
+import { Loader2, Lock, RefreshCw, Send } from "lucide-react"
+import { fetchDisputeMessages, postDisputeMessage } from "@/app/actions/disputes"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -42,9 +42,12 @@ function timestamp(date: Date) {
  * O mesmo componente serve às partes e à moderação: `canPostInternal` habilita
  * as notas internas, que o servidor também revalida antes de gravar.
  */
+/** Intervalo do polling do chat. Curto o bastante para parecer "ao vivo". */
+const POLL_INTERVAL = 4000
+
 export function DisputeChat({
   disputeId,
-  messages,
+  messages: initialMessages,
   viewerRole,
   canPostInternal = false,
   closed = false,
@@ -56,10 +59,84 @@ export function DisputeChat({
   closed?: boolean
 }) {
   const router = useRouter()
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [body, setBody] = useState("")
   const [internal, setInternal] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
   const [pending, start] = useTransition()
+
+  // Referência ao fim da lista para rolar automaticamente quando chega mensagem.
+  const bottomRef = useRef<HTMLDivElement>(null)
+  // Guarda o id da última mensagem já vista para só rolar quando há novidade.
+  const lastSeenId = useRef<number>(initialMessages.at(-1)?.id ?? 0)
+
+  // Se o servidor reenviar o histórico (ex.: após encerrar o caso), adota-o.
+  useEffect(() => {
+    setMessages((current) => {
+      const latestKnown = current.at(-1)?.id ?? 0
+      const latestIncoming = initialMessages.at(-1)?.id ?? 0
+      return latestIncoming >= latestKnown ? initialMessages : current
+    })
+  }, [initialMessages])
+
+  const sync = useCallback(async () => {
+    setSyncing(true)
+    try {
+      const result = await fetchDisputeMessages(disputeId)
+      if (result.ok) setMessages(result.messages as ChatMessage[])
+    } catch {
+      // Falha de rede momentânea: o próximo ciclo tenta de novo.
+    } finally {
+      setSyncing(false)
+    }
+  }, [disputeId])
+
+  // Polling enquanto a disputa está aberta, pausado com a aba em segundo plano
+  // para não gastar requisições à toa. Volta a sincronizar assim que retorna.
+  useEffect(() => {
+    if (closed) return
+
+    let timer: ReturnType<typeof setInterval> | null = null
+
+    function startPolling() {
+      if (timer) return
+      timer = setInterval(sync, POLL_INTERVAL)
+    }
+    function stopPolling() {
+      if (timer) {
+        clearInterval(timer)
+        timer = null
+      }
+    }
+    function onVisibility() {
+      if (document.visibilityState === "visible") {
+        void sync()
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+
+    if (document.visibilityState === "visible") startPolling()
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("focus", sync)
+
+    return () => {
+      stopPolling()
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("focus", sync)
+    }
+  }, [closed, sync])
+
+  // Rola para a última mensagem sempre que surge algo novo.
+  useEffect(() => {
+    const latestId = messages.at(-1)?.id ?? 0
+    if (latestId > lastSeenId.current) {
+      lastSeenId.current = latestId
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+    }
+  }, [messages])
 
   function send() {
     setError(null)
@@ -70,12 +147,27 @@ export function DisputeChat({
         return
       }
       setBody("")
+      await sync()
+      // Mantém o resto da página (prazos, status) em dia sem recarregar tudo.
       router.refresh()
     })
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {!closed ? (
+        <div className="flex items-center gap-1.5 text-[0.7rem] text-muted-foreground">
+          <span className="relative flex size-2">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary/60" />
+            <span className="relative inline-flex size-2 rounded-full bg-primary" />
+          </span>
+          Atualização automática ativada
+          {syncing ? (
+            <RefreshCw className="size-3 animate-spin" aria-hidden="true" />
+          ) : null}
+        </div>
+      ) : null}
+
       <ul className="flex flex-col gap-3">
         {messages.map((message) => {
           const isSystem = message.authorRole === "system"
@@ -126,6 +218,7 @@ export function DisputeChat({
             </li>
           )
         })}
+        <div ref={bottomRef} aria-hidden="true" />
       </ul>
 
       {closed ? (

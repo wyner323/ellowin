@@ -2,12 +2,13 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import {
   product,
+  productImage,
   productVariant,
   review,
   sellerApplication,
   user,
 } from "@/lib/db/schema"
-import { listings as demoListings } from "@/lib/catalog"
+import { getCategory, listings as demoListings } from "@/lib/catalog"
 
 /**
  * Leitura da vitrine.
@@ -26,6 +27,8 @@ export type StorefrontCard = {
   /** Menor preço entre as variantes ativas. */
   priceCents: number
   delivery: string
+  /** Capa do anúncio. Sem foto, cai na imagem da categoria. */
+  imageUrl: string
   href: string | null
   seller: {
     name: string
@@ -33,6 +36,11 @@ export type StorefrontCard = {
     rating: number | null
     sales: number
   }
+}
+
+/** Imagem da categoria, usada como fallback quando o anúncio não tem foto. */
+function categoryImage(slug: string): string {
+  return getCategory(slug)?.image ?? "/placeholder.svg"
 }
 
 function demoToCard(l: (typeof demoListings)[number]): StorefrontCard {
@@ -44,6 +52,7 @@ function demoToCard(l: (typeof demoListings)[number]): StorefrontCard {
     game: l.game,
     priceCents: Math.round(l.price * 100),
     delivery: l.delivery,
+    imageUrl: categoryImage(l.category),
     href: null,
     seller: {
       name: l.seller.name,
@@ -91,6 +100,11 @@ async function getRealCards(filters: {
         select min(v."priceCents") from "product_variant" v
         where v."productId" = ${product.id} and v."active" = true and v."stock" > 0
       )`,
+      coverUrl: sql<string | null>`(
+        select img."url" from "product_image" img
+        where img."productId" = ${product.id}
+        order by img."sortOrder" asc, img."id" asc limit 1
+      )`,
     })
     .from(product)
     .leftJoin(user, eq(user.id, product.sellerId))
@@ -108,6 +122,7 @@ async function getRealCards(filters: {
       game: r.game,
       priceCents: Number(r.minPrice),
       delivery: r.deliveryTime,
+      imageUrl: r.coverUrl ?? categoryImage(r.categorySlug),
       href: `/produtos/${r.slug}`,
       seller: {
         name: r.storeName ?? r.sellerName ?? "Vendedor Ellowin",
@@ -156,6 +171,8 @@ export type ProductDetail = {
   salesCount: number
   rating: number | null
   ratingCount: number
+  /** Fotos do anúncio, capa primeiro. Vazio quando o vendedor não subiu nenhuma. */
+  images: string[]
   seller: {
     id: string
     name: string
@@ -211,6 +228,12 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     .where(and(eq(productVariant.productId, row.id), eq(productVariant.active, true)))
     .orderBy(asc(productVariant.sortOrder), asc(productVariant.id))
 
+  const imageRows = await db
+    .select({ url: productImage.url })
+    .from(productImage)
+    .where(eq(productImage.productId, row.id))
+    .orderBy(asc(productImage.sortOrder), asc(productImage.id))
+
   const reviewRows = await db
     .select({
       id: review.id,
@@ -241,6 +264,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
         ? Math.round((row.ratingSum / row.ratingCount) * 10) / 10
         : null,
     ratingCount: row.ratingCount,
+    images: imageRows.map((i) => i.url),
     seller: {
       id: row.sellerId,
       name: row.storeName ?? row.sellerName ?? "Vendedor Ellowin",
@@ -295,22 +319,26 @@ export async function getSellerProducts(sellerId: string) {
 
   if (rows.length === 0) return []
 
+  const productIds = rows.map((r) => r.id)
+
   const variants = await db
     .select()
     .from(productVariant)
-    .where(
-      inArray(
-        productVariant.productId,
-        rows.map((r) => r.id),
-      ),
-    )
+    .where(inArray(productVariant.productId, productIds))
     .orderBy(asc(productVariant.sortOrder), asc(productVariant.id))
+
+  const imageRows = await db
+    .select()
+    .from(productImage)
+    .where(inArray(productImage.productId, productIds))
+    .orderBy(asc(productImage.sortOrder), asc(productImage.id))
 
   return rows.map((p) => ({
     ...p,
     rating:
       p.ratingCount > 0 ? Math.round((p.ratingSum / p.ratingCount) * 10) / 10 : null,
     variants: variants.filter((v) => v.productId === p.id),
+    coverUrl: imageRows.find((i) => i.productId === p.id)?.url ?? null,
   }))
 }
 
@@ -329,5 +357,11 @@ export async function getProductForSeller(sellerId: string, productId: number) {
     .where(eq(productVariant.productId, row.id))
     .orderBy(asc(productVariant.sortOrder), asc(productVariant.id))
 
-  return { ...row, variants }
+  const imageRows = await db
+    .select({ url: productImage.url })
+    .from(productImage)
+    .where(eq(productImage.productId, row.id))
+    .orderBy(asc(productImage.sortOrder), asc(productImage.id))
+
+  return { ...row, variants, images: imageRows.map((i) => i.url) }
 }
