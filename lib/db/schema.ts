@@ -168,6 +168,19 @@ export const product = pgTable("product", {
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })
 
+/**
+ * Fotos do anúncio, ordenadas. A de menor `sortOrder` é a capa (aparece no
+ * card da vitrine). Guardamos só a URL pública do Vercel Blob — o arquivo já
+ * chega comprimido do navegador.
+ */
+export const productImage = pgTable("product_image", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull(),
+  url: text("url").notNull(),
+  sortOrder: integer("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})
+
 /** O "item específico" que o comprador escolhe: cada variante tem preço próprio. */
 export const productVariant = pgTable("product_variant", {
   id: serial("id").primaryKey(),

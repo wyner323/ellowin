@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import Image from "next/image"
 import { redirect } from "next/navigation"
-import { ArrowLeft, Package, Plus } from "lucide-react"
+import { ArrowLeft, ImageIcon, Package, Plus } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { StarRating } from "@/components/marketplace/star-rating"
@@ -82,7 +83,24 @@ export default async function MeusProdutosPage() {
                     className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex min-w-0 flex-col gap-1">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                          {p.coverUrl ? (
+                            <Image
+                              src={p.coverUrl || "/placeholder.svg"}
+                              alt=""
+                              fill
+                              sizes="56px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <span className="flex size-full items-center justify-center text-muted-foreground">
+                              <ImageIcon className="size-5" aria-hidden="true" />
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex min-w-0 flex-col gap-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
                             className={
@@ -105,6 +123,7 @@ export default async function MeusProdutosPage() {
                           {active.length} {active.length === 1 ? "item" : "itens"} ·{" "}
                           {stock} em estoque · {p.salesCount} vendas
                         </span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2">

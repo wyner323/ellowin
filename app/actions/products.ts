@@ -1,12 +1,50 @@
 "use server"
 
-import { and, eq, sql } from "drizzle-orm"
+import { del } from "@vercel/blob"
+import { and, asc, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
-import { product, productVariant, sellerApplication } from "@/lib/db/schema"
+import { product, productImage, productVariant, sellerApplication } from "@/lib/db/schema"
 import { parseToCents } from "@/lib/money"
 import { getUserId } from "@/lib/session"
 import type { ActionResult } from "@/app/actions/auth"
+
+const MAX_IMAGES = 5
+
+/**
+ * Só aceitamos URLs de imagem que vieram do nosso próprio Blob. Isso impede que
+ * alguém injete uma URL externa arbitrária no anúncio pelo payload.
+ */
+function sanitizeImages(images: string[] | undefined): string[] {
+  if (!Array.isArray(images)) return []
+  const seen = new Set<string>()
+  const clean: string[] = []
+
+  for (const raw of images) {
+    if (typeof raw !== "string" || seen.has(raw)) continue
+    try {
+      const url = new URL(raw)
+      if (url.protocol === "https:" && url.hostname.endsWith(".public.blob.vercel-storage.com")) {
+        seen.add(raw)
+        clean.push(raw)
+      }
+    } catch {
+      // URL inválida: ignora.
+    }
+    if (clean.length >= MAX_IMAGES) break
+  }
+
+  return clean
+}
+
+/** Regrava as fotos do produto na ordem recebida (0 = capa). */
+async function replaceProductImages(productId: number, images: string[]) {
+  await db.delete(productImage).where(eq(productImage.productId, productId))
+  if (images.length === 0) return
+  await db.insert(productImage).values(
+    images.map((url, i) => ({ productId, url, sortOrder: i })),
+  )
+}
 
 /** Vendedor precisa ter concluído o cadastro (nível 4 / aprovado) para anunciar. */
 async function requireSeller(userId: string) {
@@ -106,6 +144,7 @@ export async function createProduct(input: {
   description: string
   deliveryType: string
   deliveryTime: string
+  images?: string[]
   variants: VariantInput[]
 }): Promise<ActionResult & { slug?: string }> {
   const userId = await getUserId()
@@ -159,6 +198,8 @@ export async function createProduct(input: {
     })),
   )
 
+  await replaceProductImages(created.id, sanitizeImages(input.images))
+
   revalidatePath("/painel/vendedor/produtos")
   revalidatePath("/")
   revalidatePath(`/catalogo/${input.categorySlug}`)
@@ -174,6 +215,7 @@ export async function updateProduct(input: {
   description: string
   deliveryType: string
   deliveryTime: string
+  images?: string[]
   variants: (VariantInput & { id?: number })[]
 }): Promise<ActionResult> {
   const userId = await getUserId()
@@ -261,8 +303,29 @@ export async function updateProduct(input: {
       ),
     )
 
+  // Sincroniza as fotos: regrava na nova ordem e apaga do Blob as que saíram.
+  const nextImages = sanitizeImages(input.images)
+  const previous = await db
+    .select({ url: productImage.url })
+    .from(productImage)
+    .where(eq(productImage.productId, owned.id))
+    .orderBy(asc(productImage.sortOrder))
+
+  await replaceProductImages(owned.id, nextImages)
+
+  const removed = previous.map((p) => p.url).filter((url) => !nextImages.includes(url))
+  if (removed.length) {
+    // Falha ao apagar o arquivo não deve derrubar o salvamento do anúncio.
+    try {
+      await del(removed)
+    } catch (error) {
+      console.error("[v0] Falha ao remover imagens antigas do Blob:", error)
+    }
+  }
+
   revalidatePath("/painel/vendedor/produtos")
   revalidatePath(`/produtos/${owned.slug}`)
+  revalidatePath("/")
 
   return { ok: true, message: "Anúncio atualizado." }
 }
