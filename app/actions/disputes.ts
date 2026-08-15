@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { dispute, order } from "@/lib/db/schema"
 import { DISPUTE_REASONS } from "@/lib/disputes"
+import { getDisputeMessages } from "@/lib/orders"
 import { formatCents } from "@/lib/money"
 import { getStaff } from "@/lib/roles"
 import { getUserId } from "@/lib/session"
@@ -202,6 +203,24 @@ export async function postDisputeMessage(input: {
   revalidatePath("/admin/disputas")
 
   return { ok: true }
+}
+
+/**
+ * Busca as mensagens do chat para atualização em tempo real (polling).
+ *
+ * Revalida a participação a cada chamada, então as notas internas só voltam
+ * para a moderação — o cliente nunca decide sozinho o que pode ver.
+ */
+export async function fetchDisputeMessages(disputeId: number) {
+  const participation = await resolveParticipation(disputeId)
+  if (!participation) return { ok: false as const, messages: [] }
+
+  const messages = await getDisputeMessages(
+    disputeId,
+    participation.role === "moderator",
+  )
+
+  return { ok: true as const, messages }
 }
 
 /** Moderador assume o caso. O histórico continua aberto para os demais. */
