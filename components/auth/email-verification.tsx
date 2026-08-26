@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { CheckCircle2, Loader2, Mail, RotateCw } from "lucide-react"
 import { resendEmailCode, verifyEmailCode } from "@/app/actions/auth"
 import { OtpInput } from "@/components/auth/otp-input"
 import { Button } from "@/components/ui/button"
+
+const SIGNUP_FALLBACK_KEY = "ellowin:signup-otp-fallback"
 
 export function EmailVerification({
   email,
@@ -21,6 +23,22 @@ export function EmailVerification({
   const [demoCode, setDemoCode] = useState<string | null>(null)
   const [verifying, startVerify] = useTransition()
   const [resending, startResend] = useTransition()
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem(SIGNUP_FALLBACK_KEY)
+    if (!raw) return
+    sessionStorage.removeItem(SIGNUP_FALLBACK_KEY)
+    try {
+      const { code: fallbackCode, message } = JSON.parse(raw) as {
+        code?: string
+        message?: string
+      }
+      if (fallbackCode) setDemoCode(fallbackCode)
+      if (message) setNotice(message)
+    } catch {
+      // ignora fallback malformado
+    }
+  }, [])
 
   function submit(event: React.FormEvent) {
     event.preventDefault()

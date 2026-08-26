@@ -90,6 +90,12 @@ export function RegisterWizard() {
         if (result.field === "cpf" || result.field === "birthDate") setStep(1)
         return
       }
+      if (result.demoCode) {
+        sessionStorage.setItem(
+          "ellowin:signup-otp-fallback",
+          JSON.stringify({ code: result.demoCode, message: result.message }),
+        )
+      }
       router.push("/verificar-email")
       router.refresh()
     })

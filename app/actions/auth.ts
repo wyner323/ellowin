@@ -140,9 +140,17 @@ export async function registerUser(input: {
     })
     .onConflictDoNothing()
 
-  await issueOtp(created.id, "email", email)
+  const otpResult = await issueOtp(created.id, "email", email)
 
   revalidatePath("/")
+  if (!otpResult.sent)
+    return {
+      ok: true,
+      demoCode: otpResult.code,
+      message:
+        "O envio de email não está disponível, então o código aparece aqui em modo demonstração.",
+    }
+
   return { ok: true }
 }
 
