@@ -32,6 +32,7 @@ export type ActionResult = {
 
 const OTP_TTL_MINUTES = 10
 const MAX_ATTEMPTS = 5
+const RESEND_COOLDOWN_SECONDS = 30
 
 function generateCode() {
   return String(Math.floor(100000 + Math.random() * 900000))
@@ -184,11 +185,33 @@ async function issueOtp(
   return { ...result, code }
 }
 
+/** Segundos restantes antes que um novo código possa ser pedido para esse canal. */
+async function otpCooldownRemaining(
+  userId: string,
+  channel: "email" | "phone",
+): Promise<number> {
+  const [row] = await db
+    .select({ createdAt: otpCode.createdAt })
+    .from(otpCode)
+    .where(and(eq(otpCode.userId, userId), eq(otpCode.channel, channel)))
+    .orderBy(desc(otpCode.createdAt))
+    .limit(1)
+
+  if (!row) return 0
+
+  const elapsedSeconds = (Date.now() - row.createdAt.getTime()) / 1000
+  return Math.max(0, Math.ceil(RESEND_COOLDOWN_SECONDS - elapsedSeconds))
+}
+
 export async function resendEmailCode(): Promise<ActionResult> {
   const session = await getSession()
   if (!session?.user) return { ok: false, error: "Sessão expirada." }
   if (session.user.emailVerified)
     return { ok: true, message: "Seu email já está confirmado." }
+
+  const wait = await otpCooldownRemaining(session.user.id, "email")
+  if (wait > 0)
+    return { ok: false, error: `Aguarde ${wait}s antes de pedir um novo código.` }
 
   const result = await issueOtp(session.user.id, "email", session.user.email)
   if (!result.sent)
@@ -214,6 +237,10 @@ export async function sendPhoneCode(): Promise<ActionResult> {
   if (!p?.phone) return { ok: false, error: "Nenhum telefone cadastrado." }
   if (p.phoneVerified)
     return { ok: true, message: "Seu telefone já está confirmado." }
+
+  const wait = await otpCooldownRemaining(userId, "phone")
+  if (wait > 0)
+    return { ok: false, error: `Aguarde ${wait}s antes de pedir um novo código.` }
 
   const result = await issueOtp(userId, "phone", p.phone)
   if (!result.sent)
@@ -325,7 +352,13 @@ export async function loginUser(input: {
       body: { email: input.email.trim().toLowerCase(), password: input.password },
       headers: new Headers(),
     })
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : ""
+    if (/rate.?limit|too many/i.test(message))
+      return {
+        ok: false,
+        error: "Muitas tentativas de login. Aguarde um minuto e tente novamente.",
+      }
     return { ok: false, error: "Email ou senha incorretos." }
   }
 

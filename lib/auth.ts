@@ -27,6 +27,16 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
   },
+  // Freia força bruta de senha: no máximo 5 tentativas de login por minuto
+  // por IP, além do limite geral mais folgado para as demais rotas de auth.
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 20,
+    customRules: {
+      "/sign-in/email": { window: 60, max: 5 },
+    },
+  },
   // nextCookies precisa ser o último plugin: é ele que grava o cookie de
   // sessão quando o cadastro/login acontece dentro de uma server action.
   plugins: [nextCookies()],
