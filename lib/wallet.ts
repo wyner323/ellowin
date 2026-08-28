@@ -1,4 +1,4 @@
-import type { PoolClient } from "pg"
+import type { PoolClient } from "@neondatabase/serverless"
 import { desc, eq } from "drizzle-orm"
 import { db, pool } from "@/lib/db"
 import { wallet, walletTransaction } from "@/lib/db/schema"
