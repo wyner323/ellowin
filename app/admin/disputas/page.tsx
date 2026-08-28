@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { ChevronRight, Inbox } from "lucide-react"
+import { LiveRefresh } from "@/components/live-refresh"
 import { SlaBadge } from "@/components/disputes/sla-panel"
 import { DISPUTE_REASONS } from "@/lib/disputes"
 import { formatCents } from "@/lib/money"
@@ -22,6 +23,7 @@ export default async function FilaDisputasPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10">
+      <LiveRefresh intervalMs={30000} />
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Fila de disputas</h1>
         <p className="text-sm text-muted-foreground">

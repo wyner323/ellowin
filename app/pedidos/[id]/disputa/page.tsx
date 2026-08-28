@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, ShieldAlert } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { LiveRefresh } from "@/components/live-refresh"
 import { DisputeChat } from "@/components/disputes/dispute-chat"
 import { SlaBadge, SlaPanel } from "@/components/disputes/sla-panel"
 import { Button } from "@/components/ui/button"
@@ -48,6 +49,7 @@ export default async function DisputaPage({
 
   return (
     <div className="flex min-h-screen flex-col">
+      <LiveRefresh intervalMs={30000} />
       <SiteHeader />
 
       <main className="flex-1">

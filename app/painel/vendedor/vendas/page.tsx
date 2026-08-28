@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { ArrowLeft, ChevronRight, Store } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { LiveRefresh } from "@/components/live-refresh"
 import { OrderStatusBadge } from "@/components/orders/order-status-badge"
 import { Button } from "@/components/ui/button"
 import { formatCents } from "@/lib/money"
@@ -23,6 +24,7 @@ export default async function VendasPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <LiveRefresh />
       <SiteHeader />
 
       <main className="flex-1">

@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, MessageSquare, ShieldCheck } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { LiveRefresh } from "@/components/live-refresh"
 import { OrderActions } from "@/components/orders/order-actions"
 import { OrderStatusBadge } from "@/components/orders/order-status-badge"
 import { OpenDisputeForm } from "@/components/orders/open-dispute-form"
@@ -58,6 +59,7 @@ export default async function PedidoPage({
 
   return (
     <div className="flex min-h-screen flex-col">
+      <LiveRefresh />
       <SiteHeader />
 
       <main className="flex-1">

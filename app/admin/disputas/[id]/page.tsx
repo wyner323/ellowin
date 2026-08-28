@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeft, ExternalLink } from "lucide-react"
+import { LiveRefresh } from "@/components/live-refresh"
 import { DisputeChat } from "@/components/disputes/dispute-chat"
 import { ResolveDispute } from "@/components/disputes/resolve-dispute"
 import { SlaBadge, SlaPanel } from "@/components/disputes/sla-panel"
@@ -59,6 +60,7 @@ export default async function CasoDisputaPage({
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10">
+      <LiveRefresh intervalMs={30000} />
       <div>
         <Button
           render={<Link href="/admin/disputas" />}

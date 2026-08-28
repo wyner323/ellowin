@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { Package, Plus, ShieldAlert, Store, TrendingUp } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { LiveRefresh } from "@/components/live-refresh"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { Button } from "@/components/ui/button"
 import { db } from "@/lib/db"
@@ -75,6 +76,7 @@ export default async function PainelVendedorPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <LiveRefresh />
       <SiteHeader />
 
       <main className="flex-1">
