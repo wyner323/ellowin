@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { Lock, Wallet as WalletIcon } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { LiveRefresh } from "@/components/live-refresh"
 import { WalletForms } from "@/components/wallet/wallet-forms"
 import { Badge } from "@/components/ui/badge"
 import { formatCents } from "@/lib/money"
@@ -37,6 +38,7 @@ export default async function CarteiraPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <LiveRefresh />
       <SiteHeader />
 
       <main className="flex-1">
