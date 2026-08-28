@@ -102,51 +102,59 @@ export async function sweepDisputeSla() {
   let processed = 0
 
   for (const row of stale) {
-    const [ord] = await db
-      .select()
-      .from(order)
-      .where(eq(order.id, row.orderId))
-      .limit(1)
+    // Uma disputa com problema (ex.: custódia já baixada por outra rota) não
+    // pode travar a varredura inteira — as telas de disputa/moderação chamam
+    // isso a cada carregamento, então um erro aqui não pode virar 500 pra
+    // quem só está tentando ver a fila.
+    try {
+      const [ord] = await db
+        .select()
+        .from(order)
+        .where(eq(order.id, row.orderId))
+        .limit(1)
 
-    if (!ord || ord.status !== "em_disputa") continue
+      if (!ord || ord.status !== "em_disputa") continue
 
-    await withTransaction(async (client) => {
-      await refundEscrow(
-        client,
-        ord.buyerId,
-        ord.amountCents,
-        ord.id,
-        `Reembolso automático por SLA — pedido #${ord.id}`,
-      )
+      await withTransaction(async (client) => {
+        await refundEscrow(
+          client,
+          ord.buyerId,
+          ord.amountCents,
+          ord.id,
+          `Reembolso automático por SLA — pedido #${ord.id}`,
+        )
 
-      await client.query(
-        `UPDATE "order" SET "status" = 'reembolsado', "completedAt" = now() WHERE "id" = $1`,
-        [ord.id],
-      )
+        await client.query(
+          `UPDATE "order" SET "status" = 'reembolsado', "completedAt" = now() WHERE "id" = $1`,
+          [ord.id],
+        )
 
-      await client.query(
-        `UPDATE "dispute"
-            SET "status" = 'resolvida_comprador',
-                "resolution" = $2,
-                "resolvedAt" = now()
-          WHERE "id" = $1`,
-        [
-          row.id,
-          "Reembolso automático: o vendedor não respondeu dentro das 48h úteis do SLA.",
-        ],
-      )
+        await client.query(
+          `UPDATE "dispute"
+              SET "status" = 'resolvida_comprador',
+                  "resolution" = $2,
+                  "resolvedAt" = now()
+            WHERE "id" = $1`,
+          [
+            row.id,
+            "Reembolso automático: o vendedor não respondeu dentro das 48h úteis do SLA.",
+          ],
+        )
 
-      await client.query(
-        `INSERT INTO "dispute_message" ("disputeId", "authorRole", "body")
-         VALUES ($1, 'system', $2)`,
-        [
-          row.id,
-          "Prazo de 48h úteis encerrado sem resposta do vendedor. O valor em custódia foi devolvido ao comprador automaticamente.",
-        ],
-      )
-    })
+        await client.query(
+          `INSERT INTO "dispute_message" ("disputeId", "authorRole", "body")
+           VALUES ($1, 'system', $2)`,
+          [
+            row.id,
+            "Prazo de 48h úteis encerrado sem resposta do vendedor. O valor em custódia foi devolvido ao comprador automaticamente.",
+          ],
+        )
+      })
 
-    processed += 1
+      processed += 1
+    } catch (error) {
+      console.error(`[sla] Falha ao varrer a disputa #${row.id}:`, error)
+    }
   }
 
   return processed
