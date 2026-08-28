@@ -69,7 +69,10 @@ export const verification = pgTable("verification", {
 
 export const profile = pgTable("profile", {
   id: serial("id").primaryKey(),
-  userId: text("userId").notNull().unique(),
+  userId: text("userId")
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
   fullName: text("fullName").notNull(),
   phone: text("phone"),
   cpf: text("cpf"),
@@ -82,7 +85,10 @@ export const profile = pgTable("profile", {
 
 export const sellerApplication = pgTable("seller_application", {
   id: serial("id").primaryKey(),
-  userId: text("userId").notNull().unique(),
+  userId: text("userId")
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
   storeName: text("storeName"),
   storeSlug: text("storeSlug"),
   category: text("category"),
@@ -104,7 +110,9 @@ export const sellerApplication = pgTable("seller_application", {
 
 export const otpCode = pgTable("otp_code", {
   id: serial("id").primaryKey(),
-  userId: text("userId").notNull(),
+  userId: text("userId")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
   channel: text("channel").notNull(),
   destination: text("destination").notNull(),
   code: text("code").notNull(),
@@ -124,7 +132,10 @@ export const otpCode = pgTable("otp_code", {
 
 export const wallet = pgTable("wallet", {
   id: serial("id").primaryKey(),
-  userId: text("userId").notNull().unique(),
+  userId: text("userId")
+    .notNull()
+    .unique()
+    .references(() => user.id),
   availableCents: integer("availableCents").notNull().default(0),
   heldCents: integer("heldCents").notNull().default(0),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
@@ -134,7 +145,9 @@ export const wallet = pgTable("wallet", {
 /** Extrato imutável: uma linha por movimentação, nunca atualizada. */
 export const walletTransaction = pgTable("wallet_transaction", {
   id: serial("id").primaryKey(),
-  userId: text("userId").notNull(),
+  userId: text("userId")
+    .notNull()
+    .references(() => user.id),
   orderId: integer("orderId"),
   /** deposito | saque | compra | custodia | venda | reembolso | taxa */
   kind: text("kind").notNull(),
@@ -150,7 +163,9 @@ export const walletTransaction = pgTable("wallet_transaction", {
 
 export const product = pgTable("product", {
   id: serial("id").primaryKey(),
-  sellerId: text("sellerId").notNull(),
+  sellerId: text("sellerId")
+    .notNull()
+    .references(() => user.id),
   slug: text("slug").notNull().unique(),
   title: text("title").notNull(),
   categorySlug: text("categorySlug").notNull(),
@@ -175,7 +190,9 @@ export const product = pgTable("product", {
  */
 export const productImage = pgTable("product_image", {
   id: serial("id").primaryKey(),
-  productId: integer("productId").notNull(),
+  productId: integer("productId")
+    .notNull()
+    .references(() => product.id, { onDelete: "cascade" }),
   url: text("url").notNull(),
   sortOrder: integer("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
@@ -184,7 +201,9 @@ export const productImage = pgTable("product_image", {
 /** O "item específico" que o comprador escolhe: cada variante tem preço próprio. */
 export const productVariant = pgTable("product_variant", {
   id: serial("id").primaryKey(),
-  productId: integer("productId").notNull(),
+  productId: integer("productId")
+    .notNull()
+    .references(() => product.id, { onDelete: "cascade" }),
   label: text("label").notNull(),
   priceCents: integer("priceCents").notNull(),
   stock: integer("stock").notNull().default(0),
@@ -200,10 +219,18 @@ export const productVariant = pgTable("product_variant", {
 
 export const order = pgTable("order", {
   id: serial("id").primaryKey(),
-  buyerId: text("buyerId").notNull(),
-  sellerId: text("sellerId").notNull(),
-  productId: integer("productId").notNull(),
-  variantId: integer("variantId").notNull(),
+  buyerId: text("buyerId")
+    .notNull()
+    .references(() => user.id),
+  sellerId: text("sellerId")
+    .notNull()
+    .references(() => user.id),
+  productId: integer("productId")
+    .notNull()
+    .references(() => product.id),
+  variantId: integer("variantId")
+    .notNull()
+    .references(() => productVariant.id),
   /** Snapshots: o pedido preserva o que foi comprado mesmo se o anúncio mudar. */
   productTitle: text("productTitle").notNull(),
   variantLabel: text("variantLabel").notNull(),
@@ -222,10 +249,19 @@ export const order = pgTable("order", {
 /** Uma avaliação por pedido concluído — alimenta o ranking do vendedor. */
 export const review = pgTable("review", {
   id: serial("id").primaryKey(),
-  orderId: integer("orderId").notNull().unique(),
-  productId: integer("productId").notNull(),
-  sellerId: text("sellerId").notNull(),
-  buyerId: text("buyerId").notNull(),
+  orderId: integer("orderId")
+    .notNull()
+    .unique()
+    .references(() => order.id),
+  productId: integer("productId")
+    .notNull()
+    .references(() => product.id),
+  sellerId: text("sellerId")
+    .notNull()
+    .references(() => user.id),
+  buyerId: text("buyerId")
+    .notNull()
+    .references(() => user.id),
   rating: integer("rating").notNull(),
   comment: text("comment"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
@@ -233,8 +269,13 @@ export const review = pgTable("review", {
 
 export const dispute = pgTable("dispute", {
   id: serial("id").primaryKey(),
-  orderId: integer("orderId").notNull().unique(),
-  openedBy: text("openedBy").notNull(),
+  orderId: integer("orderId")
+    .notNull()
+    .unique()
+    .references(() => order.id),
+  openedBy: text("openedBy")
+    .notNull()
+    .references(() => user.id),
   reason: text("reason").notNull(),
   description: text("description").notNull().default(""),
   /** aberta | em_analise | resolvida_comprador | resolvida_vendedor | cancelada */
@@ -244,7 +285,7 @@ export const dispute = pgTable("dispute", {
   sellerResponseDueAt: timestamp("sellerResponseDueAt").notNull(),
   resolutionDueAt: timestamp("resolutionDueAt").notNull(),
   sellerFirstResponseAt: timestamp("sellerFirstResponseAt"),
-  moderatorId: text("moderatorId"),
+  moderatorId: text("moderatorId").references(() => user.id),
   resolution: text("resolution"),
   resolvedAt: timestamp("resolvedAt"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
@@ -253,8 +294,10 @@ export const dispute = pgTable("dispute", {
 /** Histórico compartilhado: qualquer moderador lê o caso inteiro e dá continuidade. */
 export const disputeMessage = pgTable("dispute_message", {
   id: serial("id").primaryKey(),
-  disputeId: integer("disputeId").notNull(),
-  authorId: text("authorId"),
+  disputeId: integer("disputeId")
+    .notNull()
+    .references(() => dispute.id, { onDelete: "cascade" }),
+  authorId: text("authorId").references(() => user.id),
   /** buyer | seller | moderator | system */
   authorRole: text("authorRole").notNull(),
   body: text("body").notNull(),
