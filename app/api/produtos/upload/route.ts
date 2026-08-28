@@ -43,7 +43,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const ext = file.name.split(".").pop()?.toLowerCase() || "webp"
+    // Extensão vem do MIME já validado acima, nunca do nome enviado pelo
+    // cliente — evita path traversal / injeção via file.name malicioso.
+    const EXT_BY_TYPE: Record<string, string> = {
+      "image/webp": "webp",
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/avif": "avif",
+    }
+    const ext = EXT_BY_TYPE[file.type]
     const blob = await put(`produtos/${session.user.id}/${crypto.randomUUID()}.${ext}`, file, {
       access: "public",
       contentType: file.type,

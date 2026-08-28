@@ -6,6 +6,17 @@ import { CheckCircle2, Loader2, PackageCheck, XCircle } from "lucide-react"
 import { cancelOrder, confirmReceipt, markDelivered } from "@/app/actions/orders"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 /**
  * Ações de um pedido, filtradas por papel:
@@ -90,18 +101,38 @@ export function OrderActions({
       ) : null}
 
       {canCancel ? (
-        <Button
-          variant="outline"
-          onClick={() => run(() => cancelOrder(orderId))}
-          disabled={pending}
-        >
-          {pending ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <XCircle className="size-4" />
-          )}
-          Cancelar pedido
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger
+            render={
+              <Button variant="outline" disabled={pending}>
+                {pending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <XCircle className="size-4" />
+                )}
+                Cancelar pedido
+              </Button>
+            }
+          />
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancelar este pedido?</AlertDialogTitle>
+              <AlertDialogDescription>
+                O valor pago volta para o saldo do comprador e o pedido é encerrado.
+                Essa ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Voltar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => run(() => cancelOrder(orderId))}
+              >
+                Cancelar pedido
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       ) : null}
 
       {error ? (
