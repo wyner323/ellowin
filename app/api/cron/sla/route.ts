@@ -7,8 +7,11 @@ import { sweepDisputeSla } from "@/lib/sla"
  * essa checagem impede que qualquer pessoa dispare o sweep manualmente.
  */
 export async function GET(request: Request) {
+  const secret = process.env.CRON_SECRET
   const authHeader = request.headers.get("authorization")
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Sem CRON_SECRET configurada, `Bearer ${undefined}` viraria uma string fixa
+  // e adivinhável ("Bearer undefined") — falha fechado em vez de aceitar isso.
+  if (!secret || authHeader !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 })
   }
 

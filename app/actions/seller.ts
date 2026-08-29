@@ -196,6 +196,9 @@ export async function savePayoutStep(input: {
 
 /** Marca o avanço de etapa quando a verificação de contato é concluída. */
 export async function advanceContactStep(step: number): Promise<ActionResult> {
+  if (!Number.isInteger(step) || step < 1 || step > 6)
+    return { ok: false, error: "Etapa inválida." }
+
   const userId = await getUserId()
   await upsertApplication(userId, {
     currentStep: step,
