@@ -11,7 +11,9 @@ import { OrderStatusBadge } from "@/components/orders/order-status-badge"
 import { OpenDisputeForm } from "@/components/orders/open-dispute-form"
 import { ReviewForm } from "@/components/orders/review-form"
 import { StarRating } from "@/components/marketplace/star-rating"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatCents } from "@/lib/money"
 import { getOrderDetail, getOrderMessages } from "@/lib/orders"
 import { getStaff } from "@/lib/roles"
@@ -120,78 +122,107 @@ export default async function PedidoPage({
             </p>
           ) : null}
 
-          {detail.deliveryPayload ? (
-            <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
-              <h2 className="text-sm font-semibold">Dados da entrega</h2>
-              <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground">
-                {detail.deliveryPayload}
-              </pre>
-            </section>
-          ) : null}
+          {(() => {
+            const detailsPanel = (
+              <div className="flex flex-col gap-6">
+                {detail.deliveryPayload ? (
+                  <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
+                    <h2 className="text-sm font-semibold">Dados da entrega</h2>
+                    <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground">
+                      {detail.deliveryPayload}
+                    </pre>
+                  </section>
+                ) : null}
 
-          {detail.dispute ? (
-            <section className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-5">
-              <h2 className="text-sm font-semibold">Este pedido está em disputa</h2>
-              <p className="text-sm text-muted-foreground">
-                A conversa com {viewer.isBuyer ? "o vendedor" : "o comprador"} e o
-                suporte da Ellowin acontece no chat do caso.
-              </p>
-              <Button
-                render={<Link href={`/pedidos/${detail.id}/disputa`} />}
-                className="self-start"
-              >
-                <MessageSquare className="size-4" />
-                Abrir chat da disputa
-              </Button>
-            </section>
-          ) : null}
+                {detail.dispute ? (
+                  <section className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-5">
+                    <h2 className="text-sm font-semibold">Este pedido está em disputa</h2>
+                    <p className="text-sm text-muted-foreground">
+                      A conversa com {viewer.isBuyer ? "o vendedor" : "o comprador"} e o
+                      suporte da Ellowin acontece no chat do caso.
+                    </p>
+                    <Button
+                      render={<Link href={`/pedidos/${detail.id}/disputa`} />}
+                      className="self-start"
+                    >
+                      <MessageSquare className="size-4" />
+                      Abrir chat da disputa
+                    </Button>
+                  </section>
+                ) : null}
 
-          {viewer.isBuyer || viewer.isSeller ? (
-            <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
-              <h2 className="text-sm font-semibold">
-                Conversa com {viewer.isBuyer ? "o vendedor" : "o comprador"}
-              </h2>
-              <OrderChat
-                orderId={detail.id}
-                messages={chatMessages}
-                viewerRole={viewer.isBuyer ? "buyer" : "seller"}
-              />
-            </section>
-          ) : null}
+                {hasActions ? (
+                  <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
+                    <h2 className="text-sm font-semibold">Ações</h2>
+                    <OrderActions
+                      orderId={detail.id}
+                      status={detail.status}
+                      isBuyer={viewer.isBuyer}
+                      isSeller={viewer.isSeller}
+                    />
+                    {canOpenDispute ? (
+                      <OpenDisputeForm orderId={detail.id} amountCents={detail.amountCents} />
+                    ) : null}
+                  </section>
+                ) : null}
 
-          {hasActions ? (
-            <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
-              <h2 className="text-sm font-semibold">Ações</h2>
-              <OrderActions
-                orderId={detail.id}
-                status={detail.status}
-                isBuyer={viewer.isBuyer}
-                isSeller={viewer.isSeller}
-              />
-              {canOpenDispute ? (
-                <OpenDisputeForm orderId={detail.id} amountCents={detail.amountCents} />
-              ) : null}
-            </section>
-          ) : null}
+                {canReview ? (
+                  <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
+                    <h2 className="text-sm font-semibold">Avalie o vendedor</h2>
+                    <ReviewForm orderId={detail.id} />
+                  </section>
+                ) : null}
 
-          {canReview ? (
-            <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
-              <h2 className="text-sm font-semibold">Avalie o vendedor</h2>
-              <ReviewForm orderId={detail.id} />
-            </section>
-          ) : null}
+                {detail.review ? (
+                  <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
+                    <h2 className="text-sm font-semibold">Avaliação registrada</h2>
+                    <StarRating rating={detail.review.rating} size="md" />
+                    {detail.review.comment ? (
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        {detail.review.comment}
+                      </p>
+                    ) : null}
+                  </section>
+                ) : null}
 
-          {detail.review ? (
-            <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
-              <h2 className="text-sm font-semibold">Avaliação registrada</h2>
-              <StarRating rating={detail.review.rating} size="md" />
-              {detail.review.comment ? (
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {detail.review.comment}
-                </p>
-              ) : null}
-            </section>
-          ) : null}
+                {!detail.deliveryPayload && !detail.dispute && !hasActions && !canReview && !detail.review ? (
+                  <p className="rounded-xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">
+                    Nada pendente por aqui no momento.
+                  </p>
+                ) : null}
+              </div>
+            )
+
+            if (!(viewer.isBuyer || viewer.isSeller)) return detailsPanel
+
+            return (
+              <Tabs defaultValue="detalhes">
+                <TabsList>
+                  <TabsIndicator />
+                  <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
+                  <TabsTrigger value="chat" className="gap-2">
+                    Chat
+                    {chatMessages.length > 0 ? (
+                      <Badge variant="secondary" className="h-4.5 px-1.5 text-[0.65rem]">
+                        {chatMessages.length}
+                      </Badge>
+                    ) : null}
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="detalhes">{detailsPanel}</TabsContent>
+
+                <TabsContent value="chat">
+                  <OrderChat
+                    orderId={detail.id}
+                    messages={chatMessages}
+                    viewerRole={viewer.isBuyer ? "buyer" : "seller"}
+                    counterpartyName={counterparty}
+                  />
+                </TabsContent>
+              </Tabs>
+            )
+          })()}
         </div>
       </main>
 

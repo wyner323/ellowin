@@ -20,28 +20,40 @@ export function Hero() {
     <section className="border-b border-border bg-gradient-to-b from-accent/60 to-background">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-14 lg:flex-row lg:items-center lg:py-20">
         <div className="flex flex-1 flex-col items-start gap-6">
-          <Badge variant="secondary" className="gap-1.5">
+          <Badge
+            variant="secondary"
+            className="animate-in fade-in slide-in-from-bottom-2 gap-1.5 fill-mode-both duration-500"
+          >
             <Fingerprint className="size-3.5" aria-hidden="true" />
             Cadastro verificado por CPF e email
           </Badge>
-          <h1 className="text-4xl leading-tight font-bold text-balance sm:text-5xl">
+          <h1 className="animate-in fade-in slide-in-from-bottom-3 text-4xl leading-tight font-bold text-balance fill-mode-both delay-75 duration-700 sm:text-5xl">
             O marketplace de produtos digitais onde o dinheiro só sai depois da
             entrega
           </h1>
-          <p className="max-w-xl text-base leading-relaxed text-muted-foreground text-pretty">
+          <p className="animate-in fade-in slide-in-from-bottom-3 max-w-xl text-base leading-relaxed text-muted-foreground text-pretty fill-mode-both delay-150 duration-700">
             Contas de jogos, moedas, gift cards e boosting de vendedores
             verificados. A Ellowin retém o pagamento até você confirmar que
             recebeu o que comprou.
           </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button render={<Link href="/cadastro" />} size="lg">
+          <div className="animate-in fade-in slide-in-from-bottom-3 flex flex-wrap items-center gap-3 fill-mode-both delay-200 duration-700">
+            <Button
+              render={<Link href="/cadastro" />}
+              size="lg"
+              className="transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98]"
+            >
               Criar minha conta
             </Button>
-            <Button render={<Link href="/vender" />} size="lg" variant="outline">
+            <Button
+              render={<Link href="/vender" />}
+              size="lg"
+              variant="outline"
+              className="transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98]"
+            >
               Quero vender
             </Button>
           </div>
-          <dl className="flex flex-wrap gap-x-8 gap-y-3 pt-2">
+          <dl className="animate-in fade-in slide-in-from-bottom-3 flex flex-wrap gap-x-8 gap-y-3 pt-2 fill-mode-both delay-300 duration-700">
             {[
               { value: '29.5k', label: 'anúncios ativos' },
               { value: '4.9/5', label: 'avaliação média' },
@@ -58,8 +70,12 @@ export function Hero() {
         </div>
 
         <div className="flex flex-1 flex-col gap-3">
-          {listings.slice(0, 3).map((listing) => (
-            <Card key={listing.id} className="border-border/70">
+          {listings.slice(0, 3).map((listing, index) => (
+            <Card
+              key={listing.id}
+              style={{ animationDelay: `${150 + index * 100}ms` }}
+              className="animate-in fade-in slide-in-from-right-4 border-border/70 fill-mode-both duration-700 transition-all hover:-translate-y-0.5 hover:shadow-md"
+            >
               <CardContent className="flex items-center gap-4 p-4">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent font-display text-sm font-bold text-accent-foreground">
                   {listing.game.slice(0, 2).toUpperCase()}
@@ -102,7 +118,7 @@ export function CategoryGrid() {
           <Link
             key={category.slug}
             href={`/catalogo/${category.slug}`}
-            className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary"
+            className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-lg"
           >
             <div className="relative aspect-[4/3] overflow-hidden bg-accent">
               <Image
@@ -110,7 +126,7 @@ export function CategoryGrid() {
                 alt={`Ilustração do catálogo de ${category.name}`}
                 fill
                 sizes="(max-width: 640px) 100vw, 25vw"
-                className="object-cover transition-transform duration-300 group-hover:scale-105"
+                className="object-cover transition-transform duration-500 group-hover:scale-110"
               />
             </div>
             <div className="flex flex-1 flex-col gap-2 p-4">
@@ -143,7 +159,7 @@ export function GameStrip() {
           <Link
             key={game}
             href="/catalogo/contas"
-            className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+            className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:text-primary hover:shadow-sm"
           >
             {game}
           </Link>
@@ -214,9 +230,9 @@ export function HowItWorks() {
           {steps.map((step, index) => (
             <div
               key={step.title}
-              className="flex flex-col gap-3 rounded-xl border border-border bg-card p-6"
+              className="group flex flex-col gap-3 rounded-xl border border-border bg-card p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
             >
-              <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
                 <step.icon className="size-5" aria-hidden="true" />
               </span>
               <h3 className="text-base font-semibold">
@@ -263,9 +279,9 @@ export function TrustSection() {
           ].map((item) => (
             <li
               key={item.level}
-              className="flex items-center gap-3 rounded-lg border border-border bg-background p-3"
+              className="group flex items-center gap-3 rounded-lg border border-border bg-background p-3 transition-all duration-200 hover:border-primary/40 hover:bg-accent/40"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground transition-transform duration-200 group-hover:scale-110">
                 N{item.level}
               </span>
               <span className="flex-1 text-sm font-medium">{item.label}</span>

@@ -15,3 +15,5 @@ node_modules
 .DS_Store
 .vercel
 .env*
+next-env.d.ts
+*.tsbuildinfo

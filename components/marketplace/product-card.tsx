@@ -21,7 +21,7 @@ export function ProductCard({ card }: { card: StorefrontCard }) {
         alt={card.title}
         fill
         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
-        className="object-cover transition-transform duration-300 group-hover:scale-105"
+        className="object-cover transition-transform duration-500 group-hover:scale-110"
       />
     </div>
   )
@@ -69,7 +69,7 @@ export function ProductCard({ card }: { card: StorefrontCard }) {
     return (
       <Link
         href={card.href}
-        className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary"
+        className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-lg"
       >
         {cover}
         {body}
