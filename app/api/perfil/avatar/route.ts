@@ -51,14 +51,16 @@ export async function POST(request: NextRequest) {
 
     const ext = EXT_BY_TYPE[file.type]
     // Nome fixo por usuário (sem UUID): cada troca substitui a anterior, sem
-    // acumular lixo no Blob.
+    // acumular lixo no Blob. Só que aí a URL não muda — o navegador e o
+    // otimizador de imagem do Next cacheiam pela URL, então sem um `?v=` novo
+    // a foto antiga continuaria aparecendo mesmo com o arquivo já trocado.
     const blob = await put(`avatars/${session.user.id}.${ext}`, file, {
       access: "public",
       contentType: file.type,
       allowOverwrite: true,
     })
 
-    return NextResponse.json({ url: blob.url })
+    return NextResponse.json({ url: `${blob.url}?v=${Date.now()}` })
   } catch (error) {
     console.error("[v0] Falha no upload de avatar:", error)
     return NextResponse.json({ error: "Não foi possível enviar a imagem." }, { status: 500 })

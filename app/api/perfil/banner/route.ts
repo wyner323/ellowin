@@ -43,13 +43,15 @@ export async function POST(request: NextRequest) {
     }
 
     const ext = EXT_BY_TYPE[file.type]
+    // Nome fixo por usuário: sem um `?v=` novo a cada troca, a URL não muda e
+    // o navegador/otimizador de imagem continua servindo o banner antigo em cache.
     const blob = await put(`banners/${session.user.id}.${ext}`, file, {
       access: "public",
       contentType: file.type,
       allowOverwrite: true,
     })
 
-    return NextResponse.json({ url: blob.url })
+    return NextResponse.json({ url: `${blob.url}?v=${Date.now()}` })
   } catch (error) {
     console.error("[v0] Falha no upload de banner:", error)
     return NextResponse.json({ error: "Não foi possível enviar a imagem." }, { status: 500 })
