@@ -15,7 +15,12 @@ export const metadata: Metadata = {
   title: "Novo anúncio",
 }
 
-export default async function NovoProdutoPage() {
+export default async function NovoProdutoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ jogo?: string }>
+}) {
+  const { jogo } = await searchParams
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
@@ -52,7 +57,7 @@ export default async function NovoProdutoPage() {
             </p>
           </header>
 
-          <ProductForm />
+          <ProductForm defaultGame={jogo} />
         </div>
       </main>
 

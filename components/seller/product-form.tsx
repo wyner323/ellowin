@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Plus, Trash2 } from "lucide-react"
+import { Loader2, Plus, SlidersHorizontal, Trash2 } from "lucide-react"
 import { createProduct, updateProduct, type VariantInput } from "@/app/actions/products"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { GameProductPicker } from "@/components/seller/game-product-picker"
 import { ProductImageUploader } from "@/components/seller/product-image-uploader"
 
 const CATEGORIES = [
@@ -36,7 +37,9 @@ const EMPTY_ROW: Row = { label: "", price: "", stock: "1", deliveryNote: "" }
  */
 export function ProductForm({
   product,
+  defaultGame,
 }: {
+  defaultGame?: string
   product?: {
     id: number
     title: string
@@ -84,6 +87,23 @@ export function ProductForm({
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
+  // Ao editar um anúncio existente, pula direto pro formulário — o picker é
+  // só pra ajudar a começar do zero.
+  const [pickerResolved, setPickerResolved] = useState(editing)
+
+  function applyPickerSelection(selection: {
+    categorySlug: string
+    game: string
+    title: string
+    variants: string[]
+  }) {
+    setCategorySlug(selection.categorySlug)
+    setGame(selection.game)
+    setTitle(selection.title)
+    setRows(selection.variants.map((label) => ({ label, price: "", stock: "1", deliveryNote: "" })))
+    setPickerResolved(true)
+  }
+
   function patchRow(index: number, patch: Partial<Row>) {
     setRows((current) =>
       current.map((row, i) => (i === index ? { ...row, ...patch } : row)),
@@ -119,10 +139,33 @@ export function ProductForm({
     })
   }
 
+  if (!pickerResolved) {
+    return (
+      <GameProductPicker
+        defaultGame={defaultGame}
+        onSelect={applyPickerSelection}
+        onManual={() => setPickerResolved(true)}
+      />
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
-        <h2 className="text-sm font-semibold">Sobre o anúncio</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">Sobre o anúncio</h2>
+          {!editing ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setPickerResolved(false)}
+            >
+              <SlidersHorizontal className="size-3.5" />
+              Trocar sugestão
+            </Button>
+          ) : null}
+        </div>
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="title">Título</Label>
