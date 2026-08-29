@@ -113,6 +113,12 @@ export async function SiteHeader() {
       </div>
 
       <div className="mx-auto hidden w-full max-w-6xl items-center gap-6 px-4 pb-2.5 lg:flex">
+        <Link
+          href="/jogos"
+          className="text-sm font-medium text-foreground transition-colors hover:text-primary"
+        >
+          Jogos
+        </Link>
         {categories.map((category) => (
           <Link
             key={category.slug}

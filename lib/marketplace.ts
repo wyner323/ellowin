@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm"
 import { db } from "@/lib/db"
 import {
   dispute,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/db/schema"
 import { getCategory, listings as demoListings } from "@/lib/catalog"
 import { computeSellerBadges } from "@/lib/badges"
+import { slugifyGame } from "@/lib/product-catalog"
 
 /**
  * Leitura da vitrine.
@@ -66,25 +67,9 @@ function demoToCard(l: (typeof demoListings)[number]): StorefrontCard {
   }
 }
 
-/** Produtos reais ativos, com preço mínimo e nome da loja. */
-async function getRealCards(filters: {
-  categorySlug?: string
-  query?: string
-}): Promise<StorefrontCard[]> {
-  const conditions = [eq(product.status, "ativo")]
-
-  if (filters.categorySlug) {
-    conditions.push(eq(product.categorySlug, filters.categorySlug))
-  }
-
-  if (filters.query) {
-    const term = `%${filters.query.toLowerCase()}%`
-    conditions.push(
-      sql`(lower(${product.title}) like ${term} or lower(coalesce(${product.game}, '')) like ${term})`,
-    )
-  }
-
-  const rows = await db
+/** Query base dos anúncios reais ativos — preço mínimo, capa e loja do vendedor. */
+function activeRealProductsQuery(extraConditions: SQL[] = []) {
+  return db
     .select({
       id: product.id,
       slug: product.slug,
@@ -112,28 +97,52 @@ async function getRealCards(filters: {
     .from(product)
     .leftJoin(user, eq(user.id, product.sellerId))
     .leftJoin(sellerApplication, eq(sellerApplication.userId, product.sellerId))
-    .where(and(...conditions))
+    .where(and(eq(product.status, "ativo"), ...extraConditions))
     .orderBy(desc(product.createdAt))
+}
 
-  return rows
-    .filter((r) => r.minPrice !== null)
-    .map((r) => ({
-      key: `real-${r.id}`,
-      source: "real" as const,
-      title: r.title,
-      categorySlug: r.categorySlug,
-      game: r.game,
-      priceCents: Number(r.minPrice),
-      delivery: r.deliveryTime,
-      imageUrl: r.coverUrl ?? categoryImage(r.categorySlug),
-      href: `/produtos/${r.slug}`,
-      seller: {
-        name: r.storeName ?? r.sellerName ?? "Vendedor Ellowin",
-        level: r.sellerLevel ?? 1,
-        rating: r.ratingCount > 0 ? Math.round((r.ratingSum / r.ratingCount) * 10) / 10 : null,
-        sales: r.salesCount,
-      },
-    }))
+type ActiveRealProductRow = Awaited<ReturnType<typeof activeRealProductsQuery>>[number]
+
+function realRowToCard(r: ActiveRealProductRow): StorefrontCard {
+  return {
+    key: `real-${r.id}`,
+    source: "real" as const,
+    title: r.title,
+    categorySlug: r.categorySlug,
+    game: r.game,
+    priceCents: Number(r.minPrice),
+    delivery: r.deliveryTime,
+    imageUrl: r.coverUrl ?? categoryImage(r.categorySlug),
+    href: `/produtos/${r.slug}`,
+    seller: {
+      name: r.storeName ?? r.sellerName ?? "Vendedor Ellowin",
+      level: r.sellerLevel ?? 1,
+      rating: r.ratingCount > 0 ? Math.round((r.ratingSum / r.ratingCount) * 10) / 10 : null,
+      sales: r.salesCount,
+    },
+  }
+}
+
+/** Produtos reais ativos, com preço mínimo e nome da loja. */
+async function getRealCards(filters: {
+  categorySlug?: string
+  query?: string
+}): Promise<StorefrontCard[]> {
+  const conditions: SQL[] = []
+
+  if (filters.categorySlug) {
+    conditions.push(eq(product.categorySlug, filters.categorySlug))
+  }
+
+  if (filters.query) {
+    const term = `%${filters.query.toLowerCase()}%`
+    conditions.push(
+      sql`(lower(${product.title}) like ${term} or lower(coalesce(${product.game}, '')) like ${term})`,
+    )
+  }
+
+  const rows = await activeRealProductsQuery(conditions)
+  return rows.filter((r) => r.minPrice !== null).map(realRowToCard)
 }
 
 /** Produtos reais primeiro, anúncios de demonstração depois. */
@@ -463,4 +472,35 @@ export async function getSellerStorefront(slug: string) {
         seller: { name: row.storeName ?? row.displayName ?? row.name, level: row.level, rating: stats.rating, sales: stats.salesCount },
       })),
   }
+}
+
+/* ---------------------------------------------------------------------------
+ * Navegação por jogo (`/jogos`) — reaproveita o catálogo de `lib/product-catalog`.
+ * `product.game` é texto livre, então o cruzamento com o slug do jogo é feito
+ * em JS (via `slugifyGame`), não em SQL — assim anúncios antigos continuam
+ * aparecendo certo sem precisar de migração.
+ * ------------------------------------------------------------------------ */
+
+/** Quantidade de anúncios ativos por jogo, para o índice `/jogos`. */
+export async function getGameListingCounts(): Promise<Record<string, number>> {
+  const rows = await db
+    .select({ game: product.game })
+    .from(product)
+    .where(and(eq(product.status, "ativo"), sql`${product.game} is not null`))
+
+  const counts: Record<string, number> = {}
+  for (const row of rows) {
+    if (!row.game) continue
+    const slug = slugifyGame(row.game)
+    counts[slug] = (counts[slug] ?? 0) + 1
+  }
+  return counts
+}
+
+/** Anúncios ativos de um jogo específico, para `/jogos/[slug]`. */
+export async function getListingsByGame(gameSlug: string): Promise<StorefrontCard[]> {
+  const rows = await activeRealProductsQuery()
+  return rows
+    .filter((r) => r.minPrice !== null && r.game && slugifyGame(r.game) === gameSlug)
+    .map(realRowToCard)
 }
