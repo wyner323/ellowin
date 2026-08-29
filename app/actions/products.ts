@@ -5,11 +5,26 @@ import { and, asc, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { product, productImage, productVariant, sellerApplication } from "@/lib/db/schema"
+import { DEFAULT_MANUAL_DELIVERY_TIME, INSTANT_DELIVERY_TIME } from "@/lib/delivery"
 import { parseToCents } from "@/lib/money"
 import { getUserId } from "@/lib/session"
 import type { ActionResult } from "@/app/actions/auth"
 
 const MAX_IMAGES = 5
+
+/**
+ * Entrega automática é sempre instantânea — nunca confia no que o cliente
+ * mandou pra esse par, recalcula sempre a partir do tipo de entrega.
+ */
+function normalizeDelivery(deliveryType: string, deliveryTime: string) {
+  if (deliveryType === "automatica") {
+    return { deliveryType: "automatica" as const, deliveryTime: INSTANT_DELIVERY_TIME }
+  }
+  return {
+    deliveryType: "manual" as const,
+    deliveryTime: deliveryTime.trim() || DEFAULT_MANUAL_DELIVERY_TIME,
+  }
+}
 
 /**
  * Só aceitamos URLs de imagem que vieram do nosso próprio Blob. Isso impede que
@@ -172,6 +187,7 @@ export async function createProduct(input: {
   if (error || !parsed) return { ok: false, field: "variants", error: error ?? undefined }
 
   const slug = await uniqueSlug(slugify(title))
+  const delivery = normalizeDelivery(input.deliveryType, input.deliveryTime)
 
   const [created] = await db
     .insert(product)
@@ -182,8 +198,8 @@ export async function createProduct(input: {
       categorySlug: input.categorySlug,
       game: input.game.trim() || null,
       description: input.description.trim(),
-      deliveryType: input.deliveryType === "automatica" ? "automatica" : "manual",
-      deliveryTime: input.deliveryTime.trim() || "até 24h",
+      deliveryType: delivery.deliveryType,
+      deliveryTime: delivery.deliveryTime,
     })
     .returning({ id: product.id })
 
@@ -235,6 +251,8 @@ export async function updateProduct(input: {
   const { error, parsed } = validateVariants(input.variants)
   if (error || !parsed) return { ok: false, field: "variants", error: error ?? undefined }
 
+  const delivery = normalizeDelivery(input.deliveryType, input.deliveryTime)
+
   await db
     .update(product)
     .set({
@@ -242,8 +260,8 @@ export async function updateProduct(input: {
       categorySlug: input.categorySlug,
       game: input.game.trim() || null,
       description: input.description.trim(),
-      deliveryType: input.deliveryType === "automatica" ? "automatica" : "manual",
-      deliveryTime: input.deliveryTime.trim() || "até 24h",
+      deliveryType: delivery.deliveryType,
+      deliveryTime: delivery.deliveryTime,
       updatedAt: new Date(),
     })
     .where(eq(product.id, owned.id))

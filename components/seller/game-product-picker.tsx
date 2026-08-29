@@ -18,6 +18,8 @@ export type PickerSelection = {
   game: string
   title: string
   variants: string[]
+  deliveryType: "manual" | "automatica"
+  deliveryTime: string
 }
 
 /**
@@ -132,6 +134,8 @@ export function GameProductPicker({
                 game: selectedGame.name,
                 title: kind.titleTemplate(selectedGame.name),
                 variants: kind.starterVariants,
+                deliveryType: kind.deliveryType,
+                deliveryTime: kind.deliveryTime,
               })
             }
             className="rounded-full border border-border bg-background px-3.5 py-1.5 text-sm transition-colors hover:border-primary hover:text-primary"

@@ -10,6 +10,8 @@
  * template à mão pra cada um.
  */
 
+import { DEFAULT_MANUAL_DELIVERY_TIME, INSTANT_DELIVERY_TIME } from "@/lib/delivery"
+
 export function slugifyGame(value: string): string {
   return value
     .toLowerCase()
@@ -263,6 +265,9 @@ export type ProductKind = {
   categorySlug: "contas" | "moedas" | "boosting" | "gift-cards"
   titleTemplate: (game: string) => string
   starterVariants: string[]
+  /** Sugestão inicial — o vendedor pode trocar livremente no formulário. */
+  deliveryType: "manual" | "automatica"
+  deliveryTime: string
 }
 
 export const PRODUCT_KINDS: Record<ProductKindId, ProductKind> = {
@@ -272,6 +277,8 @@ export const PRODUCT_KINDS: Record<ProductKindId, ProductKind> = {
     categorySlug: "contas",
     titleTemplate: (game) => `Conta ${game} — full acesso`,
     starterVariants: ["Conta nível inicial", "Conta avançada"],
+    deliveryType: "manual",
+    deliveryTime: DEFAULT_MANUAL_DELIVERY_TIME,
   },
   moeda_ou_itens: {
     id: "moeda_ou_itens",
@@ -279,6 +286,8 @@ export const PRODUCT_KINDS: Record<ProductKindId, ProductKind> = {
     categorySlug: "moedas",
     titleTemplate: (game) => `Moedas e itens de ${game}`,
     starterVariants: ["Pacote pequeno", "Pacote grande"],
+    deliveryType: "automatica",
+    deliveryTime: INSTANT_DELIVERY_TIME,
   },
   boost_ou_servico: {
     id: "boost_ou_servico",
@@ -286,6 +295,8 @@ export const PRODUCT_KINDS: Record<ProductKindId, ProductKind> = {
     categorySlug: "boosting",
     titleTemplate: (game) => `Boost / serviço em ${game}`,
     starterVariants: ["Serviço avulso"],
+    deliveryType: "manual",
+    deliveryTime: "Até 48 horas",
   },
   gift_card_ou_assinatura: {
     id: "gift_card_ou_assinatura",
@@ -293,6 +304,8 @@ export const PRODUCT_KINDS: Record<ProductKindId, ProductKind> = {
     categorySlug: "gift-cards",
     titleTemplate: (game) => `${game} — código digital`,
     starterVariants: ["Valor padrão"],
+    deliveryType: "automatica",
+    deliveryTime: INSTANT_DELIVERY_TIME,
   },
 }
 

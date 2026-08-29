@@ -15,8 +15,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { GameProductPicker } from "@/components/seller/game-product-picker"
+import { GameProductPicker, type PickerSelection } from "@/components/seller/game-product-picker"
 import { ProductImageUploader } from "@/components/seller/product-image-uploader"
+import {
+  DEFAULT_MANUAL_DELIVERY_TIME,
+  DELIVERY_TIME_OPTIONS,
+  INSTANT_DELIVERY_TIME,
+} from "@/lib/delivery"
 
 const CATEGORIES = [
   { value: "contas", label: "Contas de jogos" },
@@ -67,7 +72,11 @@ export function ProductForm({
   const [game, setGame] = useState(product?.game ?? "")
   const [description, setDescription] = useState(product?.description ?? "")
   const [deliveryType, setDeliveryType] = useState(product?.deliveryType ?? "manual")
-  const [deliveryTime, setDeliveryTime] = useState(product?.deliveryTime ?? "até 24h")
+  const [deliveryTime, setDeliveryTime] = useState(
+    product?.deliveryType === "automatica"
+      ? INSTANT_DELIVERY_TIME
+      : (product?.deliveryTime ?? DEFAULT_MANUAL_DELIVERY_TIME),
+  )
   const [images, setImages] = useState<string[]>(product?.images ?? [])
 
   const [rows, setRows] = useState<Row[]>(
@@ -91,17 +100,22 @@ export function ProductForm({
   // só pra ajudar a começar do zero.
   const [pickerResolved, setPickerResolved] = useState(editing)
 
-  function applyPickerSelection(selection: {
-    categorySlug: string
-    game: string
-    title: string
-    variants: string[]
-  }) {
+  function applyPickerSelection(selection: PickerSelection) {
     setCategorySlug(selection.categorySlug)
     setGame(selection.game)
     setTitle(selection.title)
+    setDeliveryType(selection.deliveryType)
+    setDeliveryTime(selection.deliveryTime)
     setRows(selection.variants.map((label) => ({ label, price: "", stock: "1", deliveryNote: "" })))
     setPickerResolved(true)
+  }
+
+  function changeDeliveryType(value: string) {
+    const next = value === "automatica" ? "automatica" : "manual"
+    setDeliveryType(next)
+    // Entrega automática é sempre instantânea — não existe "prazo" pra ela.
+    if (next === "automatica") setDeliveryTime(INSTANT_DELIVERY_TIME)
+    else if (deliveryTime === INSTANT_DELIVERY_TIME) setDeliveryTime(DEFAULT_MANUAL_DELIVERY_TIME)
   }
 
   function patchRow(index: number, patch: Partial<Row>) {
@@ -228,10 +242,7 @@ export function ProductForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
             <Label htmlFor="deliveryType">Tipo de entrega</Label>
-            <Select
-              value={deliveryType}
-              onValueChange={(value) => setDeliveryType(value ?? "manual")}
-            >
+            <Select value={deliveryType} onValueChange={(value) => changeDeliveryType(value ?? "manual")}>
               <SelectTrigger id="deliveryType">
                 <SelectValue />
               </SelectTrigger>
@@ -244,13 +255,32 @@ export function ProductForm({
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="deliveryTime">Prazo de entrega</Label>
-            <Input
-              id="deliveryTime"
-              value={deliveryTime}
-              onChange={(e) => setDeliveryTime(e.target.value)}
-              placeholder="Ex.: até 30 minutos"
-              disabled={pending}
-            />
+            {deliveryType === "automatica" ? (
+              <div
+                id="deliveryTime"
+                className="flex h-9 items-center rounded-lg border border-input bg-muted/50 px-3 text-sm text-muted-foreground"
+              >
+                {INSTANT_DELIVERY_TIME}
+              </div>
+            ) : (
+              <Select value={deliveryTime} onValueChange={(value) => setDeliveryTime(value ?? DEFAULT_MANUAL_DELIVERY_TIME)}>
+                <SelectTrigger id="deliveryTime">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* Anúncios antigos podem ter um prazo em texto livre que não é
+                      mais uma opção — mantém ele selecionável em vez de sumir. */}
+                  {deliveryTime && !DELIVERY_TIME_OPTIONS.some((o) => o.label === deliveryTime) ? (
+                    <SelectItem value={deliveryTime}>{deliveryTime}</SelectItem>
+                  ) : null}
+                  {DELIVERY_TIME_OPTIONS.map((option) => (
+                    <SelectItem key={option.label} value={option.label}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
       </section>
