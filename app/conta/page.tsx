@@ -1,16 +1,22 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { FileCheck2, Store, Wallet } from "lucide-react"
+import { CalendarDays, ExternalLink, FileCheck2, Store, Wallet } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { AccentColorPicker } from "@/components/account/accent-color-picker"
+import { AvatarUpload } from "@/components/account/avatar-upload"
+import { BioForm } from "@/components/account/bio-form"
+import { DisplayNameForm } from "@/components/account/display-name-form"
 import { VerificationPanel } from "@/components/account/verification-panel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import type { AccentColorId } from "@/lib/accent-colors"
 import { getAccountState, verificationProgress } from "@/lib/session"
 import { formatCpf } from "@/lib/validation"
+import { initialsOf, publicName } from "@/lib/utils"
 
 export const metadata: Metadata = {
   title: "Minha conta",
@@ -30,7 +36,7 @@ export default async function ContaPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-balance">
-              Olá, {state.fullName.split(" ")[0]}
+              Olá, {publicName(state.fullName.split(" ")[0], state.displayName)}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">{state.email}</p>
           </div>
@@ -39,7 +45,40 @@ export default async function ContaPage() {
           </Badge>
         </div>
 
-        <Card className="mt-8">
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="text-base">Perfil público</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-6">
+            <AvatarUpload imageUrl={state.image} initials={initialsOf(state.fullName)} />
+            <DisplayNameForm initialValue={state.displayName ?? ""} />
+            <BioForm initialValue={state.bio ?? ""} />
+            <AccentColorPicker
+              initialValue={(state.accentColor as AccentColorId) ?? "padrao"}
+            />
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CalendarDays className="size-3.5" aria-hidden="true" />
+              Membro desde{" "}
+              {state.memberSince.toLocaleDateString("pt-BR", {
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
+            {state.seller?.status === "aprovado" && state.seller.storeSlug ? (
+              <Button
+                render={<Link href={`/loja/${state.seller.storeSlug}`} />}
+                variant="outline"
+                size="sm"
+                className="self-start"
+              >
+                <ExternalLink className="size-3.5" />
+                Ver minha loja pública
+              </Button>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
           <CardHeader>
             <CardTitle className="text-base">Progresso da verificação</CardTitle>
           </CardHeader>

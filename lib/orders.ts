@@ -1,4 +1,4 @@
-import { aliasedTable, and, asc, desc, eq, inArray, or } from "drizzle-orm"
+import { aliasedTable, and, asc, desc, eq, inArray, or, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import {
   dispute,
@@ -21,6 +21,11 @@ import {
 
 const buyer = aliasedTable(user, "buyer")
 const seller = aliasedTable(user, "seller")
+
+/** Apelido público (fallback pro nome legal) — nunca expõe o nome real. */
+function publicNameCol(t: typeof user) {
+  return sql<string>`coalesce(${t.displayName}, ${t.name})`
+}
 
 export const ORDER_STATUS_LABEL: Record<string, string> = {
   aguardando_entrega: "Aguardando entrega",
@@ -62,7 +67,7 @@ export async function getBuyerOrders(userId: string) {
   const rows = await db
     .select({
       ...orderColumns,
-      sellerName: seller.name,
+      sellerName: publicNameCol(seller),
       storeName: sellerApplication.storeName,
       productSlug: product.slug,
     })
@@ -80,7 +85,7 @@ export async function getSellerOrders(userId: string) {
   const rows = await db
     .select({
       ...orderColumns,
-      buyerName: buyer.name,
+      buyerName: publicNameCol(buyer),
       productSlug: product.slug,
     })
     .from(order)
@@ -133,9 +138,9 @@ export async function getOrderDetail(
   const [row] = await db
     .select({
       ...orderColumns,
-      buyerName: buyer.name,
+      buyerName: publicNameCol(buyer),
       buyerEmail: buyer.email,
-      sellerName: seller.name,
+      sellerName: publicNameCol(seller),
       sellerEmail: seller.email,
       storeName: sellerApplication.storeName,
       productSlug: product.slug,
@@ -183,7 +188,8 @@ export async function getOrderMessages(orderId: number) {
       authorRole: orderMessage.authorRole,
       body: orderMessage.body,
       createdAt: orderMessage.createdAt,
-      authorName: user.name,
+      authorName: publicNameCol(user),
+      authorImage: user.image,
     })
     .from(orderMessage)
     .leftJoin(user, eq(user.id, orderMessage.authorId))
@@ -209,7 +215,7 @@ export async function getDisputeMessages(disputeId: number, includeInternal: boo
       body: disputeMessage.body,
       internal: disputeMessage.internal,
       createdAt: disputeMessage.createdAt,
-      authorName: user.name,
+      authorName: publicNameCol(user),
     })
     .from(disputeMessage)
     .leftJoin(user, eq(user.id, disputeMessage.authorId))
@@ -249,8 +255,8 @@ export async function getDisputeQueue(statusFilter?: string[]) {
       productTitle: order.productTitle,
       variantLabel: order.variantLabel,
       orderStatus: order.status,
-      buyerName: buyer.name,
-      sellerName: seller.name,
+      buyerName: publicNameCol(buyer),
+      sellerName: publicNameCol(seller),
     })
     .from(dispute)
     .leftJoin(order, eq(order.id, dispute.orderId))

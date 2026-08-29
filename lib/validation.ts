@@ -108,6 +108,22 @@ export function isValidFullName(value: string) {
   return parts.every((p) => p.length >= 2) && /^[\p{L}\s'.-]+$/u.test(value)
 }
 
+/**
+ * Apelido público (2-20 caracteres, letras/números/espaço/_/-/.), precisa ter
+ * pelo menos uma letra ou número — bloqueia algo como só pontuação.
+ */
+export function isValidDisplayName(value: string) {
+  const trimmed = (value ?? "").trim()
+  if (trimmed.length < 2 || trimmed.length > 20) return false
+  if (!/^[\p{L}\p{N}\s_.-]+$/u.test(trimmed)) return false
+  return /[\p{L}\p{N}]/u.test(trimmed)
+}
+
+/** Bio curta do perfil público — até 160 caracteres, pode ser vazia. */
+export function isValidBio(value: string) {
+  return (value ?? "").trim().length <= 160
+}
+
 /** Data no formato dd/mm/aaaa, com idade entre 18 e 110 anos. */
 export function isValidBirthDate(value: string) {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((value ?? "").trim())

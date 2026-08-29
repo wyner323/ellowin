@@ -17,6 +17,18 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("emailVerified").notNull().default(false),
   image: text("image"),
+  /**
+   * Apelido público, escolhido pelo próprio usuário — aparece no chat, nas
+   * avaliações e nos anúncios no lugar do nome real. `name` continua sendo o
+   * nome legal (o mesmo do CPF), usado só internamente e pela moderação.
+   */
+  displayName: text("displayName"),
+  /** Frase curta exibida no perfil público (loja) e nas telas de conta. */
+  bio: text("bio"),
+  /** Capa da loja pública — só relevante para vendedores aprovados. */
+  bannerUrl: text("bannerUrl"),
+  /** Uma das chaves de ACCENT_COLORS (lib/accent-colors.ts); null = cor padrão da marca. */
+  accentColor: text("accentColor"),
   /** user | moderator | admin */
   role: text("role").notNull().default("user"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),

@@ -1,6 +1,6 @@
 "use server"
 
-import { and, desc, eq, isNull } from "drizzle-orm"
+import { and, desc, eq, isNull, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -10,6 +10,7 @@ import { getSession, getUserId } from "@/lib/session"
 import {
   isValidBirthDate,
   isValidCpf,
+  isValidDisplayName,
   isValidEmail,
   isValidFullName,
   isValidPassword,
@@ -44,6 +45,7 @@ function generateCode() {
 
 export async function registerUser(input: {
   fullName: string
+  displayName?: string
   email: string
   phone: string
   cpf: string
@@ -52,12 +54,19 @@ export async function registerUser(input: {
   acceptedTerms: boolean
 }): Promise<ActionResult> {
   const fullName = input.fullName.trim()
+  const displayName = input.displayName?.trim() || null
   const email = input.email.trim().toLowerCase()
   const cpf = onlyDigits(input.cpf)
   const phone = onlyDigits(input.phone)
 
   if (!isValidFullName(fullName))
     return { ok: false, field: "fullName", error: "Informe seu nome completo." }
+  if (displayName && !isValidDisplayName(displayName))
+    return {
+      ok: false,
+      field: "displayName",
+      error: "Use de 2 a 20 caracteres — letras, números, espaço, _ ou -.",
+    }
   if (!isValidEmail(email))
     return { ok: false, field: "email", error: "Email inválido." }
   if (!isValidPhone(phone))
@@ -105,6 +114,21 @@ export async function registerUser(input: {
       error: "Este CPF já está vinculado a uma conta Ellowin.",
     }
 
+  if (displayName) {
+    const [existingNick] = await db
+      .select({ id: user.id })
+      .from(user)
+      .where(sql`lower(${user.displayName}) = lower(${displayName})`)
+      .limit(1)
+
+    if (existingNick)
+      return {
+        ok: false,
+        field: "displayName",
+        error: "Esse apelido já está em uso. Escolha outro.",
+      }
+  }
+
   try {
     await auth.api.signUpEmail({
       body: { name: fullName, email, password: input.password },
@@ -128,6 +152,17 @@ export async function registerUser(input: {
     .limit(1)
 
   if (!created) return { ok: false, error: "Conta não localizada após criação." }
+
+  if (displayName) {
+    // Corrida rara com outro cadastro simultâneo no mesmo apelido: a conta já
+    // foi criada, então só deixamos o apelido em branco em vez de falhar tudo
+    // — dá pra definir de novo em Minha conta.
+    await db
+      .update(user)
+      .set({ displayName })
+      .where(eq(user.id, created.id))
+      .catch(() => {})
+  }
 
   await db
     .insert(profile)

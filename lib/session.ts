@@ -17,6 +17,11 @@ export async function getUserId() {
 export type AccountState = {
   id: string
   name: string
+  displayName: string | null
+  image: string | null
+  bio: string | null
+  accentColor: string | null
+  bannerUrl: string | null
   email: string
   emailVerified: boolean
   fullName: string
@@ -24,8 +29,10 @@ export type AccountState = {
   cpf: string | null
   phoneVerified: boolean
   cpfVerified: boolean
+  memberSince: Date
   seller: {
     storeName: string | null
+    storeSlug: string | null
     category: string | null
     currentStep: number
     level: number
@@ -63,6 +70,11 @@ export async function getAccountState(): Promise<AccountState | null> {
   return {
     id: userId,
     name: row?.name ?? session.user.name,
+    displayName: row?.displayName ?? null,
+    image: row?.image ?? null,
+    bio: row?.bio ?? null,
+    accentColor: row?.accentColor ?? null,
+    bannerUrl: row?.bannerUrl ?? null,
     email: row?.email ?? session.user.email,
     emailVerified: row?.emailVerified ?? false,
     fullName: p?.fullName ?? row?.name ?? session.user.name,
@@ -70,9 +82,11 @@ export async function getAccountState(): Promise<AccountState | null> {
     cpf: p?.cpf ?? null,
     phoneVerified: p?.phoneVerified ?? false,
     cpfVerified: p?.cpfVerified ?? false,
+    memberSince: row?.createdAt ?? new Date(),
     seller: s
       ? {
           storeName: s.storeName,
+          storeSlug: s.storeSlug,
           category: s.category,
           currentStep: s.currentStep,
           level: s.level,

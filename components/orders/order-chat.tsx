@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2, MessageCircle, RefreshCw, Send } from "lucide-react"
 import { fetchOrderMessages, postOrderMessage } from "@/app/actions/orders"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -14,6 +14,7 @@ export type OrderChatMessage = {
   authorId: string | null
   authorRole: string
   authorName: string | null
+  authorImage?: string | null
   body: string
   createdAt: Date
 }
@@ -217,6 +218,9 @@ export function OrderChat({
                   ) : (
                     <>
                       <Avatar size="sm" className="mt-0.5">
+                        {message.authorImage ? (
+                          <AvatarImage src={message.authorImage} alt="" />
+                        ) : null}
                         <AvatarFallback
                           className={cn(
                             "font-semibold",

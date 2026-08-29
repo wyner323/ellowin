@@ -1,12 +1,35 @@
 "use server"
 
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { profile, sellerApplication } from "@/lib/db/schema"
 import { getUserId } from "@/lib/session"
 import { isValidCpf, onlyDigits } from "@/lib/validation"
 import type { ActionResult } from "@/app/actions/auth"
+
+/**
+ * Garante que o slug seja único (a URL da loja pública depende disso).
+ * Se já existe outra loja com o mesmo slug, acrescenta -2, -3... até achar
+ * um livre. Reaplicar a etapa 1 com o mesmo nome não conta como colisão.
+ */
+async function uniqueStoreSlug(base: string, userId: string) {
+  const root = base || "loja"
+  let candidate = root
+  let suffix = 1
+
+  while (true) {
+    const [existing] = await db
+      .select({ userId: sellerApplication.userId })
+      .from(sellerApplication)
+      .where(sql`lower(${sellerApplication.storeSlug}) = lower(${candidate})`)
+      .limit(1)
+
+    if (!existing || existing.userId === userId) return candidate
+    suffix++
+    candidate = `${root}-${suffix}`
+  }
+}
 
 async function upsertApplication(
   userId: string,
@@ -49,12 +72,14 @@ export async function saveStoreStep(input: {
       error: "Descreva sua operação com pelo menos 30 caracteres.",
     }
 
-  const slug = storeName
+  const baseSlug = storeName
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
+
+  const slug = await uniqueStoreSlug(baseSlug, userId)
 
   await upsertApplication(userId, {
     storeName,

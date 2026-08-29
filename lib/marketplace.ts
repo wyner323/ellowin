@@ -1,6 +1,8 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import {
+  dispute,
+  order,
   product,
   productImage,
   productVariant,
@@ -9,6 +11,7 @@ import {
   user,
 } from "@/lib/db/schema"
 import { getCategory, listings as demoListings } from "@/lib/catalog"
+import { computeSellerBadges } from "@/lib/badges"
 
 /**
  * Leitura da vitrine.
@@ -93,7 +96,7 @@ async function getRealCards(filters: {
       ratingCount: product.ratingCount,
       salesCount: product.salesCount,
       sellerId: product.sellerId,
-      sellerName: user.name,
+      sellerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
       storeName: sellerApplication.storeName,
       sellerLevel: sellerApplication.level,
       minPrice: sql<number>`(
@@ -177,6 +180,7 @@ export type ProductDetail = {
     id: string
     name: string
     level: number
+    storeSlug: string | null
   }
   variants: {
     id: number
@@ -210,9 +214,11 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       ratingSum: product.ratingSum,
       ratingCount: product.ratingCount,
       sellerId: product.sellerId,
-      sellerName: user.name,
+      sellerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
       storeName: sellerApplication.storeName,
+      storeSlug: sellerApplication.storeSlug,
       sellerLevel: sellerApplication.level,
+      sellerStatus: sellerApplication.status,
     })
     .from(product)
     .leftJoin(user, eq(user.id, product.sellerId))
@@ -240,7 +246,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       rating: review.rating,
       comment: review.comment,
       createdAt: review.createdAt,
-      buyerName: user.name,
+      buyerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
     })
     .from(review)
     .leftJoin(user, eq(user.id, review.buyerId))
@@ -269,6 +275,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       id: row.sellerId,
       name: row.storeName ?? row.sellerName ?? "Vendedor Ellowin",
       level: row.sellerLevel ?? 1,
+      storeSlug: row.sellerStatus === "aprovado" ? row.storeSlug : null,
     },
     variants: variants.map((v) => ({
       id: v.id,
@@ -364,4 +371,96 @@ export async function getProductForSeller(sellerId: string, productId: number) {
     .orderBy(asc(productImage.sortOrder), asc(productImage.id))
 
   return { ...row, variants, images: imageRows.map((i) => i.url) }
+}
+
+export type SellerStorefront = Awaited<ReturnType<typeof getSellerStorefront>>
+
+/**
+ * Loja pública de um vendedor aprovado — perfil + vitrine de anúncios ativos.
+ * `slug` é comparado sem diferenciar maiúsculas (é assim que o índice único
+ * do banco também trata).
+ */
+export async function getSellerStorefront(slug: string) {
+  const [row] = await db
+    .select({
+      sellerId: sellerApplication.userId,
+      storeName: sellerApplication.storeName,
+      level: sellerApplication.level,
+      status: sellerApplication.status,
+      displayName: user.displayName,
+      name: user.name,
+      image: user.image,
+      bio: user.bio,
+      bannerUrl: user.bannerUrl,
+      accentColor: user.accentColor,
+      memberSince: user.createdAt,
+    })
+    .from(sellerApplication)
+    .innerJoin(user, eq(user.id, sellerApplication.userId))
+    .where(sql`lower(${sellerApplication.storeSlug}) = lower(${slug})`)
+    .limit(1)
+
+  if (!row || row.status !== "aprovado") return null
+
+  const [stats, disputeRow] = await Promise.all([
+    getSellerStats(row.sellerId),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(dispute)
+      .innerJoin(order, eq(order.id, dispute.orderId))
+      .where(eq(order.sellerId, row.sellerId)),
+  ])
+
+  const activeProducts = await db
+    .select({
+      id: product.id,
+      slug: product.slug,
+      title: product.title,
+      categorySlug: product.categorySlug,
+      game: product.game,
+      deliveryTime: product.deliveryTime,
+      ratingSum: product.ratingSum,
+      ratingCount: product.ratingCount,
+      minPrice: sql<number>`(
+        select min(v."priceCents") from "product_variant" v
+        where v."productId" = ${product.id} and v."active" = true and v."stock" > 0
+      )`,
+      coverUrl: sql<string | null>`(
+        select img."url" from "product_image" img
+        where img."productId" = ${product.id}
+        order by img."sortOrder" asc, img."id" asc limit 1
+      )`,
+    })
+    .from(product)
+    .where(and(eq(product.sellerId, row.sellerId), eq(product.status, "ativo")))
+    .orderBy(desc(product.createdAt))
+
+  const disputesCount = Number(disputeRow[0]?.count ?? 0)
+
+  return {
+    sellerId: row.sellerId,
+    name: row.storeName ?? row.displayName ?? row.name,
+    image: row.image,
+    bio: row.bio,
+    bannerUrl: row.bannerUrl,
+    accentColor: row.accentColor,
+    level: row.level,
+    memberSince: row.memberSince,
+    stats,
+    badges: computeSellerBadges({ ...stats, disputesCount }),
+    products: activeProducts
+      .filter((p) => p.minPrice !== null)
+      .map((p) => ({
+        key: `real-${p.id}`,
+        source: "real" as const,
+        title: p.title,
+        categorySlug: p.categorySlug,
+        game: p.game,
+        priceCents: Number(p.minPrice),
+        delivery: p.deliveryTime,
+        imageUrl: p.coverUrl ?? categoryImage(p.categorySlug),
+        href: `/produtos/${p.slug}`,
+        seller: { name: row.storeName ?? row.displayName ?? row.name, level: row.level, rating: stats.rating, sales: stats.salesCount },
+      })),
+  }
 }

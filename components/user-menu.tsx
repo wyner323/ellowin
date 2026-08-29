@@ -12,6 +12,8 @@ import {
   Wallet,
 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
+import { accentColorHex } from '@/lib/accent-colors'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -22,26 +24,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { initialsOf, publicName } from '@/lib/utils'
 
 export function UserMenu({
   name,
+  displayName,
+  image,
+  accentColor,
   email,
   isSeller = false,
   isStaff = false,
 }: {
   name: string
+  displayName?: string | null
+  image?: string | null
+  accentColor?: string | null
   email: string
   isSeller?: boolean
   isStaff?: boolean
 }) {
   const router = useRouter()
 
-  const initials = name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('')
+  const shownName = publicName(name, displayName)
+  const accent = accentColorHex(accentColor)
+  const initials = initialsOf(shownName)
 
   async function handleSignOut() {
     await authClient.signOut()
@@ -60,18 +66,21 @@ export function UserMenu({
           />
         }
       >
-        <span className="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-          {initials || 'E'}
-        </span>
+        <Avatar size="sm" style={accent ? { boxShadow: `0 0 0 2px ${accent}` } : undefined}>
+          {image ? <AvatarImage src={image} alt="" /> : null}
+          <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
         <span className="hidden max-w-24 truncate text-sm md:inline">
-          {name.split(' ')[0]}
+          {shownName.split(' ')[0]}
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         {/* O GroupLabel do Base UI só funciona dentro de um Group. */}
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex flex-col gap-0.5">
-            <span className="truncate text-sm font-medium">{name}</span>
+            <span className="truncate text-sm font-medium">{shownName}</span>
             <span className="truncate text-xs font-normal text-muted-foreground">
               {email}
             </span>

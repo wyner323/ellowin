@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { categories } from '@/lib/catalog'
 import { db } from '@/lib/db'
-import { sellerApplication } from '@/lib/db/schema'
+import { sellerApplication, user as userTable } from '@/lib/db/schema'
 import { getStaff } from '@/lib/roles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,7 +17,7 @@ export async function SiteHeader() {
 
   // Só consultamos cargo e loja quando há sessão, para não pesar as páginas
   // públicas com duas queries por render.
-  const [staff, application] = session?.user
+  const [staff, application, profileRow] = session?.user
     ? await Promise.all([
         getStaff(),
         db
@@ -25,8 +25,17 @@ export async function SiteHeader() {
           .from(sellerApplication)
           .where(eq(sellerApplication.userId, session.user.id))
           .limit(1),
+        db
+          .select({
+            displayName: userTable.displayName,
+            image: userTable.image,
+            accentColor: userTable.accentColor,
+          })
+          .from(userTable)
+          .where(eq(userTable.id, session.user.id))
+          .limit(1),
       ])
-    : [null, []]
+    : [null, [], []]
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
@@ -82,6 +91,9 @@ export async function SiteHeader() {
               </Button>
               <UserMenu
                 name={session.user.name}
+                displayName={profileRow[0]?.displayName ?? null}
+                image={profileRow[0]?.image ?? null}
+                accentColor={profileRow[0]?.accentColor ?? null}
                 email={session.user.email}
                 isSeller={application[0]?.status === 'aprovado'}
                 isStaff={Boolean(staff)}

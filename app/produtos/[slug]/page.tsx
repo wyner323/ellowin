@@ -90,7 +90,17 @@ export default async function ProductPage({
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1.5">
                     <BadgeCheck className="size-4 text-primary" aria-hidden="true" />
-                    {item.seller.name} · Nível {item.seller.level}
+                    {item.seller.storeSlug ? (
+                      <Link
+                        href={`/loja/${item.seller.storeSlug}`}
+                        className="font-medium text-foreground hover:text-primary hover:underline"
+                      >
+                        {item.seller.name}
+                      </Link>
+                    ) : (
+                      item.seller.name
+                    )}{" "}
+                    · Nível {item.seller.level}
                   </span>
                   <StarRating rating={item.rating} count={item.ratingCount} size="md" />
                   <span className="flex items-center gap-1.5">

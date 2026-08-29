@@ -24,6 +24,7 @@ import {
   formatPhone,
   isValidBirthDate,
   isValidCpf,
+  isValidDisplayName,
   isValidEmail,
   isValidFullName,
   isValidPassword,
@@ -34,6 +35,7 @@ import {
 
 type Form = {
   fullName: string
+  displayName: string
   email: string
   phone: string
   cpf: string
@@ -51,6 +53,7 @@ export function RegisterWizard() {
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<Form>({
     fullName: "",
+    displayName: "",
     email: "",
     phone: "",
     cpf: "",
@@ -69,7 +72,10 @@ export function RegisterWizard() {
   const score = passwordScore(form.password)
 
   const stepValid = [
-    isValidFullName(form.fullName) && isValidEmail(form.email) && isValidPhone(form.phone),
+    isValidFullName(form.fullName) &&
+      isValidEmail(form.email) &&
+      isValidPhone(form.phone) &&
+      (!form.displayName || isValidDisplayName(form.displayName)),
     cpfValid && isValidBirthDate(form.birthDate),
     isValidPassword(form.password) && form.acceptedTerms,
   ][step]
@@ -85,7 +91,12 @@ export function RegisterWizard() {
       const result = await registerUser(form)
       if (!result.ok) {
         setError(result.error ?? "Não foi possível concluir o cadastro.")
-        if (result.field === "email" || result.field === "phone" || result.field === "fullName")
+        if (
+          result.field === "email" ||
+          result.field === "phone" ||
+          result.field === "fullName" ||
+          result.field === "displayName"
+        )
           setStep(0)
         if (result.field === "cpf" || result.field === "birthDate") setStep(1)
         return
@@ -149,6 +160,17 @@ export function RegisterWizard() {
               autoComplete="name"
               valid={isValidFullName(form.fullName)}
               hint="Como aparece no seu documento oficial."
+            />
+            <Field
+              id="displayName"
+              label="Apelido (opcional)"
+              value={form.displayName}
+              onChange={(v) => set("displayName", v.slice(0, 20))}
+              placeholder="Como quer ser chamado no site"
+              autoComplete="nickname"
+              valid={form.displayName.length > 0 && isValidDisplayName(form.displayName)}
+              invalid={form.displayName.length > 0 && !isValidDisplayName(form.displayName)}
+              hint="Aparece no chat e nas avaliações no lugar do seu nome — pode deixar em branco e definir depois."
             />
             <Field
               id="email"

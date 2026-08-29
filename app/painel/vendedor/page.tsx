@@ -1,14 +1,16 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Package, Plus, ShieldAlert, Store, TrendingUp } from "lucide-react"
+import { ExternalLink, Package, Plus, ShieldAlert, Store, TrendingUp } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
+import { BannerUpload } from "@/components/account/banner-upload"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { db } from "@/lib/db"
-import { sellerApplication } from "@/lib/db/schema"
+import { sellerApplication, user } from "@/lib/db/schema"
 import { getSellerStats } from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
 import { getMyDisputes, getSellerOrders } from "@/lib/orders"
@@ -33,11 +35,16 @@ export default async function PainelVendedorPage() {
 
   if (!application || application.status !== "aprovado") redirect("/vender")
 
-  const [stats, orders, wallet, disputes] = await Promise.all([
+  const [stats, orders, wallet, disputes, [profileRow]] = await Promise.all([
     getSellerStats(session.user.id),
     getSellerOrders(session.user.id),
     getWalletSummary(session.user.id),
     getMyDisputes(session.user.id),
+    db
+      .select({ bannerUrl: user.bannerUrl })
+      .from(user)
+      .where(eq(user.id, session.user.id))
+      .limit(1),
   ])
 
   const pending = orders.filter((o) => o.status === "aguardando_entrega")
@@ -164,6 +171,25 @@ export default async function PainelVendedorPage() {
               </span>
             </Link>
           </div>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle className="text-base">Personalizar loja</CardTitle>
+              {application.storeSlug ? (
+                <Button
+                  render={<Link href={`/loja/${application.storeSlug}`} target="_blank" />}
+                  variant="outline"
+                  size="sm"
+                >
+                  <ExternalLink className="size-3.5" />
+                  Ver loja pública
+                </Button>
+              ) : null}
+            </CardHeader>
+            <CardContent>
+              <BannerUpload bannerUrl={profileRow?.bannerUrl ?? null} />
+            </CardContent>
+          </Card>
         </div>
       </main>
 
