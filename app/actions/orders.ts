@@ -3,7 +3,8 @@
 import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
-import { order, product } from "@/lib/db/schema"
+import { order, orderMessage, product } from "@/lib/db/schema"
+import { getOrderMessages } from "@/lib/orders"
 import { AUTO_RELEASE_DAYS, splitOrderAmount } from "@/lib/money"
 import { getUserId } from "@/lib/session"
 import { moveToEscrow, releaseEscrowToSeller, refundEscrow, withTransaction } from "@/lib/wallet"
@@ -228,6 +229,60 @@ export async function cancelOrder(orderId: number): Promise<ActionResult> {
   revalidatePath("/painel/vendedor/vendas")
 
   return { ok: true, message: "Pedido cancelado e valor devolvido." }
+}
+
+/** Só comprador e vendedor do pedido participam do chat — a moderação usa o canal da disputa. */
+async function resolveOrderParticipation(
+  orderId: number,
+): Promise<{ role: "buyer" | "seller"; orderId: number } | null> {
+  const userId = await getUserId()
+
+  const [row] = await db
+    .select({ buyerId: order.buyerId, sellerId: order.sellerId })
+    .from(order)
+    .where(eq(order.id, orderId))
+    .limit(1)
+
+  if (!row) return null
+  if (row.buyerId === userId) return { role: "buyer", orderId }
+  if (row.sellerId === userId) return { role: "seller", orderId }
+
+  return null
+}
+
+/** Nova mensagem no chat do pedido, pra combinar a entrega antes de qualquer disputa. */
+export async function postOrderMessage(input: {
+  orderId: number
+  body: string
+}): Promise<ActionResult> {
+  const userId = await getUserId()
+  const participation = await resolveOrderParticipation(input.orderId)
+  if (!participation) return { ok: false, error: "Pedido não encontrado." }
+
+  const body = input.body.trim()
+  if (body.length < 2) return { ok: false, field: "body", error: "Escreva uma mensagem." }
+  if (body.length > 2000)
+    return { ok: false, field: "body", error: "Mensagem muito longa (máximo 2000 caracteres)." }
+
+  await db.insert(orderMessage).values({
+    orderId: input.orderId,
+    authorId: userId,
+    authorRole: participation.role,
+    body,
+  })
+
+  revalidatePath(`/pedidos/${input.orderId}`)
+
+  return { ok: true }
+}
+
+/** Busca as mensagens do chat do pedido para atualização em tempo real (polling). */
+export async function fetchOrderMessages(orderId: number) {
+  const participation = await resolveOrderParticipation(orderId)
+  if (!participation) return { ok: false as const, messages: [] }
+
+  const messages = await getOrderMessages(orderId)
+  return { ok: true as const, messages }
 }
 
 /** Usado pelo painel do vendedor para saber se ele tem anúncios publicados. */

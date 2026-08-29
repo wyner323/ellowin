@@ -4,6 +4,7 @@ import {
   dispute,
   disputeMessage,
   order,
+  orderMessage,
   product,
   review,
   sellerApplication,
@@ -171,6 +172,23 @@ export async function getOrderDetail(
     review: reviewRow ?? null,
     dispute: disputeRow ?? null,
   }
+}
+
+/** Histórico do chat do pedido — comprador e vendedor coordenando a entrega. */
+export async function getOrderMessages(orderId: number) {
+  return db
+    .select({
+      id: orderMessage.id,
+      authorId: orderMessage.authorId,
+      authorRole: orderMessage.authorRole,
+      body: orderMessage.body,
+      createdAt: orderMessage.createdAt,
+      authorName: user.name,
+    })
+    .from(orderMessage)
+    .leftJoin(user, eq(user.id, orderMessage.authorId))
+    .where(eq(orderMessage.orderId, orderId))
+    .orderBy(asc(orderMessage.createdAt))
 }
 
 /**

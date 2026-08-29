@@ -291,6 +291,23 @@ export const dispute = pgTable("dispute", {
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 })
 
+/**
+ * Chat do pedido: comprador e vendedor combinam a entrega antes de qualquer
+ * disputa. Só as duas partes têm acesso — a moderação entra pelo chat da
+ * disputa, que é o canal formal de escalonamento.
+ */
+export const orderMessage = pgTable("order_message", {
+  id: serial("id").primaryKey(),
+  orderId: integer("orderId")
+    .notNull()
+    .references(() => order.id, { onDelete: "cascade" }),
+  authorId: text("authorId").references(() => user.id),
+  /** buyer | seller | system */
+  authorRole: text("authorRole").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})
+
 /** Histórico compartilhado: qualquer moderador lê o caso inteiro e dá continuidade. */
 export const disputeMessage = pgTable("dispute_message", {
   id: serial("id").primaryKey(),

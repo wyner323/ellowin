@@ -6,13 +6,14 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
 import { OrderActions } from "@/components/orders/order-actions"
+import { OrderChat } from "@/components/orders/order-chat"
 import { OrderStatusBadge } from "@/components/orders/order-status-badge"
 import { OpenDisputeForm } from "@/components/orders/open-dispute-form"
 import { ReviewForm } from "@/components/orders/review-form"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { Button } from "@/components/ui/button"
 import { formatCents } from "@/lib/money"
-import { getOrderDetail } from "@/lib/orders"
+import { getOrderDetail, getOrderMessages } from "@/lib/orders"
 import { getStaff } from "@/lib/roles"
 import { getSession } from "@/lib/session"
 
@@ -37,6 +38,9 @@ export default async function PedidoPage({
   if (!detail) notFound()
 
   const { viewer } = detail
+
+  // O chat do pedido é só entre as duas partes — a moderação usa o canal da disputa.
+  const chatMessages = viewer.isBuyer || viewer.isSeller ? await getOrderMessages(orderId) : []
   const counterparty = viewer.isBuyer
     ? (detail.storeName ?? detail.sellerName ?? "Vendedor")
     : (detail.buyerName ?? "Comprador")
@@ -139,6 +143,19 @@ export default async function PedidoPage({
                 <MessageSquare className="size-4" />
                 Abrir chat da disputa
               </Button>
+            </section>
+          ) : null}
+
+          {viewer.isBuyer || viewer.isSeller ? (
+            <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
+              <h2 className="text-sm font-semibold">
+                Conversa com {viewer.isBuyer ? "o vendedor" : "o comprador"}
+              </h2>
+              <OrderChat
+                orderId={detail.id}
+                messages={chatMessages}
+                viewerRole={viewer.isBuyer ? "buyer" : "seller"}
+              />
             </section>
           ) : null}
 
