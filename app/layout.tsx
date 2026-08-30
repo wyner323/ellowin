@@ -1,6 +1,7 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
+import { DesignLab } from '@/components/dev/design-lab'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
@@ -62,6 +63,7 @@ export default function RootLayout({
         {children}
         <Toaster position="top-center" />
         {process.env.NODE_ENV === 'production' && <Analytics />}
+        {process.env.NODE_ENV === 'development' && <DesignLab />}
       </body>
     </html>
   )
