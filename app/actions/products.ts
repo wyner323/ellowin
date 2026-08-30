@@ -7,6 +7,7 @@ import { db } from "@/lib/db"
 import { product, productImage, productVariant, sellerApplication } from "@/lib/db/schema"
 import { DEFAULT_MANUAL_DELIVERY_TIME, INSTANT_DELIVERY_TIME } from "@/lib/delivery"
 import { parseToCents } from "@/lib/money"
+import { slugifyGame } from "@/lib/product-catalog"
 import { getUserId } from "@/lib/session"
 import type { ActionResult } from "@/app/actions/auth"
 
@@ -71,6 +72,16 @@ async function requireSeller(userId: string) {
 
   if (!s || s.status !== "aprovado") return null
   return s
+}
+
+/** Pra revalidar a loja pública do vendedor depois de criar/editar/pausar um anúncio. */
+async function getStoreSlug(userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ storeSlug: sellerApplication.storeSlug })
+    .from(sellerApplication)
+    .where(eq(sellerApplication.userId, userId))
+    .limit(1)
+  return row?.storeSlug ?? null
 }
 
 function slugify(value: string) {
@@ -216,9 +227,12 @@ export async function createProduct(input: {
 
   await replaceProductImages(created.id, sanitizeImages(input.images))
 
+  const storeSlug = await getStoreSlug(userId)
   revalidatePath("/painel/vendedor/produtos")
   revalidatePath("/")
   revalidatePath(`/catalogo/${input.categorySlug}`)
+  if (storeSlug) revalidatePath(`/loja/${storeSlug}`)
+  if (input.game.trim()) revalidatePath(`/jogos/${slugifyGame(input.game.trim())}`)
 
   return { ok: true, message: "Anúncio publicado.", slug }
 }
@@ -237,7 +251,7 @@ export async function updateProduct(input: {
   const userId = await getUserId()
 
   const [owned] = await db
-    .select({ id: product.id, slug: product.slug })
+    .select({ id: product.id, slug: product.slug, categorySlug: product.categorySlug })
     .from(product)
     .where(and(eq(product.id, input.productId), eq(product.sellerId, userId)))
     .limit(1)
@@ -341,9 +355,14 @@ export async function updateProduct(input: {
     }
   }
 
+  const storeSlug = await getStoreSlug(userId)
   revalidatePath("/painel/vendedor/produtos")
   revalidatePath(`/produtos/${owned.slug}`)
   revalidatePath("/")
+  revalidatePath(`/catalogo/${input.categorySlug}`)
+  if (owned.categorySlug !== input.categorySlug) revalidatePath(`/catalogo/${owned.categorySlug}`)
+  if (storeSlug) revalidatePath(`/loja/${storeSlug}`)
+  if (input.game.trim()) revalidatePath(`/jogos/${slugifyGame(input.game.trim())}`)
 
   return { ok: true, message: "Anúncio atualizado." }
 }
@@ -352,7 +371,13 @@ export async function toggleProductStatus(productId: number): Promise<ActionResu
   const userId = await getUserId()
 
   const [owned] = await db
-    .select({ id: product.id, status: product.status, slug: product.slug })
+    .select({
+      id: product.id,
+      status: product.status,
+      slug: product.slug,
+      game: product.game,
+      categorySlug: product.categorySlug,
+    })
     .from(product)
     .where(and(eq(product.id, productId), eq(product.sellerId, userId)))
     .limit(1)
@@ -366,8 +391,13 @@ export async function toggleProductStatus(productId: number): Promise<ActionResu
     .set({ status: next, updatedAt: new Date() })
     .where(eq(product.id, owned.id))
 
+  const storeSlug = await getStoreSlug(userId)
   revalidatePath("/painel/vendedor/produtos")
   revalidatePath(`/produtos/${owned.slug}`)
+  revalidatePath("/")
+  revalidatePath(`/catalogo/${owned.categorySlug}`)
+  if (storeSlug) revalidatePath(`/loja/${storeSlug}`)
+  if (owned.game) revalidatePath(`/jogos/${slugifyGame(owned.game)}`)
 
   return {
     ok: true,
