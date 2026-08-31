@@ -84,13 +84,18 @@ function activeRealProductsQuery(extraConditions: SQL[] = []) {
       sellerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
       storeName: sellerApplication.storeName,
       sellerLevel: sellerApplication.level,
+      // Correlaciona com `"product"."id"` por texto, não interpolando
+      // `product.id` — o Drizzle renderiza um Column interpolado aqui sem
+      // qualificador de tabela, e como a subquery também tem uma coluna
+      // "id" (a da própria variante/imagem), o Postgres resolvia pro escopo
+      // errado (comparava a variante com o próprio id dela, nunca batendo).
       minPrice: sql<number>`(
         select min(v."priceCents") from "product_variant" v
-        where v."productId" = ${product.id} and v."active" = true and v."stock" > 0
+        where v."productId" = "product"."id" and v."active" = true and v."stock" > 0
       )`,
       coverUrl: sql<string | null>`(
         select img."url" from "product_image" img
-        where img."productId" = ${product.id}
+        where img."productId" = "product"."id"
         order by img."sortOrder" asc, img."id" asc limit 1
       )`,
     })
@@ -430,13 +435,15 @@ export async function getSellerStorefront(slug: string) {
       deliveryTime: product.deliveryTime,
       ratingSum: product.ratingSum,
       ratingCount: product.ratingCount,
+      // Ver o comentário equivalente em activeRealProductsQuery: correlaciona
+      // por texto ("product"."id"), não interpolando o Column do Drizzle.
       minPrice: sql<number>`(
         select min(v."priceCents") from "product_variant" v
-        where v."productId" = ${product.id} and v."active" = true and v."stock" > 0
+        where v."productId" = "product"."id" and v."active" = true and v."stock" > 0
       )`,
       coverUrl: sql<string | null>`(
         select img."url" from "product_image" img
-        where img."productId" = ${product.id}
+        where img."productId" = "product"."id"
         order by img."sortOrder" asc, img."id" asc limit 1
       )`,
     })
