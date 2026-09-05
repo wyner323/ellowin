@@ -5,8 +5,19 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { profile, sellerApplication, user } from "@/lib/db/schema"
 
+/**
+ * Ponto único de leitura da sessão — getUserId() e getAccountState() passam
+ * por aqui, então é o lugar certo pra marcar atividade, e cobre os dois sem
+ * duplicar a chamada.
+ */
 export async function getSession() {
-  return auth.api.getSession({ headers: await headers() })
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (session?.user) {
+    // Roda depois da resposta (via after/waitUntil do Vercel) — não atrasa a
+    // page/action por causa de um detalhe cosmético, mas ainda garante que rode.
+    after(() => touchLastActive(session.user.id).catch((error) => console.error("[touchLastActive]", error)))
+  }
+  return session
 }
 
 const TOUCH_THROTTLE_MINUTES = 2
@@ -15,7 +26,7 @@ const TOUCH_THROTTLE_MINUTES = 2
  * Marca o usuário como ativo agora, pro status online/offline do perfil
  * público (lib/time.ts). Um único UPDATE guardado por WHERE (sem ler antes) —
  * no máximo 1 escrita por usuário a cada TOUCH_THROTTLE_MINUTES, não importa
- * quantas actions ele dispare nesse intervalo.
+ * quantas vezes a sessão seja lida nesse intervalo.
  */
 async function touchLastActive(userId: string) {
   await db
@@ -32,9 +43,6 @@ async function touchLastActive(userId: string) {
 export async function getUserId() {
   const session = await getSession()
   if (!session?.user) throw new Error("Não autenticado")
-  // Roda depois da resposta (via after/waitUntil do Vercel) — não atrasa a
-  // action por causa de um detalhe cosmético, mas ainda garante que rode.
-  after(() => touchLastActive(session.user.id).catch((error) => console.error("[touchLastActive]", error)))
   return session.user.id
 }
 
