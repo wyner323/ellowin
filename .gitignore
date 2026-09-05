@@ -17,3 +17,8 @@ node_modules
 .env*
 next-env.d.ts
 *.tsbuildinfo
+
+# Local Claude Code skills (not part of the app)
+.agents/
+.claude/skills/
+skills-lock.json
