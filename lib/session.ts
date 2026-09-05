@@ -1,5 +1,6 @@
 import { headers } from "next/headers"
-import { and, desc, eq } from "drizzle-orm"
+import { after } from "next/server"
+import { and, desc, eq, sql } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { profile, sellerApplication, user } from "@/lib/db/schema"
@@ -8,9 +9,32 @@ export async function getSession() {
   return auth.api.getSession({ headers: await headers() })
 }
 
+const TOUCH_THROTTLE_MINUTES = 2
+
+/**
+ * Marca o usuário como ativo agora, pro status online/offline do perfil
+ * público (lib/time.ts). Um único UPDATE guardado por WHERE (sem ler antes) —
+ * no máximo 1 escrita por usuário a cada TOUCH_THROTTLE_MINUTES, não importa
+ * quantas actions ele dispare nesse intervalo.
+ */
+async function touchLastActive(userId: string) {
+  await db
+    .update(user)
+    .set({ lastActiveAt: new Date() })
+    .where(
+      and(
+        eq(user.id, userId),
+        sql`(${user.lastActiveAt} is null or ${user.lastActiveAt} < now() - interval '${sql.raw(String(TOUCH_THROTTLE_MINUTES))} minutes')`,
+      ),
+    )
+}
+
 export async function getUserId() {
   const session = await getSession()
   if (!session?.user) throw new Error("Não autenticado")
+  // Roda depois da resposta (via after/waitUntil do Vercel) — não atrasa a
+  // action por causa de um detalhe cosmético, mas ainda garante que rode.
+  after(() => touchLastActive(session.user.id).catch((error) => console.error("[touchLastActive]", error)))
   return session.user.id
 }
 

@@ -31,6 +31,8 @@ export const user = pgTable("user", {
   accentColor: text("accentColor"),
   /** user | moderator | admin */
   role: text("role").notNull().default("user"),
+  /** Última atividade autenticada — status online/offline no perfil público. Atualizado (com throttle) em getUserId(). */
+  lastActiveAt: timestamp("lastActiveAt"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })

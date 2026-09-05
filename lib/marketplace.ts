@@ -331,6 +331,41 @@ export async function getSellerStats(sellerId: string) {
   }
 }
 
+/** Quebra das avaliações recebidas em positiva (nota 4-5) / neutra (3) / negativa (1-2), pro perfil público. */
+export async function getSellerReputationBreakdown(sellerId: string) {
+  const [row] = await db
+    .select({
+      positivas: sql<number>`coalesce(sum(case when ${review.rating} >= 4 then 1 else 0 end), 0)`,
+      neutras: sql<number>`coalesce(sum(case when ${review.rating} = 3 then 1 else 0 end), 0)`,
+      negativas: sql<number>`coalesce(sum(case when ${review.rating} <= 2 then 1 else 0 end), 0)`,
+    })
+    .from(review)
+    .where(eq(review.sellerId, sellerId))
+
+  return {
+    positivas: Number(row?.positivas ?? 0),
+    neutras: Number(row?.neutras ?? 0),
+    negativas: Number(row?.negativas ?? 0),
+  }
+}
+
+/** Últimas avaliações recebidas por um vendedor, pro perfil público. */
+export async function getSellerRecentReviews(sellerId: string, limit = 5) {
+  return db
+    .select({
+      id: review.id,
+      rating: review.rating,
+      comment: review.comment,
+      createdAt: review.createdAt,
+      buyerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
+    })
+    .from(review)
+    .leftJoin(user, eq(user.id, review.buyerId))
+    .where(eq(review.sellerId, sellerId))
+    .orderBy(desc(review.createdAt))
+    .limit(limit)
+}
+
 export async function getSellerProducts(sellerId: string) {
   const rows = await db
     .select()
@@ -408,6 +443,7 @@ export async function getSellerStorefront(slug: string) {
       bannerUrl: user.bannerUrl,
       accentColor: user.accentColor,
       memberSince: user.createdAt,
+      lastActiveAt: user.lastActiveAt,
     })
     .from(sellerApplication)
     .innerJoin(user, eq(user.id, sellerApplication.userId))
@@ -416,13 +452,15 @@ export async function getSellerStorefront(slug: string) {
 
   if (!row || row.status !== "aprovado") return null
 
-  const [stats, disputeRow] = await Promise.all([
+  const [stats, disputeRow, reputation, recentReviews] = await Promise.all([
     getSellerStats(row.sellerId),
     db
       .select({ count: sql<number>`count(*)` })
       .from(dispute)
       .innerJoin(order, eq(order.id, dispute.orderId))
       .where(eq(order.sellerId, row.sellerId)),
+    getSellerReputationBreakdown(row.sellerId),
+    getSellerRecentReviews(row.sellerId),
   ])
 
   const activeProducts = await db
@@ -462,7 +500,10 @@ export async function getSellerStorefront(slug: string) {
     accentColor: row.accentColor,
     level: row.level,
     memberSince: row.memberSince,
+    lastActiveAt: row.lastActiveAt,
     stats,
+    reputation,
+    recentReviews,
     badges: computeSellerBadges({ ...stats, disputesCount }),
     products: activeProducts
       .filter((p) => p.minPrice !== null)
