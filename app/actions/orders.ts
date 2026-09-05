@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { order, orderMessage, product } from "@/lib/db/schema"
 import { getOrderMessages } from "@/lib/orders"
+import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, splitOrderAmount } from "@/lib/money"
 import { getUserId } from "@/lib/session"
 import { moveToEscrow, releaseEscrowToSeller, refundEscrow, withTransaction } from "@/lib/wallet"
@@ -33,9 +34,10 @@ export async function purchase(variantId: number): Promise<ActionResult & { orde
         sellerId: string
         status: string
         deliveryType: string
+        deliveryTime: string
       }>(
         `SELECT v."id", v."productId", v."label", v."priceCents", v."stock", v."active",
-                p."title", p."sellerId", p."status", p."deliveryType"
+                p."title", p."sellerId", p."status", p."deliveryType", p."deliveryTime"
            FROM "product_variant" v
            JOIN "product" p ON p."id" = v."productId"
           WHERE v."id" = $1
@@ -57,12 +59,16 @@ export async function purchase(variantId: number): Promise<ActionResult & { orde
         Date.now() + AUTO_RELEASE_DAYS * 24 * 60 * 60 * 1000,
       )
 
+      const deliveryHours = hoursForDeliveryTime(variant.deliveryTime)
+      const deliveryDueAt =
+        deliveryHours != null ? new Date(Date.now() + deliveryHours * 60 * 60 * 1000) : null
+
       const inserted = await client.query<{ id: number }>(
         `INSERT INTO "order"
            ("buyerId", "sellerId", "productId", "variantId", "productTitle",
             "variantLabel", "amountCents", "feeCents", "sellerNetCents",
-            "status", "autoReleaseAt")
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aguardando_entrega', $10)
+            "status", "autoReleaseAt", "deliveryDueAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aguardando_entrega', $10, $11)
          RETURNING "id"`,
         [
           buyerId,
@@ -75,6 +81,7 @@ export async function purchase(variantId: number): Promise<ActionResult & { orde
           feeCents,
           sellerNetCents,
           autoReleaseAt,
+          deliveryDueAt,
         ],
       )
 

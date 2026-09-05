@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Image from "next/image"
 import { notFound } from "next/navigation"
-import { CalendarDays, Clock, MessageSquareText, Meh, ThumbsDown, ThumbsUp } from "lucide-react"
+import { CalendarDays, Clock, Gauge, MessageSquareText, Meh, Timer, ThumbsDown, ThumbsUp } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { ProductCard } from "@/components/marketplace/product-card"
@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BADGE_META } from "@/lib/badges"
 import { accentColorHex } from "@/lib/accent-colors"
 import { getSellerStorefront } from "@/lib/marketplace"
-import { formatLastActive, isOnline } from "@/lib/time"
+import { formatDurationHours, formatLastActive, isOnline } from "@/lib/time"
 import { cn, initialsOf } from "@/lib/utils"
 
 export async function generateMetadata({
@@ -178,6 +178,35 @@ export default async function LojaPage({
                       <span className="text-xs text-muted-foreground">Negativas</span>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Velocidade de entrega</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {store.delivery.total === 0 ? (
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Timer className="size-4 shrink-0" aria-hidden="true" />
+                      Ainda não há entregas suficientes para calcular esse indicador.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 divide-x divide-border text-center">
+                      <div className="flex flex-col items-center gap-1 px-2">
+                        <Gauge className="size-4 text-success" aria-hidden="true" />
+                        <span className="text-xl font-semibold">{store.delivery.onTimePercent}%</span>
+                        <span className="text-xs text-muted-foreground">Entregue no prazo</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1 px-2">
+                        <Timer className="size-4 text-muted-foreground" aria-hidden="true" />
+                        <span className="text-xl font-semibold">
+                          {formatDurationHours(store.delivery.avgDeliveryHours!)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">Tempo médio de entrega</span>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

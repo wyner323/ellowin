@@ -349,6 +349,31 @@ export async function getSellerReputationBreakdown(sellerId: string) {
   }
 }
 
+/**
+ * % de pedidos entregues dentro do prazo prometido + tempo médio de entrega,
+ * pro perfil público. Só conta pedidos com `deliveryDueAt` preenchido —
+ * entrega automática (sem janela fixa) fica fora dos dois números.
+ */
+export async function getSellerDeliveryStats(sellerId: string) {
+  const [row] = await db
+    .select({
+      total: sql<number>`coalesce(sum(case when ${order.deliveryDueAt} is not null then 1 else 0 end), 0)`,
+      onTime: sql<number>`coalesce(sum(case when ${order.deliveryDueAt} is not null and ${order.deliveredAt} <= ${order.deliveryDueAt} then 1 else 0 end), 0)`,
+      avgHours: sql<number | null>`avg(case when ${order.deliveryDueAt} is not null
+        then extract(epoch from (${order.deliveredAt} - ${order.createdAt})) / 3600 end)`,
+    })
+    .from(order)
+    .where(and(eq(order.sellerId, sellerId), sql`${order.deliveredAt} is not null`))
+
+  const total = Number(row?.total ?? 0)
+  const onTime = Number(row?.onTime ?? 0)
+  return {
+    total,
+    onTimePercent: total > 0 ? Math.round((onTime / total) * 100) : null,
+    avgDeliveryHours: row?.avgHours != null ? Number(row.avgHours) : null,
+  }
+}
+
 /** Últimas avaliações recebidas por um vendedor, pro perfil público. */
 export async function getSellerRecentReviews(sellerId: string, limit = 5) {
   return db
@@ -452,7 +477,7 @@ export async function getSellerStorefront(slug: string) {
 
   if (!row || row.status !== "aprovado") return null
 
-  const [stats, disputeRow, reputation, recentReviews] = await Promise.all([
+  const [stats, disputeRow, reputation, recentReviews, delivery] = await Promise.all([
     getSellerStats(row.sellerId),
     db
       .select({ count: sql<number>`count(*)` })
@@ -461,6 +486,7 @@ export async function getSellerStorefront(slug: string) {
       .where(eq(order.sellerId, row.sellerId)),
     getSellerReputationBreakdown(row.sellerId),
     getSellerRecentReviews(row.sellerId),
+    getSellerDeliveryStats(row.sellerId),
   ])
 
   const activeProducts = await db
@@ -504,6 +530,7 @@ export async function getSellerStorefront(slug: string) {
     stats,
     reputation,
     recentReviews,
+    delivery,
     badges: computeSellerBadges({ ...stats, disputesCount }),
     products: activeProducts
       .filter((p) => p.minPrice !== null)

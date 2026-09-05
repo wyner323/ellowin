@@ -255,6 +255,8 @@ export const order = pgTable("order", {
   status: text("status").notNull().default("aguardando_entrega"),
   deliveryPayload: text("deliveryPayload"),
   deliveredAt: timestamp("deliveredAt"),
+  /** Prazo prometido, congelado a partir de product.deliveryTime na compra — mesmo motivo de productTitle/variantLabel acima. Null pra entrega automática ou pedidos anteriores a esta coluna. */
+  deliveryDueAt: timestamp("deliveryDueAt"),
   autoReleaseAt: timestamp("autoReleaseAt"),
   completedAt: timestamp("completedAt"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),

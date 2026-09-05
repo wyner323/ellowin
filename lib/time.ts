@@ -22,3 +22,14 @@ export function formatLastActive(lastActiveAt: Date | null): string {
   const days = Math.floor(hours / 24)
   return `há ${days} dia${days === 1 ? "" : "s"}`
 }
+
+/** "menos de 1 hora" / "3 horas" / "2 dias" — duração média, não "tempo atrás". */
+export function formatDurationHours(hours: number): string {
+  if (hours < 1) return "menos de 1 hora"
+  if (hours < 24) {
+    const h = Math.round(hours)
+    return `${h} hora${h === 1 ? "" : "s"}`
+  }
+  const days = Math.round(hours / 24)
+  return `${days} dia${days === 1 ? "" : "s"}`
+}
