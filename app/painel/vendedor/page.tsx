@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
 import { BannerUpload } from "@/components/account/banner-upload"
+import { BalanceTrendChart, SalesPerDayChart } from "@/components/seller/dashboard-charts"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,7 +16,7 @@ import { getSellerStats } from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
 import { getMyDisputes, getSellerOrders } from "@/lib/orders"
 import { getSession } from "@/lib/session"
-import { getWalletSummary } from "@/lib/wallet"
+import { getWalletEntries, getWalletSummary } from "@/lib/wallet"
 import { eq } from "drizzle-orm"
 
 export const metadata: Metadata = {
@@ -35,10 +36,11 @@ export default async function PainelVendedorPage() {
 
   if (!application || application.status !== "aprovado") redirect("/vender")
 
-  const [stats, orders, wallet, disputes, [profileRow]] = await Promise.all([
+  const [stats, orders, wallet, walletEntries, disputes, [profileRow]] = await Promise.all([
     getSellerStats(session.user.id),
     getSellerOrders(session.user.id),
     getWalletSummary(session.user.id),
+    getWalletEntries(session.user.id, 60),
     getMyDisputes(session.user.id),
     db
       .select({ bannerUrl: user.bannerUrl })
@@ -51,6 +53,40 @@ export default async function PainelVendedorPage() {
   const openDisputes = disputes.filter(
     (d) => d.status === "aberta" || d.status === "em_analise",
   )
+
+  // Ledger já vem em ordem decrescente; inverte pra desenhar o gráfico em
+  // ordem cronológica, e cada linha já carrega o saldo resultante — sem
+  // agregação nenhuma.
+  const balanceHistory = [...walletEntries].reverse().map((e) => ({
+    label: e.createdAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+    balanceCents: e.balanceAfterCents,
+  }))
+
+  // Vendas concluídas dos últimos 14 dias, agrupadas por dia (dias sem venda
+  // ficam zerados pra manter o eixo contínuo) — deriva de `orders`, já
+  // buscado acima pra calcular `escrowCents`, sem query nova.
+  const salesByDay = new Map<string, number>()
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    salesByDay.set(d.toISOString().slice(0, 10), 0)
+  }
+  for (const o of orders) {
+    if (o.status !== "concluido" || !o.completedAt) continue
+    const key = o.completedAt.toISOString().slice(0, 10)
+    if (salesByDay.has(key)) salesByDay.set(key, salesByDay.get(key)! + 1)
+  }
+  const salesTimeline = Array.from(salesByDay, ([date, count]) => {
+    // Monta a data pelos componentes (não `new Date(dateString)`, que o JS
+    // interpreta como UTC-meia-noite) pra garantir que o rótulo sempre bate
+    // com o dia da própria chave, não importa o fuso do processo.
+    const [y, m, d] = date.split("-").map(Number)
+    const label = new Date(y, m - 1, d).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+    })
+    return { label, count }
+  })
 
   // A custódia fica na carteira do comprador até a liberação, então o valor a
   // receber do vendedor vem dos pedidos ainda não concluídos, não do seu saldo.
@@ -109,19 +145,18 @@ export default async function PainelVendedorPage() {
 
           <div className="grid gap-3 sm:grid-cols-3">
             {cards.map((card) => (
-              <div
-                key={card.label}
-                className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4"
-              >
-                <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <card.icon className="size-3.5" aria-hidden="true" />
-                  {card.label}
-                </span>
-                <strong className="font-display text-2xl font-bold tracking-tight">
-                  {card.value}
-                </strong>
-                <span className="text-xs text-muted-foreground">{card.hint}</span>
-              </div>
+              <Card key={card.label}>
+                <CardContent className="flex flex-col gap-2">
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <card.icon className="size-3.5" aria-hidden="true" />
+                    {card.label}
+                  </span>
+                  <strong className="font-display text-2xl font-bold tracking-tight">
+                    {card.value}
+                  </strong>
+                  <span className="text-xs text-muted-foreground">{card.hint}</span>
+                </CardContent>
+              </Card>
             ))}
           </div>
 
@@ -142,6 +177,28 @@ export default async function PainelVendedorPage() {
               </Button>
             </div>
           ) : null}
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">Desempenho</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Saldo ao longo do tempo</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BalanceTrendChart data={balanceHistory} />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Vendas nos últimos 14 dias</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <SalesPerDayChart data={salesTimeline} hasAnySale={stats.salesCount > 0} />
+                </CardContent>
+              </Card>
+            </div>
+          </section>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <Link
