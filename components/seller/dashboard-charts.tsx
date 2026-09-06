@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   Tooltip,
   XAxis,
+  YAxis,
 } from "recharts"
 import { formatCents } from "@/lib/money"
 
@@ -20,8 +21,19 @@ const tooltipStyle = {
     borderColor: "var(--border)",
     borderRadius: "var(--radius-md)",
     color: "var(--popover-foreground)",
+    fontSize: 12,
   },
   labelStyle: { color: "var(--popover-foreground)" },
+}
+
+// Poucos ticks, sempre incluindo início/fim — evita rótulos amontoados
+// quando o card fica estreito (celular, ou lado a lado no desktop).
+const xAxisProps = {
+  tick: axisTick,
+  axisLine,
+  tickLine: false,
+  interval: "preserveStartEnd" as const,
+  minTickGap: 24,
 }
 
 type BalancePoint = { label: string; balanceCents: number }
@@ -36,9 +48,9 @@ export function BalanceTrendChart({ data }: { data: BalancePoint[] }) {
   }
 
   return (
-    <div className="h-56 w-full">
+    <div className="h-48 w-full sm:h-56">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+        <AreaChart data={data} margin={{ left: -12, right: 8, top: 8, bottom: 0 }}>
           <defs>
             <linearGradient id="balanceFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
@@ -46,11 +58,13 @@ export function BalanceTrendChart({ data }: { data: BalancePoint[] }) {
             </linearGradient>
           </defs>
           <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis
-            dataKey="label"
+          <XAxis dataKey="label" {...xAxisProps} />
+          <YAxis
+            width={44}
             tick={axisTick}
-            axisLine={axisLine}
+            axisLine={false}
             tickLine={false}
+            tickFormatter={(v: number) => Math.round(v / 100).toLocaleString("pt-BR")}
           />
           <Tooltip
             {...tooltipStyle}
@@ -83,15 +97,17 @@ export function SalesPerDayChart({
   }
 
   return (
-    <div className="h-56 w-full">
+    <div className="h-48 w-full sm:h-56">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+        <BarChart data={data} margin={{ left: -20, right: 8, top: 8, bottom: 0 }}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis
-            dataKey="label"
+          <XAxis dataKey="label" {...xAxisProps} />
+          <YAxis
+            width={28}
             tick={axisTick}
-            axisLine={axisLine}
+            axisLine={false}
             tickLine={false}
+            allowDecimals={false}
           />
           <Tooltip
             {...tooltipStyle}

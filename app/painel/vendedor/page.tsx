@@ -180,7 +180,7 @@ export default async function PainelVendedorPage() {
 
           <section className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold">Desempenho</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Saldo ao longo do tempo</CardTitle>
