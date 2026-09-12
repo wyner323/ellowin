@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
 import { BannerUpload } from "@/components/account/banner-upload"
-import { BalanceTrendChart, SalesPerDayChart, TrendBadge } from "@/components/seller/dashboard-charts"
+import { BalanceTrendChart, SalesPerformanceCard, TrendBadge } from "@/components/seller/dashboard-charts"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -62,11 +62,14 @@ export default async function PainelVendedorPage() {
     balanceCents: e.balanceAfterCents,
   }))
 
-  // Vendas concluídas dos últimos 14 dias, agrupadas por dia (dias sem venda
+  // Vendas concluídas dos últimos 60 dias, agrupadas por dia (dias sem venda
   // ficam zerados pra manter o eixo contínuo) — deriva de `orders`, já
-  // buscado acima pra calcular `escrowCents`, sem query nova.
+  // buscado acima pra calcular `escrowCents`, sem query nova. 60 dias é o
+  // dobro do maior período selecionável no card (30d), pra sempre sobrar um
+  // "período anterior" completo pra comparar (o recorte por período e a
+  // comparação em si acontecem no client, em SalesPerformanceCard).
   const salesByDay = new Map<string, { count: number; totalCents: number }>()
-  for (let i = 13; i >= 0; i--) {
+  for (let i = 59; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i)
     salesByDay.set(d.toISOString().slice(0, 10), { count: 0, totalCents: 0 })
@@ -91,17 +94,6 @@ export default async function PainelVendedorPage() {
     })
     return { label, count, totalCents }
   })
-
-  // Comparação com o período anterior: quantas vendas nos 14 dias atuais
-  // (soma do próprio salesTimeline) vs. nos 14 dias antes desses.
-  const currentPeriodSalesCount = salesTimeline.reduce((sum, d) => sum + d.count, 0)
-  let previousPeriodSalesCount = 0
-  for (const o of orders) {
-    if (o.status !== "concluido" || !o.completedAt) continue
-    const daysAgo = (Date.now() - o.completedAt.getTime()) / (1000 * 60 * 60 * 24)
-    if (daysAgo >= 14 && daysAgo < 28) previousPeriodSalesCount++
-  }
-  const salesDelta = currentPeriodSalesCount - previousPeriodSalesCount
 
   // Variação do saldo entre o lançamento mais antigo e o mais recente
   // mostrados no gráfico (não é um período fixo — segue a janela real dos
@@ -220,17 +212,7 @@ export default async function PainelVendedorPage() {
                   <BalanceTrendChart data={balanceHistory} />
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Vendas nos últimos 14 dias</CardTitle>
-                  {stats.salesCount > 0 ? (
-                    <TrendBadge delta={salesDelta} label="vs. período anterior" />
-                  ) : null}
-                </CardHeader>
-                <CardContent>
-                  <SalesPerDayChart data={salesTimeline} hasAnySale={stats.salesCount > 0} />
-                </CardContent>
-              </Card>
+              <SalesPerformanceCard data={salesTimeline} hasAnySale={stats.salesCount > 0} />
             </div>
           </section>
 

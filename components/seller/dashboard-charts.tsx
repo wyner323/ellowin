@@ -14,6 +14,7 @@ import {
   YAxis,
 } from "recharts"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCents } from "@/lib/money"
 import { cn } from "@/lib/utils"
 
@@ -128,74 +129,130 @@ export function BalanceTrendChart({ data }: { data: BalancePoint[] }) {
   )
 }
 
-type SalesPoint = { label: string; count: number; totalCents: number }
+type SalesDay = { label: string; count: number; totalCents: number }
 type SalesMetric = "count" | "revenue"
 
-export function SalesPerDayChart({
-  data,
-  hasAnySale,
-}: {
-  data: SalesPoint[]
-  hasAnySale: boolean
-}) {
-  const [metric, setMetric] = useState<SalesMetric>("count")
-
-  if (!hasAnySale) {
-    return <p className="text-sm text-muted-foreground">Você ainda não vendeu nada.</p>
-  }
-
+function SalesBarChart({ data, metric }: { data: SalesDay[]; metric: SalesMetric }) {
   const isRevenue = metric === "revenue"
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex w-fit gap-1 rounded-lg border border-border p-0.5">
-        <Button
-          type="button"
-          size="xs"
-          variant={metric === "count" ? "secondary" : "ghost"}
-          onClick={() => setMetric("count")}
-        >
-          Nº de vendas
-        </Button>
-        <Button
-          type="button"
-          size="xs"
-          variant={isRevenue ? "secondary" : "ghost"}
-          onClick={() => setMetric("revenue")}
-        >
-          Receita
-        </Button>
-      </div>
-
-      <div className="h-48 w-full sm:h-56">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ left: -20, right: 8, top: 8, bottom: 0 }}>
-            <CartesianGrid stroke="var(--border)" vertical={false} />
-            <XAxis dataKey="label" {...xAxisProps} />
-            <YAxis
-              width={isRevenue ? 44 : 28}
-              tick={axisTick}
-              axisLine={false}
-              tickLine={false}
-              allowDecimals={false}
-              tickFormatter={
-                isRevenue ? (v: number) => Math.round(v / 100).toLocaleString("pt-BR") : undefined
-              }
-            />
-            <Tooltip
-              {...tooltipStyle}
-              formatter={(value) =>
-                isRevenue ? [formatCents(Number(value)), "Receita"] : [Number(value), "Vendas"]
-              }
-            />
-            <Bar
-              dataKey={isRevenue ? "totalCents" : "count"}
-              fill="var(--color-chart-2)"
-              radius={4}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+    <div className="h-48 w-full sm:h-56">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ left: -20, right: 8, top: 8, bottom: 0 }}>
+          <CartesianGrid stroke="var(--border)" vertical={false} />
+          <XAxis dataKey="label" {...xAxisProps} />
+          <YAxis
+            width={isRevenue ? 44 : 28}
+            tick={axisTick}
+            axisLine={false}
+            tickLine={false}
+            allowDecimals={false}
+            tickFormatter={
+              isRevenue ? (v: number) => Math.round(v / 100).toLocaleString("pt-BR") : undefined
+            }
+          />
+          <Tooltip
+            {...tooltipStyle}
+            formatter={(value) =>
+              isRevenue ? [formatCents(Number(value)), "Receita"] : [Number(value), "Vendas"]
+            }
+          />
+          <Bar
+            dataKey={isRevenue ? "totalCents" : "count"}
+            fill="var(--color-chart-2)"
+            radius={4}
+          />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
+  )
+}
+
+const SALES_PERIODS = [7, 14, 30] as const
+type SalesPeriod = (typeof SALES_PERIODS)[number]
+
+/**
+ * Card "Vendas" completo (título, seletor de período, alternância de
+ * métrica e o gráfico) — dono do próprio estado, por isso o card inteiro
+ * vira client component em vez de só o gráfico.
+ *
+ * `data` vem do servidor já com os últimos 60 dias (o dobro do maior
+ * período disponível), do mais antigo pro mais recente, pra sempre sobrar
+ * um "período anterior" completo pra comparar contra o período selecionado.
+ */
+export function SalesPerformanceCard({
+  data,
+  hasAnySale,
+}: {
+  data: SalesDay[]
+  hasAnySale: boolean
+}) {
+  const [period, setPeriod] = useState<SalesPeriod>(14)
+  const [metric, setMetric] = useState<SalesMetric>("count")
+
+  const currentSlice = data.slice(-period)
+  const previousSlice = data.slice(-period * 2, -period)
+  const sumBy = (days: SalesDay[], key: "count" | "totalCents") =>
+    days.reduce((total, d) => total + d[key], 0)
+  const delta =
+    metric === "revenue"
+      ? sumBy(currentSlice, "totalCents") - sumBy(previousSlice, "totalCents")
+      : sumBy(currentSlice, "count") - sumBy(previousSlice, "count")
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Vendas nos últimos {period} dias</CardTitle>
+        {hasAnySale ? (
+          <TrendBadge
+            delta={delta}
+            label="vs. período anterior"
+            formattedAbs={metric === "revenue" ? formatCents(Math.abs(delta)) : undefined}
+          />
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        {!hasAnySale ? (
+          <p className="text-sm text-muted-foreground">Você ainda não vendeu nada.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex w-fit gap-1 rounded-lg border border-border p-0.5">
+                {SALES_PERIODS.map((p) => (
+                  <Button
+                    key={p}
+                    type="button"
+                    size="xs"
+                    variant={period === p ? "secondary" : "ghost"}
+                    onClick={() => setPeriod(p)}
+                  >
+                    {p}d
+                  </Button>
+                ))}
+              </div>
+              <div className="flex w-fit gap-1 rounded-lg border border-border p-0.5">
+                <Button
+                  type="button"
+                  size="xs"
+                  variant={metric === "count" ? "secondary" : "ghost"}
+                  onClick={() => setMetric("count")}
+                >
+                  Nº de vendas
+                </Button>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant={metric === "revenue" ? "secondary" : "ghost"}
+                  onClick={() => setMetric("revenue")}
+                >
+                  Receita
+                </Button>
+              </div>
+            </div>
+            <SalesBarChart data={currentSlice} metric={metric} />
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
