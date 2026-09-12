@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Minus, TrendingDown, TrendingUp } from "lucide-react"
 import {
   Area,
@@ -12,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import { Button } from "@/components/ui/button"
 import { formatCents } from "@/lib/money"
 import { cn } from "@/lib/utils"
 
@@ -126,7 +128,8 @@ export function BalanceTrendChart({ data }: { data: BalancePoint[] }) {
   )
 }
 
-type SalesPoint = { label: string; count: number }
+type SalesPoint = { label: string; count: number; totalCents: number }
+type SalesMetric = "count" | "revenue"
 
 export function SalesPerDayChart({
   data,
@@ -135,30 +138,64 @@ export function SalesPerDayChart({
   data: SalesPoint[]
   hasAnySale: boolean
 }) {
+  const [metric, setMetric] = useState<SalesMetric>("count")
+
   if (!hasAnySale) {
     return <p className="text-sm text-muted-foreground">Você ainda não vendeu nada.</p>
   }
 
+  const isRevenue = metric === "revenue"
+
   return (
-    <div className="h-48 w-full sm:h-56">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ left: -20, right: 8, top: 8, bottom: 0 }}>
-          <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis dataKey="label" {...xAxisProps} />
-          <YAxis
-            width={28}
-            tick={axisTick}
-            axisLine={false}
-            tickLine={false}
-            allowDecimals={false}
-          />
-          <Tooltip
-            {...tooltipStyle}
-            formatter={(value) => [Number(value), "Vendas"]}
-          />
-          <Bar dataKey="count" fill="var(--color-chart-2)" radius={4} />
-        </BarChart>
-      </ResponsiveContainer>
+    <div className="flex flex-col gap-2">
+      <div className="flex w-fit gap-1 rounded-lg border border-border p-0.5">
+        <Button
+          type="button"
+          size="xs"
+          variant={metric === "count" ? "secondary" : "ghost"}
+          onClick={() => setMetric("count")}
+        >
+          Nº de vendas
+        </Button>
+        <Button
+          type="button"
+          size="xs"
+          variant={isRevenue ? "secondary" : "ghost"}
+          onClick={() => setMetric("revenue")}
+        >
+          Receita
+        </Button>
+      </div>
+
+      <div className="h-48 w-full sm:h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ left: -20, right: 8, top: 8, bottom: 0 }}>
+            <CartesianGrid stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="label" {...xAxisProps} />
+            <YAxis
+              width={isRevenue ? 44 : 28}
+              tick={axisTick}
+              axisLine={false}
+              tickLine={false}
+              allowDecimals={false}
+              tickFormatter={
+                isRevenue ? (v: number) => Math.round(v / 100).toLocaleString("pt-BR") : undefined
+              }
+            />
+            <Tooltip
+              {...tooltipStyle}
+              formatter={(value) =>
+                isRevenue ? [formatCents(Number(value)), "Receita"] : [Number(value), "Vendas"]
+              }
+            />
+            <Bar
+              dataKey={isRevenue ? "totalCents" : "count"}
+              fill="var(--color-chart-2)"
+              radius={4}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }

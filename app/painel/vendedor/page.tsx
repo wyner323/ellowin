@@ -65,18 +65,22 @@ export default async function PainelVendedorPage() {
   // Vendas concluídas dos últimos 14 dias, agrupadas por dia (dias sem venda
   // ficam zerados pra manter o eixo contínuo) — deriva de `orders`, já
   // buscado acima pra calcular `escrowCents`, sem query nova.
-  const salesByDay = new Map<string, number>()
+  const salesByDay = new Map<string, { count: number; totalCents: number }>()
   for (let i = 13; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i)
-    salesByDay.set(d.toISOString().slice(0, 10), 0)
+    salesByDay.set(d.toISOString().slice(0, 10), { count: 0, totalCents: 0 })
   }
   for (const o of orders) {
     if (o.status !== "concluido" || !o.completedAt) continue
     const key = o.completedAt.toISOString().slice(0, 10)
-    if (salesByDay.has(key)) salesByDay.set(key, salesByDay.get(key)! + 1)
+    const bucket = salesByDay.get(key)
+    if (bucket) {
+      bucket.count += 1
+      bucket.totalCents += o.sellerNetCents
+    }
   }
-  const salesTimeline = Array.from(salesByDay, ([date, count]) => {
+  const salesTimeline = Array.from(salesByDay, ([date, { count, totalCents }]) => {
     // Monta a data pelos componentes (não `new Date(dateString)`, que o JS
     // interpreta como UTC-meia-noite) pra garantir que o rótulo sempre bate
     // com o dia da própria chave, não importa o fuso do processo.
@@ -85,7 +89,7 @@ export default async function PainelVendedorPage() {
       day: "2-digit",
       month: "2-digit",
     })
-    return { label, count }
+    return { label, count, totalCents }
   })
 
   // Comparação com o período anterior: quantas vendas nos 14 dias atuais
