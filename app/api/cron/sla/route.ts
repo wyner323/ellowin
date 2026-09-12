@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { sweepDisputeSla } from "@/lib/sla"
+import { sweepDeliveryDeadline, sweepDisputeSla } from "@/lib/sla"
 
 /**
  * Chamado pelo Vercel Cron (ver vercel.json). A Vercel injeta o header
@@ -15,6 +15,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 })
   }
 
-  const processed = await sweepDisputeSla()
-  return NextResponse.json({ ok: true, processed })
+  // Os dois sweeps atuam em conjuntos de status mutuamente exclusivos
+  // (em_disputa vs. aguardando_entrega), então rodam em paralelo com
+  // segurança. allSettled em vez de Promise.all: uma falha num não pode
+  // impedir o outro de ser reportado.
+  const [disputeResult, deliveryResult] = await Promise.allSettled([
+    sweepDisputeSla(),
+    sweepDeliveryDeadline(),
+  ])
+
+  return NextResponse.json({
+    ok: true,
+    disputeProcessed: disputeResult.status === "fulfilled" ? disputeResult.value : null,
+    disputeError: disputeResult.status === "rejected" ? String(disputeResult.reason) : null,
+    deliveryProcessed: deliveryResult.status === "fulfilled" ? deliveryResult.value : null,
+    deliveryError: deliveryResult.status === "rejected" ? String(deliveryResult.reason) : null,
+  })
 }

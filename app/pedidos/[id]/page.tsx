@@ -18,6 +18,7 @@ import { formatCents } from "@/lib/money"
 import { getOrderDetail, getOrderMessages } from "@/lib/orders"
 import { getStaff } from "@/lib/roles"
 import { getSession } from "@/lib/session"
+import { sweepDeliveryDeadline } from "@/lib/sla"
 
 export const metadata: Metadata = {
   title: "Detalhe do pedido",
@@ -34,6 +35,9 @@ export default async function PedidoPage({
 
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
+
+  // Sem cron neste ambiente: o prazo de entrega é varrido ao abrir o pedido.
+  await sweepDeliveryDeadline()
 
   const staff = await getStaff()
   const detail = await getOrderDetail(orderId, session.user.id, Boolean(staff))

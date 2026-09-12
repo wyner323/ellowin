@@ -16,6 +16,7 @@ import { getSellerDeliveryStats, getSellerStats } from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
 import { getMyDisputes, getSellerOrders } from "@/lib/orders"
 import { getSession } from "@/lib/session"
+import { sweepDeliveryDeadline } from "@/lib/sla"
 import { formatDurationHours } from "@/lib/time"
 import { getWalletEntries, getWalletSummary } from "@/lib/wallet"
 import { eq } from "drizzle-orm"
@@ -36,6 +37,10 @@ export default async function PainelVendedorPage() {
     .limit(1)
 
   if (!application || application.status !== "aprovado") redirect("/vender")
+
+  // Sem cron neste ambiente: varre antes do Promise.all abaixo, já que
+  // getSellerOrders() está dentro dele.
+  await sweepDeliveryDeadline()
 
   const [stats, orders, wallet, walletEntries, delivery, disputes, [profileRow]] = await Promise.all([
     getSellerStats(session.user.id),

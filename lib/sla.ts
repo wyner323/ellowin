@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, lt } from "drizzle-orm"
+import { and, eq, inArray, isNotNull, isNull, lt } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { dispute, order } from "@/lib/db/schema"
 import { refundEscrow, withTransaction } from "@/lib/wallet"
@@ -154,6 +154,91 @@ export async function sweepDisputeSla() {
       processed += 1
     } catch (error) {
       console.error(`[sla] Falha ao varrer a disputa #${row.id}:`, error)
+    }
+  }
+
+  return processed
+}
+
+/**
+ * Aplica o prazo de entrega: reembolsa automaticamente o comprador quando o
+ * vendedor não confirma a entrega dentro da janela prometida no anúncio
+ * (order.deliveryDueAt, congelada na compra a partir de product.deliveryTime
+ * — ver lib/delivery.ts). Mesmo padrão de sweepDisputeSla(): sem cron neste
+ * ambiente, isso roda ao carregar as telas de pedidos. Também repõe o
+ * estoque da variante, já que a venda não se completou — mesmo
+ * comportamento de cancelOrder() em app/actions/orders.ts.
+ */
+export async function sweepDeliveryDeadline() {
+  const stale = await db
+    .select({ id: order.id })
+    .from(order)
+    .where(
+      and(
+        eq(order.status, "aguardando_entrega"),
+        isNotNull(order.deliveryDueAt),
+        lt(order.deliveryDueAt, new Date()),
+      ),
+    )
+
+  if (stale.length === 0) return 0
+
+  let processed = 0
+
+  for (const row of stale) {
+    // Mesmo motivo do sweepDisputeSla(): um pedido com problema não pode
+    // travar a varredura inteira, já que isso roda a cada carregamento de
+    // tela de pedidos.
+    try {
+      const [ord] = await db
+        .select()
+        .from(order)
+        .where(eq(order.id, row.id))
+        .limit(1)
+
+      if (!ord || ord.status !== "aguardando_entrega") continue
+
+      await withTransaction(async (client) => {
+        await refundEscrow(
+          client,
+          ord.buyerId,
+          ord.amountCents,
+          ord.id,
+          `Reembolso automático por prazo de entrega — pedido #${ord.id}`,
+        )
+
+        // Guarda a mesma corrida do re-check acima, mas dentro da própria
+        // transação: se o status mudou entre o SELECT de cima e aqui (ex.:
+        // vendedor entregou ou comprador cancelou nesse intervalo), o UPDATE
+        // não afeta nenhuma linha e a transação inteira desfaz o
+        // refundEscrow já executado.
+        const updated = await client.query(
+          `UPDATE "order" SET "status" = 'reembolsado', "completedAt" = now()
+            WHERE "id" = $1 AND "status" = 'aguardando_entrega'`,
+          [ord.id],
+        )
+        if (updated.rowCount === 0) {
+          throw new Error(`pedido #${ord.id} saiu de aguardando_entrega durante o reembolso`)
+        }
+
+        await client.query(
+          `UPDATE "product_variant" SET "stock" = "stock" + 1 WHERE "id" = $1`,
+          [ord.variantId],
+        )
+
+        await client.query(
+          `INSERT INTO "order_message" ("orderId", "authorRole", "body")
+           VALUES ($1, 'system', $2)`,
+          [
+            ord.id,
+            "Prazo de entrega encerrado sem confirmação do vendedor. O valor em custódia foi devolvido ao comprador automaticamente.",
+          ],
+        )
+      })
+
+      processed += 1
+    } catch (error) {
+      console.error(`[sla] Falha ao varrer o pedido #${row.id}:`, error)
     }
   }
 
