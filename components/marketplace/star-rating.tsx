@@ -35,7 +35,7 @@ export function StarRating({
             className={cn(
               iconSize,
               n <= Math.round(rating)
-                ? "fill-chart-4 text-chart-4"
+                ? "fill-gold text-gold"
                 : "text-muted-foreground/40",
             )}
           />

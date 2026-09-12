@@ -46,15 +46,18 @@ export function ProductCard({ card }: { card: StorefrontCard }) {
       <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <BadgeCheck className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
         <span className="truncate">
-          {card.seller.name} · Nível {card.seller.level} ·{" "}
-          {card.seller.sales.toLocaleString("pt-BR")} vendas
+          {card.seller.name} ·{" "}
+          <span className="font-medium text-gold">
+            Nível {card.seller.level}
+          </span>{" "}
+          · {card.seller.sales.toLocaleString("pt-BR")} vendas
         </span>
       </p>
 
       <div className="mt-auto flex items-end justify-between gap-2 border-t border-border pt-3">
         <div className="flex flex-col">
           <span className="text-xs text-muted-foreground">a partir de</span>
-          <span className="font-display text-lg font-bold">
+          <span className="font-display text-lg font-bold text-gold drop-shadow-[0_0_10px_oklch(from_var(--gold)_l_c_h_/_35%)]">
             {formatCents(card.priceCents)}
           </span>
         </div>
