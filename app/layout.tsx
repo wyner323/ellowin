@@ -1,6 +1,6 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Inter, Space_Grotesk } from 'next/font/google'
+import { Inter, Unbounded } from 'next/font/google'
 import { DesignLab } from '@/components/dev/design-lab'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
@@ -11,9 +11,9 @@ const inter = Inter({
   display: 'swap',
 })
 
-const spaceGrotesk = Space_Grotesk({
+const unbounded = Unbounded({
   subsets: ['latin'],
-  variable: '--font-space-grotesk',
+  variable: '--font-unbounded',
   display: 'swap',
 })
 
@@ -57,7 +57,7 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`bg-background ${inter.variable} ${spaceGrotesk.variable}`}
+      className={`bg-background ${inter.variable} ${unbounded.variable}`}
     >
       <body className="font-sans antialiased">
         {children}
