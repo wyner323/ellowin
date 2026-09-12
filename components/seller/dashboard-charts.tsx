@@ -1,5 +1,6 @@
 "use client"
 
+import { Minus, TrendingDown, TrendingUp } from "lucide-react"
 import {
   Area,
   AreaChart,
@@ -12,6 +13,48 @@ import {
   YAxis,
 } from "recharts"
 import { formatCents } from "@/lib/money"
+import { cn } from "@/lib/utils"
+
+/**
+ * Selo de tendência ("+4 vs. período anterior") pro cabeçalho de um card de
+ * gráfico. `formattedAbs` já vem pronto do server component (ex.:
+ * `formatCents(Math.abs(delta))`) — funções não podem ser passadas de um
+ * Server pra um Client Component, só o valor final.
+ */
+export function TrendBadge({
+  delta,
+  label,
+  formattedAbs = String(Math.abs(delta)),
+}: {
+  delta: number
+  label: string
+  formattedAbs?: string
+}) {
+  if (delta === 0) {
+    return (
+      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        <Minus className="size-3" aria-hidden="true" />
+        Sem mudança {label}
+      </span>
+    )
+  }
+
+  const isUp = delta > 0
+  const Icon = isUp ? TrendingUp : TrendingDown
+
+  return (
+    <span
+      className={cn(
+        "flex items-center gap-1 text-xs",
+        isUp ? "text-success" : "text-destructive",
+      )}
+    >
+      <Icon className="size-3" aria-hidden="true" />
+      {isUp ? "+" : "-"}
+      {formattedAbs} {label}
+    </span>
+  )
+}
 
 const axisTick = { fill: "var(--color-muted-foreground)", fontSize: 11 }
 const axisLine = { stroke: "var(--border)" }

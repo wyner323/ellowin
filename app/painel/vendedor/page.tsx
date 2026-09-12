@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
 import { BannerUpload } from "@/components/account/banner-upload"
-import { BalanceTrendChart, SalesPerDayChart } from "@/components/seller/dashboard-charts"
+import { BalanceTrendChart, SalesPerDayChart, TrendBadge } from "@/components/seller/dashboard-charts"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -87,6 +87,26 @@ export default async function PainelVendedorPage() {
     })
     return { label, count }
   })
+
+  // Comparação com o período anterior: quantas vendas nos 14 dias atuais
+  // (soma do próprio salesTimeline) vs. nos 14 dias antes desses.
+  const currentPeriodSalesCount = salesTimeline.reduce((sum, d) => sum + d.count, 0)
+  let previousPeriodSalesCount = 0
+  for (const o of orders) {
+    if (o.status !== "concluido" || !o.completedAt) continue
+    const daysAgo = (Date.now() - o.completedAt.getTime()) / (1000 * 60 * 60 * 24)
+    if (daysAgo >= 14 && daysAgo < 28) previousPeriodSalesCount++
+  }
+  const salesDelta = currentPeriodSalesCount - previousPeriodSalesCount
+
+  // Variação do saldo entre o lançamento mais antigo e o mais recente
+  // mostrados no gráfico (não é um período fixo — segue a janela real dos
+  // últimos 60 lançamentos, que pode cobrir dias ou meses dependendo do
+  // volume de movimentação).
+  const balanceDeltaCents =
+    balanceHistory.length >= 2
+      ? balanceHistory[balanceHistory.length - 1].balanceCents - balanceHistory[0].balanceCents
+      : null
 
   // A custódia fica na carteira do comprador até a liberação, então o valor a
   // receber do vendedor vem dos pedidos ainda não concluídos, não do seu saldo.
@@ -184,6 +204,13 @@ export default async function PainelVendedorPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Saldo ao longo do tempo</CardTitle>
+                  {balanceDeltaCents !== null ? (
+                    <TrendBadge
+                      delta={balanceDeltaCents}
+                      label="no período"
+                      formattedAbs={formatCents(Math.abs(balanceDeltaCents))}
+                    />
+                  ) : null}
                 </CardHeader>
                 <CardContent>
                   <BalanceTrendChart data={balanceHistory} />
@@ -192,6 +219,9 @@ export default async function PainelVendedorPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Vendas nos últimos 14 dias</CardTitle>
+                  {stats.salesCount > 0 ? (
+                    <TrendBadge delta={salesDelta} label="vs. período anterior" />
+                  ) : null}
                 </CardHeader>
                 <CardContent>
                   <SalesPerDayChart data={salesTimeline} hasAnySale={stats.salesCount > 0} />
