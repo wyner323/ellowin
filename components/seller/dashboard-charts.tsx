@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Minus, TrendingDown, TrendingUp } from "lucide-react"
+import Link from "next/link"
+import { Minus, ShoppingBag, TrendingDown, TrendingUp } from "lucide-react"
 import {
   Area,
   AreaChart,
@@ -183,9 +184,13 @@ type SalesPeriod = (typeof SALES_PERIODS)[number]
 export function SalesPerformanceCard({
   data,
   hasAnySale,
+  hasProducts,
+  storeSlug,
 }: {
   data: SalesDay[]
   hasAnySale: boolean
+  hasProducts: boolean
+  storeSlug: string | null
 }) {
   const [period, setPeriod] = useState<SalesPeriod>(14)
   const [metric, setMetric] = useState<SalesMetric>("count")
@@ -213,7 +218,26 @@ export function SalesPerformanceCard({
       </CardHeader>
       <CardContent>
         {!hasAnySale ? (
-          <p className="text-sm text-muted-foreground">Você ainda não vendeu nada.</p>
+          <div className="flex flex-col items-start gap-3">
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <ShoppingBag className="size-4 shrink-0" aria-hidden="true" />
+              {hasProducts
+                ? "Você ainda não vendeu nada."
+                : "Você ainda não tem nenhum anúncio ativo."}
+            </p>
+            <Button
+              size="sm"
+              render={
+                hasProducts ? (
+                  <Link href={storeSlug ? `/loja/${storeSlug}` : "/painel/vendedor/produtos"} target={storeSlug ? "_blank" : undefined} />
+                ) : (
+                  <Link href="/painel/vendedor/produtos/novo" />
+                )
+              }
+            >
+              {hasProducts ? "Ver minha loja pública" : "Publicar meu primeiro anúncio"}
+            </Button>
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">

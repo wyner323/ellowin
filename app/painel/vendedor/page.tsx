@@ -223,7 +223,12 @@ export default async function PainelVendedorPage() {
                   <BalanceTrendChart data={balanceHistory} />
                 </CardContent>
               </Card>
-              <SalesPerformanceCard data={salesTimeline} hasAnySale={stats.salesCount > 0} />
+              <SalesPerformanceCard
+                data={salesTimeline}
+                hasAnySale={stats.salesCount > 0}
+                hasProducts={stats.products > 0}
+                storeSlug={application.storeSlug}
+              />
             </div>
           </section>
 
