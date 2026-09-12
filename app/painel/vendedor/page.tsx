@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ExternalLink, Package, Plus, ShieldAlert, Store, TrendingUp } from "lucide-react"
+import { ExternalLink, Gauge, Package, Plus, ShieldAlert, Store, TrendingUp } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
@@ -12,10 +12,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { db } from "@/lib/db"
 import { sellerApplication, user } from "@/lib/db/schema"
-import { getSellerStats } from "@/lib/marketplace"
+import { getSellerDeliveryStats, getSellerStats } from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
 import { getMyDisputes, getSellerOrders } from "@/lib/orders"
 import { getSession } from "@/lib/session"
+import { formatDurationHours } from "@/lib/time"
 import { getWalletEntries, getWalletSummary } from "@/lib/wallet"
 import { eq } from "drizzle-orm"
 
@@ -36,11 +37,12 @@ export default async function PainelVendedorPage() {
 
   if (!application || application.status !== "aprovado") redirect("/vender")
 
-  const [stats, orders, wallet, walletEntries, disputes, [profileRow]] = await Promise.all([
+  const [stats, orders, wallet, walletEntries, delivery, disputes, [profileRow]] = await Promise.all([
     getSellerStats(session.user.id),
     getSellerOrders(session.user.id),
     getWalletSummary(session.user.id),
     getWalletEntries(session.user.id, 60),
+    getSellerDeliveryStats(session.user.id),
     getMyDisputes(session.user.id),
     db
       .select({ bannerUrl: user.bannerUrl })
@@ -131,6 +133,15 @@ export default async function PainelVendedorPage() {
       hint: `${stats.products} ${stats.products === 1 ? "anúncio" : "anúncios"}`,
       icon: Package,
     },
+    {
+      label: "Velocidade de entrega",
+      value: delivery.total > 0 ? `${delivery.onTimePercent}%` : "—",
+      hint:
+        delivery.total > 0
+          ? `No prazo — tempo médio: ${formatDurationHours(delivery.avgDeliveryHours!)}`
+          : "Ainda sem entregas suficientes",
+      icon: Gauge,
+    },
   ]
 
   return (
@@ -159,7 +170,7 @@ export default async function PainelVendedorPage() {
             </Button>
           </header>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {cards.map((card) => (
               <Card key={card.label}>
                 <CardContent className="flex flex-col gap-2">
