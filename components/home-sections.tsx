@@ -40,7 +40,7 @@ export function Hero() {
             <Button
               render={<Link href="/cadastro" />}
               size="lg"
-              className="transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98]"
+              className="shadow-[0_10px_30px_-8px_oklch(from_var(--primary)_l_c_h_/_55%)] transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98]"
             >
               Criar minha conta
             </Button>
@@ -60,7 +60,7 @@ export function Hero() {
               { value: '11 min', label: 'entrega média' },
             ].map((stat) => (
               <div key={stat.label} className="flex flex-col">
-                <dt className="font-display text-2xl font-bold text-primary">
+                <dt className="font-display text-2xl font-bold text-gold">
                   {stat.value}
                 </dt>
                 <dd className="text-xs text-muted-foreground">{stat.label}</dd>
@@ -90,7 +90,7 @@ export function Hero() {
                     {listing.seller.name} · Nível {listing.seller.level}
                   </span>
                 </div>
-                <span className="shrink-0 font-display text-sm font-bold">
+                <span className="shrink-0 font-display text-sm font-bold text-gold">
                   {formatBRL(listing.price)}
                 </span>
               </CardContent>
@@ -138,7 +138,7 @@ export function CategoryGrid() {
                 <span className="text-xs text-muted-foreground">
                   {category.listings.toLocaleString('pt-BR')} anúncios
                 </span>
-                <span className="text-xs font-semibold text-primary">
+                <span className="text-xs font-semibold text-gold">
                   a partir de {formatBRL(category.startingAt)}
                 </span>
               </div>
@@ -281,7 +281,7 @@ export function TrustSection() {
               key={item.level}
               className="group flex items-center gap-3 rounded-lg border border-border bg-background p-3 transition-all duration-200 hover:border-primary/40 hover:bg-accent/40"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground transition-transform duration-200 group-hover:scale-110">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-gold text-xs font-bold text-gold-foreground transition-transform duration-200 group-hover:scale-110">
                 N{item.level}
               </span>
               <span className="flex-1 text-sm font-medium">{item.label}</span>
