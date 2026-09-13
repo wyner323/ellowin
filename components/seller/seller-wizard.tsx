@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import {
-  BadgeCheck,
   Check,
   FileCheck2,
   Loader2,
@@ -194,10 +194,18 @@ export function SellerWizard({ state }: { state: AccountState }) {
       </div>
 
       {payoutDone && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 px-5 py-4">
-          <BadgeCheck className="size-5 text-primary" aria-hidden="true" />
+        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-primary/30 bg-primary/10 px-5 py-4">
+          <div className="relative h-16 w-16 shrink-0">
+            <Image
+              src="/images/mascote/ello-comemorando.png"
+              alt=""
+              fill
+              sizes="64px"
+              className="object-contain"
+            />
+          </div>
           <p className="flex-1 text-sm text-foreground">
-            Cadastro de vendedor aprovado. Sua loja já pode publicar anúncios.
+            Cadastro de vendedor aprovado — nível 4. Sua loja já pode publicar anúncios.
           </p>
           <Button render={<Link href="/conta" />} size="sm">
             Ir para a conta

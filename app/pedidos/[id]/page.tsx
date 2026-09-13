@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import Image from "next/image"
 import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, MessageSquare, ShieldCheck } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
@@ -172,7 +173,23 @@ export default async function PedidoPage({
 
                 {canReview ? (
                   <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
-                    <h2 className="text-sm font-semibold">Avalie o vendedor</h2>
+                    <div className="flex items-center gap-3">
+                      <div className="relative h-14 w-14 shrink-0">
+                        <Image
+                          src="/images/mascote/ello-comemorando.png"
+                          alt=""
+                          fill
+                          sizes="56px"
+                          className="object-contain"
+                        />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-semibold">Entrega confirmada!</h2>
+                        <p className="text-xs text-muted-foreground">
+                          O pagamento foi liberado ao vendedor. Avalie a compra:
+                        </p>
+                      </div>
+                    </div>
                     <ReviewForm orderId={detail.id} />
                   </section>
                 ) : null}
