@@ -60,6 +60,7 @@ export function DisputeChat({
 }) {
   const router = useRouter()
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
+  const [prevInitialMessages, setPrevInitialMessages] = useState(initialMessages)
   const [body, setBody] = useState("")
   const [internal, setInternal] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -72,13 +73,15 @@ export function DisputeChat({
   const lastSeenId = useRef<number>(initialMessages.at(-1)?.id ?? 0)
 
   // Se o servidor reenviar o histórico (ex.: após encerrar o caso), adota-o.
-  useEffect(() => {
-    setMessages((current) => {
-      const latestKnown = current.at(-1)?.id ?? 0
-      const latestIncoming = initialMessages.at(-1)?.id ?? 0
-      return latestIncoming >= latestKnown ? initialMessages : current
-    })
-  }, [initialMessages])
+  // Ajuste durante a própria renderização (em vez de um efeito) ao notar que
+  // a prop mudou — o padrão recomendado para "sincronizar estado com uma
+  // prop" sem gerar uma renderização extra.
+  if (initialMessages !== prevInitialMessages) {
+    setPrevInitialMessages(initialMessages)
+    const latestKnown = messages.at(-1)?.id ?? 0
+    const latestIncoming = initialMessages.at(-1)?.id ?? 0
+    if (latestIncoming >= latestKnown) setMessages(initialMessages)
+  }
 
   const sync = useCallback(async () => {
     setSyncing(true)

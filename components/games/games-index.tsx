@@ -48,7 +48,7 @@ export function GamesIndex({
 
       {filtered.length === 0 ? (
         <p className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          Nenhum jogo encontrado para "{query}".
+          Nenhum jogo encontrado para &quot;{query}&quot;.
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">

@@ -33,6 +33,9 @@ export function EmailVerification({
         code?: string
         message?: string
       }
+      // Hidrata do sessionStorage após montar: o servidor não tem acesso a
+      // ele, então isso não dá pra fazer durante a renderização.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (fallbackCode) setDemoCode(fallbackCode)
       if (message) setNotice(message)
     } catch {

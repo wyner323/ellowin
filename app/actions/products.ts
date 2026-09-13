@@ -100,7 +100,6 @@ async function uniqueSlug(base: string) {
   let candidate = root
   let n = 1
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const [existing] = await db
       .select({ id: product.id })

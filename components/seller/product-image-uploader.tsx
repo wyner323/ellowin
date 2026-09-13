@@ -1,10 +1,9 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { ImagePlus, Loader2, Star, X } from "lucide-react"
 import { compressImage } from "@/lib/image-compress"
-import { Button } from "@/components/ui/button"
 
 const MAX_IMAGES = 5
 
@@ -68,7 +67,9 @@ export function ProductImageUploader({
   // Ref viva com o valor atual: uploads concorrentes não sobrescrevem uns aos
   // outros ao chamar onChange em sequência.
   const currentRef = useRef(value)
-  currentRef.current = value
+  useEffect(() => {
+    currentRef.current = value
+  }, [value])
 
   function removeAt(index: number) {
     onChange(value.filter((_, i) => i !== index))

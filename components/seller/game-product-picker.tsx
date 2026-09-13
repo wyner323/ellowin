@@ -88,7 +88,7 @@ export function GameProductPicker({
           ))}
           {results.length === 0 ? (
             <p className="col-span-full py-4 text-center text-sm text-muted-foreground">
-              Nenhum resultado para "{query}".
+              Nenhum resultado para &quot;{query}&quot;.
             </p>
           ) : null}
         </div>

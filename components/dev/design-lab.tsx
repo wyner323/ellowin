@@ -319,6 +319,8 @@ export function DesignLab() {
         baselineRef.current[cacheKey] = readTokenColor(key)
       }
     }
+    // Força a re-renderização depois de popular o cache de baseline em ref —
+    // não há como derivar isso de estado sem duplicar o cache inteiro.
     forceRender((n) => n + 1)
   }, [open, mode])
 
@@ -578,6 +580,9 @@ export function DesignLab() {
       window.removeEventListener("mousemove", onMove)
       window.removeEventListener("mouseup", onUp)
     }
+    // updateFromPointer só muda quando `rect` muda (é o que ele lê) — incluí-lo
+    // faria o listener ser refeito em toda renderização à toa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rect])
 
   function finishSelection() {
@@ -1019,7 +1024,7 @@ export function DesignLab() {
           {tab === "salvos" ? (
             <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto p-4">
               <p className="text-xs text-muted-foreground">
-                Fica guardado no seu navegador e volta sozinho se você recarregar a página. Quando quiser aplicar de verdade no código, clica em "Copiar tudo" e me manda aqui no chat pra eu avaliar.
+                Fica guardado no seu navegador e volta sozinho se você recarregar a página. Quando quiser aplicar de verdade no código, clica em &quot;Copiar tudo&quot; e me manda aqui no chat pra eu avaliar.
               </p>
 
               {savedCount === 0 ? (

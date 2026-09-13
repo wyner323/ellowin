@@ -64,6 +64,7 @@ export function OrderChat({
 }) {
   const router = useRouter()
   const [messages, setMessages] = useState<OrderChatMessage[]>(initialMessages)
+  const [prevInitialMessages, setPrevInitialMessages] = useState(initialMessages)
   const [body, setBody] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -78,13 +79,15 @@ export function OrderChat({
     bottomRef.current?.scrollIntoView({ block: "end" })
   }, [])
 
-  useEffect(() => {
-    setMessages((current) => {
-      const latestKnown = current.at(-1)?.id ?? 0
-      const latestIncoming = initialMessages.at(-1)?.id ?? 0
-      return latestIncoming >= latestKnown ? initialMessages : current
-    })
-  }, [initialMessages])
+  // Ajuste durante a própria renderização (em vez de um efeito) ao notar que
+  // a prop mudou — o padrão recomendado para "sincronizar estado com uma
+  // prop" sem gerar uma renderização extra.
+  if (initialMessages !== prevInitialMessages) {
+    setPrevInitialMessages(initialMessages)
+    const latestKnown = messages.at(-1)?.id ?? 0
+    const latestIncoming = initialMessages.at(-1)?.id ?? 0
+    if (latestIncoming >= latestKnown) setMessages(initialMessages)
+  }
 
   const sync = useCallback(async () => {
     setSyncing(true)

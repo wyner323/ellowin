@@ -1,3 +1,6 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { CheckCircle2, Clock, TriangleAlert } from "lucide-react"
 import { formatDeadline, slaState } from "@/lib/sla"
 import { cn } from "@/lib/utils"
@@ -79,10 +82,24 @@ export function SlaPanel({
     },
   ]
 
+  // `now` só existe depois de montar (o servidor não pode calcular "atrasado"
+  // de forma estável) e se atualiza sozinho para o selo virar "atrasado" sem
+  // precisar recarregar a página.
+  const [now, setNow] = useState<number | null>(null)
+  useEffect(() => {
+    const tick = () => setNow(Date.now())
+    const timeout = setTimeout(tick, 0)
+    const interval = setInterval(tick, 30_000)
+    return () => {
+      clearTimeout(timeout)
+      clearInterval(interval)
+    }
+  }, [])
+
   return (
     <dl className="flex flex-col gap-3">
       {rows.map((row) => {
-        const late = !row.done && row.due.getTime() < Date.now()
+        const late = now !== null && !row.done && row.due.getTime() < now
 
         return (
           <div key={row.label} className="flex flex-col gap-0.5">
