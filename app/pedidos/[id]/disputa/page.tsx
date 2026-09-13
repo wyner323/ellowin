@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import Image from "next/image"
 import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, ShieldAlert } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
@@ -102,10 +103,21 @@ export default async function DisputaPage({
             </p>
 
             {dispute.resolution ? (
-              <p className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm text-primary">
-                <strong className="font-semibold">Decisão: </strong>
-                {dispute.resolution}
-              </p>
+              <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/10 p-3">
+                <div className="relative h-14 w-14 shrink-0">
+                  <Image
+                    src="/images/mascote/ello-guardiao.png"
+                    alt=""
+                    fill
+                    sizes="56px"
+                    className="object-contain"
+                  />
+                </div>
+                <p className="text-sm text-primary">
+                  <strong className="font-semibold">Decisão: </strong>
+                  {dispute.resolution}
+                </p>
+              </div>
             ) : null}
           </header>
 
