@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import Image from "next/image"
 import { redirect } from "next/navigation"
-import { ChevronRight, ShoppingBag } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
@@ -43,9 +44,15 @@ export default async function PedidosPage() {
 
           {orders.length === 0 ? (
             <div className="mt-8 flex flex-col items-center gap-4 rounded-xl border border-border bg-card p-10 text-center">
-              <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <ShoppingBag className="size-5" aria-hidden="true" />
-              </span>
+              <div className="relative h-28 w-28">
+                <Image
+                  src="/images/mascote/ello-repouso.png"
+                  alt=""
+                  fill
+                  sizes="112px"
+                  className="object-contain"
+                />
+              </div>
               <div>
                 <p className="font-medium">Você ainda não comprou nada</p>
                 <p className="mt-1 text-sm text-muted-foreground">

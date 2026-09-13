@@ -225,7 +225,18 @@ export function HowItWorks() {
       className="border-y border-border bg-muted/40 py-14"
     >
       <div className="mx-auto w-full max-w-6xl px-4">
-        <h2 className="text-2xl font-bold sm:text-3xl">Como funciona</h2>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 className="text-2xl font-bold sm:text-3xl">Como funciona</h2>
+          <div className="relative h-24 w-24 shrink-0 sm:h-28 sm:w-28">
+            <Image
+              src="/images/mascote/ello-sorrindo.png"
+              alt=""
+              fill
+              sizes="112px"
+              className="object-contain"
+            />
+          </div>
+        </div>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {steps.map((step, index) => (
             <div
