@@ -9,6 +9,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -278,5 +279,68 @@ export function SalesPerformanceCard({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+type ProductRevenue = { title: string; totalCents: number; count: number }
+
+const RANK_COLORS = [
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-3)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
+]
+
+/**
+ * Ranking dos anúncios que mais faturaram (só vendas concluídas). Vem do
+ * servidor já ordenado e limitado a 5 — o componente só desenha.
+ */
+export function TopProductsChart({ data }: { data: ProductRevenue[] }) {
+  if (data.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Assim que uma venda for concluída, o ranking por anúncio aparece aqui.
+      </p>
+    )
+  }
+
+  // Recharts desenha um BarChart vertical de cima pra baixo na ordem do
+  // array — inverte pra o 1º colocado (maior faturamento) ficar no topo.
+  const chartData = [...data].reverse()
+
+  return (
+    <div className="h-52 w-full sm:h-60">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 12, top: 4, bottom: 4 }}>
+          <CartesianGrid stroke="var(--border)" horizontal={false} />
+          <XAxis
+            type="number"
+            tick={axisTick}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v: number) => Math.round(v / 100).toLocaleString("pt-BR")}
+          />
+          <YAxis
+            type="category"
+            dataKey="title"
+            width={112}
+            tick={{ ...axisTick, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v: string) => (v.length > 16 ? `${v.slice(0, 15)}…` : v)}
+          />
+          <Tooltip
+            {...tooltipStyle}
+            formatter={(value) => [formatCents(Number(value)), "Faturamento"]}
+          />
+          <Bar dataKey="totalCents" radius={4} barSize={16}>
+            {chartData.map((entry, index) => (
+              <Cell key={entry.title} fill={RANK_COLORS[index % RANK_COLORS.length]} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   )
 }

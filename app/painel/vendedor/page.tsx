@@ -1,12 +1,33 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ExternalLink, Gauge, Package, Plus, ShieldAlert, Store, TrendingUp } from "lucide-react"
+import {
+  CircleDollarSign,
+  ExternalLink,
+  Gauge,
+  ImageIcon,
+  Package,
+  PackagePlus,
+  Plus,
+  ShieldAlert,
+  Sparkles,
+  Star,
+  Store,
+  TrendingUp,
+  Zap,
+} from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
 import { BannerUpload } from "@/components/account/banner-upload"
-import { BalanceTrendChart, SalesPerformanceCard, TrendBadge } from "@/components/seller/dashboard-charts"
+import {
+  BalanceTrendChart,
+  SalesPerformanceCard,
+  TopProductsChart,
+  TrendBadge,
+} from "@/components/seller/dashboard-charts"
+import { ReceivablesBreakdown } from "@/components/seller/receivables-breakdown"
+import { SellerTips, type SellerTip } from "@/components/seller/seller-tips"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -119,18 +140,58 @@ export default async function PainelVendedorPage() {
     )
     .reduce((total, o) => total + o.sellerNetCents, 0)
 
+  // Faturamento líquido acumulado — só vendas já concluídas (repasse
+  // liberado), diferente do "a receber" (ainda em custódia) e do "saldo
+  // disponível" (o que sobrou depois de saques já feitos).
+  const faturamentoTotalCents = orders
+    .filter((o) => o.status === "concluido")
+    .reduce((total, o) => total + o.sellerNetCents, 0)
+
+  // Ranking dos anúncios que mais faturaram, agrupando pelas próprias linhas
+  // de pedido (productTitle já vem congelado no pedido) — sem query extra.
+  const revenueByProduct = new Map<string, { title: string; totalCents: number; count: number }>()
+  for (const o of orders) {
+    if (o.status !== "concluido") continue
+    const key = String(o.productId ?? o.productTitle)
+    const bucket = revenueByProduct.get(key) ?? { title: o.productTitle, totalCents: 0, count: 0 }
+    bucket.totalCents += o.sellerNetCents
+    bucket.count += 1
+    revenueByProduct.set(key, bucket)
+  }
+  const topProducts = Array.from(revenueByProduct.values())
+    .sort((a, b) => b.totalCents - a.totalCents)
+    .slice(0, 5)
+
+  // Mesmo total do card "A receber", só que quebrado por etapa — pra o
+  // vendedor ver em qual parte do fluxo o dinheiro está parado.
+  const RECEIVABLE_STATUSES = ["aguardando_entrega", "entregue", "em_disputa"] as const
+  const receivableBreakdown = RECEIVABLE_STATUSES.map((status) => {
+    const matching = orders.filter((o) => o.status === status)
+    return {
+      status,
+      count: matching.length,
+      totalCents: matching.reduce((total, o) => total + o.sellerNetCents, 0),
+    }
+  }).filter((bucket) => bucket.count > 0)
+
   const cards = [
     {
-      label: "Saldo disponível",
-      value: formatCents(wallet.availableCents),
-      hint: "Liberado para saque",
-      icon: TrendingUp,
+      label: "Faturamento total",
+      value: formatCents(faturamentoTotalCents),
+      hint: "Vendas concluídas, líquido de taxa",
+      icon: CircleDollarSign,
     },
     {
       label: "A receber",
       value: formatCents(escrowCents),
       hint: "Em custódia até a confirmação",
       icon: Store,
+    },
+    {
+      label: "Saldo disponível",
+      value: formatCents(wallet.availableCents),
+      hint: "Liberado para saque",
+      icon: TrendingUp,
     },
     {
       label: "Vendas concluídas",
@@ -148,6 +209,83 @@ export default async function PainelVendedorPage() {
       icon: Gauge,
     },
   ]
+
+  // Recomendações geradas a partir do estado real da loja — só entra na
+  // lista o que de fato se aplica a este vendedor agora, e mostramos no
+  // máximo 4 pra não virar uma parede de avisos.
+  const tipCandidates: Array<SellerTip & { show: boolean }> = [
+    {
+      id: "disputas",
+      show: openDisputes.length > 0,
+      icon: ShieldAlert,
+      title: "Responda as disputas abertas",
+      description:
+        "Depois de 48h úteis sem resposta, o reembolso ao comprador é automático e você perde a venda.",
+      href: openDisputes.length > 0 ? `/pedidos/${openDisputes[0].orderId}/disputa` : undefined,
+      cta: "Ver disputa",
+    },
+    {
+      id: "entregas-pendentes",
+      show: pending.length > 0,
+      icon: Zap,
+      title: "Entregue os pedidos pendentes",
+      description: `${pending.length} ${pending.length === 1 ? "pedido está" : "pedidos estão"} aguardando os dados de entrega — quanto antes você entrega, antes o valor entra em liberação.`,
+      href: "/painel/vendedor/vendas",
+      cta: "Ver pedidos pendentes",
+    },
+    {
+      id: "velocidade",
+      show: delivery.total >= 3 && delivery.onTimePercent !== null && delivery.onTimePercent < 90,
+      icon: Gauge,
+      title: "Melhore sua velocidade de entrega",
+      description: `Só ${delivery.onTimePercent}% das suas entregas saem no prazo prometido. Vendedores rápidos aparecem com destaque e recebem mais confiança dos compradores.`,
+    },
+    {
+      id: "avaliacoes",
+      show: stats.salesCount > 0 && stats.ratingCount === 0,
+      icon: Star,
+      title: "Peça avaliações aos compradores",
+      description:
+        "Sua loja ainda não tem nenhuma avaliação. A nota aparece direto na vitrine e pesa na decisão de quem está comprando.",
+    },
+    {
+      id: "banner",
+      show: !profileRow?.bannerUrl,
+      icon: ImageIcon,
+      title: "Personalize o banner da sua loja",
+      description:
+        "Lojas com identidade visual própria passam mais confiança e se destacam na página pública.",
+    },
+    {
+      id: "poucos-anuncios",
+      show: stats.products > 0 && stats.products < 3,
+      icon: PackagePlus,
+      title: "Publique mais anúncios",
+      description:
+        "Quanto mais itens ativos, mais chances de aparecer nas buscas dos jogos que você vende.",
+      href: "/painel/vendedor/produtos/novo",
+      cta: "Criar anúncio",
+    },
+    {
+      id: "sem-vendas",
+      show: stats.salesCount === 0 && stats.products > 0,
+      icon: TrendingUp,
+      title: "Ainda sem vendas",
+      description:
+        "Preços competitivos e entrega automática ajudam a converter mais rápido nos primeiros dias.",
+    },
+  ]
+  const sellerTips: SellerTip[] = tipCandidates
+    .filter((tip) => tip.show)
+    .slice(0, 4)
+    .map((tip) => ({
+      id: tip.id,
+      icon: tip.icon,
+      title: tip.title,
+      description: tip.description,
+      href: tip.href,
+      cta: tip.cta,
+    }))
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -175,7 +313,7 @@ export default async function PainelVendedorPage() {
             </Button>
           </header>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {cards.map((card) => (
               <Card key={card.label}>
                 <CardContent className="flex flex-col gap-2">
@@ -235,6 +373,42 @@ export default async function PainelVendedorPage() {
                 storeSlug={application.storeSlug}
               />
             </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Faturamento por anúncio</CardTitle>
+                  <span className="text-xs text-muted-foreground">
+                    Top 5 em vendas concluídas
+                  </span>
+                </CardHeader>
+                <CardContent>
+                  <TopProductsChart data={topProducts} />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Detalhe do &quot;a receber&quot;</CardTitle>
+                  <span className="text-xs text-muted-foreground">
+                    Por etapa do pedido
+                  </span>
+                </CardHeader>
+                <CardContent>
+                  <ReceivablesBreakdown data={receivableBreakdown} totalCents={escrowCents} />
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
+              <Sparkles className="size-4 text-primary" aria-hidden="true" />
+              Dicas para vender mais
+            </h2>
+            <Card>
+              <CardContent>
+                <SellerTips tips={sellerTips} />
+              </CardContent>
+            </Card>
           </section>
 
           <div className="grid gap-3 sm:grid-cols-2">
