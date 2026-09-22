@@ -1,7 +1,18 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { BadgeCheck, ChevronRight, Clock, Package, ShieldAlert, ShieldCheck, Zap } from "lucide-react"
+import {
+  BadgeCheck,
+  ChevronRight,
+  Clock,
+  Meh,
+  Package,
+  ShieldAlert,
+  ShieldCheck,
+  ThumbsDown,
+  ThumbsUp,
+  Zap,
+} from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { StarRating } from "@/components/marketplace/star-rating"
@@ -49,6 +60,8 @@ export default async function ProductPage({
   const category = getCategory(item.categorySlug)
   const originLabel = accountOriginLabel(item.accountOrigin)
   const originRetainsRecovery = accountOriginRetainsRecoveryData(item.accountOrigin)
+  const { positivas, neutras, negativas } = item.seller.reputation
+  const totalSellerReviews = positivas + neutras + negativas
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -113,6 +126,24 @@ export default async function ProductPage({
                     {item.salesCount} {item.salesCount === 1 ? "venda" : "vendas"}
                   </span>
                 </div>
+
+                {totalSellerReviews > 0 ? (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span>Reputação do vendedor:</span>
+                    <span className="flex items-center gap-1">
+                      <ThumbsUp className="size-3.5 text-success" aria-hidden="true" />
+                      {positivas} positivas
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Meh className="size-3.5" aria-hidden="true" />
+                      {neutras} neutras
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <ThumbsDown className="size-3.5 text-destructive" aria-hidden="true" />
+                      {negativas} negativas
+                    </span>
+                  </div>
+                ) : null}
 
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Badge variant="secondary" className="gap-1.5">

@@ -198,6 +198,7 @@ export type ProductDetail = {
     name: string
     level: number
     storeSlug: string | null
+    reputation: { positivas: number; neutras: number; negativas: number }
   }
   variants: {
     id: number
@@ -272,6 +273,8 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     .orderBy(desc(review.createdAt))
     .limit(20)
 
+  const reputation = await getSellerReputationBreakdown(row.sellerId)
+
   return {
     id: row.id,
     slug: row.slug,
@@ -295,6 +298,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       name: row.storeName ?? row.sellerName ?? "Vendedor Ellowin",
       level: row.sellerLevel ?? 1,
       storeSlug: row.sellerStatus === "aprovado" ? row.storeSlug : null,
+      reputation,
     },
     variants: variants.map((v) => ({
       id: v.id,
