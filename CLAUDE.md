@@ -15,7 +15,14 @@ the platform and only released to the seller after delivery is confirmed.
 - `npx tsc --noEmit` — type-check. This is the main correctness gate in this repo.
 - `pnpm lint` — defined in `package.json` but **not functional**: there is no ESLint config file
   in the repo, so this currently fails. Don't assume lint output is meaningful.
-- There is no test suite (no test runner, no `*.test.ts` files anywhere in the project).
+- `pnpm test` — runs Vitest (`vitest run`) over pure-function unit tests in `lib/*.test.ts`
+  (money math, SLA business-hour deadlines, delivery time lookup, account-origin lookup, seller
+  badge thresholds). `pnpm test:watch` for interactive mode. **Coverage is intentionally narrow**:
+  only functions with zero I/O are tested — nothing in `lib/wallet.ts` (escrow) or any server
+  action has a test yet, because there is no separate test database (only one `DATABASE_URL`,
+  pointing at production) and running DB-touching tests against it would be unsafe. Provisioning
+  a dedicated test database (e.g. a Neon branch) is a prerequisite for testing that code, not yet
+  done.
 - Package manager is `pnpm` (`pnpm-lock.yaml`). This pnpm version no longer reads workspace-level
   settings from a `pnpm` key in `package.json` at all (confirmed directly: a `pnpm.overrides`
   block once broke the Vercel build silently, and later a `pnpm.onlyBuiltDependencies` addition

@@ -30,6 +30,10 @@ export function parseToCents(input: string): number | null {
     .replace(/\.(?=\d{3}(\D|$))/g, "")
     .replace(",", ".")
 
+  // Sem dígito nenhum sobrando (ex.: "abc"), `Number("")` daria 0 — um valor
+  // "válido" por engano, em vez de rejeitar a entrada como inválida.
+  if (!/\d/.test(normalized)) return null
+
   const value = Number(normalized)
   if (!Number.isFinite(value) || value < 0) return null
 
