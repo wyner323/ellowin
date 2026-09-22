@@ -16,19 +16,27 @@ the platform and only released to the seller after delivery is confirmed.
 - `pnpm lint` — defined in `package.json` but **not functional**: there is no ESLint config file
   in the repo, so this currently fails. Don't assume lint output is meaningful.
 - There is no test suite (no test runner, no `*.test.ts` files anywhere in the project).
-- Package manager is `pnpm` (`pnpm-lock.yaml`). A stale `pnpm.overrides` block in `package.json`
-  once broke the Vercel build silently — pnpm 10 doesn't read overrides from `package.json`
-  anymore, so don't add one there if a dependency override is ever needed.
+- Package manager is `pnpm` (`pnpm-lock.yaml`). This pnpm version no longer reads workspace-level
+  settings from a `pnpm` key in `package.json` at all (confirmed directly: a `pnpm.overrides`
+  block once broke the Vercel build silently, and later a `pnpm.onlyBuiltDependencies` addition
+  was silently ignored too) — that config now lives in `pnpm-workspace.yaml` instead
+  (`allowBuilds:` there gates native postinstall scripts, e.g. `esbuild`). Don't add a `pnpm` key
+  to `package.json` expecting it to do anything.
 
 ### Database changes
 
-There is **no drizzle-kit / migration runner configured**. Changing the schema is a two-step,
-manual process:
-1. Edit `lib/db/schema.ts` (source of truth for column/table shape used by the app).
-2. Hand-write an idempotent SQL script in `scripts/*.sql` (`CREATE TABLE IF NOT EXISTS`,
-   `ADD COLUMN IF NOT EXISTS`, etc. — see existing scripts for the pattern) and run it directly
-   against the Neon database yourself. Editing `schema.ts` alone does **not** touch the real
-   database.
+`drizzle-kit` is configured (`drizzle.config.ts`, migrations in `drizzle/`). To change the schema:
+1. Edit `lib/db/schema.ts` (source of truth for column/table shape).
+2. `pnpm db:generate` — diffs `schema.ts` against the migration history in `drizzle/` and writes a
+   new numbered `.sql` file there. Read the generated SQL before applying it.
+3. `pnpm db:migrate` — applies any not-yet-applied migrations to the real Neon database (tracked
+   in a `drizzle.__drizzle_migrations` table). Editing `schema.ts` alone does **not** touch the
+   database; the SQL file existing alone doesn't either.
+
+The `scripts/add-*.sql` files predate this setup — they're the historical record of what was
+hand-applied before `drizzle-kit` existed (baselined into `drizzle/0000_wooden_sway.sql` as a
+single migration, marked already-applied rather than re-run). Don't add new schema changes as a
+loose `scripts/*.sql` file anymore; always go through `db:generate`/`db:migrate`.
 
 ## Architecture
 
