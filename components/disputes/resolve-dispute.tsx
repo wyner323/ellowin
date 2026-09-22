@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Gavel, Loader2, UserCheck } from "lucide-react"
 import { claimDispute, resolveDispute } from "@/app/actions/disputes"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { formatCents } from "@/lib/money"
@@ -29,13 +30,14 @@ export function ResolveDispute({
 }) {
   const router = useRouter()
   const [note, setNote] = useState("")
+  const [accountRecovered, setAccountRecovered] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
   function decide(outcome: "comprador" | "vendedor") {
     setError(null)
     start(async () => {
-      const result = await resolveDispute({ disputeId, outcome, note })
+      const result = await resolveDispute({ disputeId, outcome, note, accountRecovered })
       if (!result.ok) {
         setError(result.error ?? "Não foi possível encerrar a disputa.")
         return
@@ -78,6 +80,21 @@ export function ResolveDispute({
           disabled={pending}
         />
       </div>
+
+      <label className="group/field flex items-start gap-2 text-sm">
+        <Checkbox
+          checked={accountRecovered}
+          onCheckedChange={(checked) => setAccountRecovered(checked === true)}
+          disabled={pending}
+          className="mt-0.5"
+        />
+        <span>
+          O vendedor recuperou a conta após a entrega
+          <span className="block text-xs text-muted-foreground">
+            Gera um registro contra o vendedor no Selo de Certificação. Só é aplicado se a decisão for a favor do comprador.
+          </span>
+        </span>
+      </label>
 
       <div className="flex flex-wrap gap-2">
         <Button

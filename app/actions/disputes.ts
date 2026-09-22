@@ -250,6 +250,7 @@ export async function resolveDispute(input: {
   disputeId: number
   outcome: "comprador" | "vendedor"
   note: string
+  accountRecovered?: boolean
 }): Promise<ActionResult> {
   const staff = await getStaff()
   if (!staff) return { ok: false, error: "Acesso restrito à moderação." }
@@ -300,6 +301,16 @@ export async function resolveDispute(input: {
         `UPDATE "order" SET "status" = 'reembolsado', "completedAt" = now() WHERE "id" = $1`,
         [row.orderId],
       )
+
+      // Só faz sentido marcar quando a disputa foi a favor do comprador —
+      // não flagamos um vendedor que venceu o caso.
+      if (input.accountRecovered) {
+        await client.query(
+          `INSERT INTO "seller_account_flag" ("sellerId", "disputeId", "moderatorId", "note")
+           VALUES ($1, $2, $3, $4)`,
+          [row.sellerId, row.disputeId, staff.id, note],
+        )
+      }
     } else {
       await releaseEscrowToSeller(client, {
         buyerId: row.buyerId,

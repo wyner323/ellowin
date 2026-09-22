@@ -8,6 +8,7 @@ const institucional = [
   { label: 'Como funciona', href: '/#como-funciona' },
   { label: 'Seja vendedor', href: '/vender' },
   { label: 'Central de segurança', href: '/#seguranca' },
+  { label: 'Verificador de contas', href: '/verificador' },
 ]
 
 const contaDeslogada = [

@@ -7,6 +7,7 @@ import { ResolveDispute } from "@/components/disputes/resolve-dispute"
 import { SlaBadge, SlaPanel } from "@/components/disputes/sla-panel"
 import { Button } from "@/components/ui/button"
 import { DISPUTE_REASONS } from "@/lib/disputes"
+import { getAccountFlagForDispute } from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
 import {
   DISPUTE_STATUS_LABEL,
@@ -32,15 +33,16 @@ export default async function CasoDisputaPage({
   const dispute = await getDisputeDetail(disputeId)
   if (!dispute) notFound()
 
-  const [order, messages] = await Promise.all([
+  const closed = dispute.status.startsWith("resolvida") || dispute.status === "cancelada"
+
+  const [order, messages, accountFlagged] = await Promise.all([
     getOrderDetail(dispute.orderId, staff.id, true),
     // A moderação lê tudo, inclusive as notas internas.
     getDisputeMessages(dispute.id, true),
+    closed ? getAccountFlagForDispute(dispute.id) : Promise.resolve(false),
   ])
 
   if (!order) notFound()
-
-  const closed = dispute.status.startsWith("resolvida") || dispute.status === "cancelada"
   const reasonLabel =
     DISPUTE_REASONS.find((r) => r.value === dispute.reason)?.label ?? dispute.reason
 
@@ -155,6 +157,11 @@ export default async function CasoDisputaPage({
         <section className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/10 p-5">
           <h2 className="text-sm font-semibold text-primary">Caso encerrado</h2>
           <p className="text-sm text-primary">{dispute.resolution}</p>
+          {accountFlagged ? (
+            <p className="text-sm font-medium text-destructive">
+              ⚠️ Conta marcada como recuperada — gerou registro no Selo de Certificação do vendedor.
+            </p>
+          ) : null}
         </section>
       ) : (
         <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">

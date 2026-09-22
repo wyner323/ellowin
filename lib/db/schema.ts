@@ -359,3 +359,26 @@ export const disputeMessage = pgTable("dispute_message", {
   internal: boolean("internal").notNull().default(false),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 })
+
+/**
+ * Registro de "conta recuperada" contra um vendedor — base do Selo de
+ * Certificação (verificador público em /verificador). Não é automático: o
+ * moderador marca manualmente ao encerrar uma disputa a favor do comprador
+ * (ver resolveDispute em app/actions/disputes.ts). `disputeId` único garante
+ * no máximo um registro por disputa.
+ */
+export const sellerAccountFlag = pgTable("seller_account_flag", {
+  id: serial("id").primaryKey(),
+  sellerId: text("sellerId")
+    .notNull()
+    .references(() => user.id),
+  disputeId: integer("disputeId")
+    .notNull()
+    .unique()
+    .references(() => dispute.id),
+  moderatorId: text("moderatorId")
+    .notNull()
+    .references(() => user.id),
+  note: text("note").notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})

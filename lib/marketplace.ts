@@ -8,6 +8,7 @@ import {
   productQuestion,
   productVariant,
   review,
+  sellerAccountFlag,
   sellerApplication,
   user,
 } from "@/lib/db/schema"
@@ -199,6 +200,7 @@ export type ProductDetail = {
     level: number
     storeSlug: string | null
     reputation: { positivas: number; neutras: number; negativas: number }
+    accountFlags: { count: number; lastFlaggedAt: Date | null }
   }
   variants: {
     id: number
@@ -273,7 +275,10 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     .orderBy(desc(review.createdAt))
     .limit(20)
 
-  const reputation = await getSellerReputationBreakdown(row.sellerId)
+  const [reputation, accountFlags] = await Promise.all([
+    getSellerReputationBreakdown(row.sellerId),
+    getSellerAccountFlagSummary(row.sellerId),
+  ])
 
   return {
     id: row.id,
@@ -299,6 +304,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       level: row.sellerLevel ?? 1,
       storeSlug: row.sellerStatus === "aprovado" ? row.storeSlug : null,
       reputation,
+      accountFlags,
     },
     variants: variants.map((v) => ({
       id: v.id,
@@ -424,6 +430,40 @@ export async function getSellerReputationBreakdown(sellerId: string) {
     neutras: Number(row?.neutras ?? 0),
     negativas: Number(row?.negativas ?? 0),
   }
+}
+
+/**
+ * Base do Selo de Certificação (ver /verificador). Não expõe a nota nem a
+ * disputa de origem — só a contagem e a data mais recente, o suficiente pra
+ * sinalizar sem vazar detalhes de um caso específico publicamente.
+ */
+export async function getSellerAccountFlagSummary(sellerId: string) {
+  const [row] = await db
+    .select({
+      count: sql<number>`count(*)`,
+      lastFlaggedAt: sql<Date | null>`max(${sellerAccountFlag.createdAt})`,
+    })
+    .from(sellerAccountFlag)
+    .where(eq(sellerAccountFlag.sellerId, sellerId))
+
+  return {
+    count: Number(row?.count ?? 0),
+    // O driver devolve o agregado `max()` como string, não como Date — apesar
+    // do `sql<Date | null>` acima ser só uma anotação de tipo, sem conversão
+    // em tempo de execução.
+    lastFlaggedAt: row?.lastFlaggedAt ? new Date(row.lastFlaggedAt) : null,
+  }
+}
+
+/** Usada só na tela de moderação, pra mostrar se aquela disputa específica já gerou um registro. */
+export async function getAccountFlagForDispute(disputeId: number) {
+  const [row] = await db
+    .select({ id: sellerAccountFlag.id })
+    .from(sellerAccountFlag)
+    .where(eq(sellerAccountFlag.disputeId, disputeId))
+    .limit(1)
+
+  return Boolean(row)
 }
 
 /**
@@ -554,7 +594,7 @@ export async function getSellerStorefront(slug: string) {
 
   if (!row || row.status !== "aprovado") return null
 
-  const [stats, disputeRow, reputation, recentReviews, delivery] = await Promise.all([
+  const [stats, disputeRow, reputation, recentReviews, delivery, accountFlags] = await Promise.all([
     getSellerStats(row.sellerId),
     db
       .select({ count: sql<number>`count(*)` })
@@ -564,6 +604,7 @@ export async function getSellerStorefront(slug: string) {
     getSellerReputationBreakdown(row.sellerId),
     getSellerRecentReviews(row.sellerId),
     getSellerDeliveryStats(row.sellerId),
+    getSellerAccountFlagSummary(row.sellerId),
   ])
 
   const activeProducts = await db
@@ -608,6 +649,7 @@ export async function getSellerStorefront(slug: string) {
     reputation,
     recentReviews,
     delivery,
+    accountFlags,
     badges: computeSellerBadges({ ...stats, disputesCount }),
     products: activeProducts
       .filter((p) => p.minPrice !== null)

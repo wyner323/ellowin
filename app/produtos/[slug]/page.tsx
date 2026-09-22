@@ -145,6 +145,13 @@ export default async function ProductPage({
                   </div>
                 ) : null}
 
+                {item.seller.accountFlags.count === 0 ? (
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-success">
+                    <ShieldCheck className="size-3.5 shrink-0" aria-hidden="true" />
+                    Selo de Certificação — sem registros de conta recuperada
+                  </p>
+                ) : null}
+
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Badge variant="secondary" className="gap-1.5">
                     {item.deliveryType === "automatica" ? (
