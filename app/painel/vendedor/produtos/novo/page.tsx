@@ -6,9 +6,11 @@ import { ArrowLeft } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { ProductForm } from "@/components/seller/product-form"
+import { SellerTabs } from "@/components/seller/seller-tabs"
 import { Button } from "@/components/ui/button"
 import { db } from "@/lib/db"
 import { sellerApplication } from "@/lib/db/schema"
+import { getSellerUnansweredQuestionsCount } from "@/lib/marketplace"
 import { getSession } from "@/lib/session"
 
 export const metadata: Metadata = {
@@ -32,9 +34,12 @@ export default async function NovoProdutoPage({
 
   if (!application || application.status !== "aprovado") redirect("/vender")
 
+  const pendingQuestions = await getSellerUnansweredQuestionsCount(session.user.id)
+
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
+      <SellerTabs pendingQuestions={pendingQuestions} />
 
       <main className="flex-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10">

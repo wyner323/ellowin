@@ -7,7 +7,9 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
 import { OrderStatusBadge } from "@/components/orders/order-status-badge"
+import { SellerTabs } from "@/components/seller/seller-tabs"
 import { Button } from "@/components/ui/button"
+import { getSellerUnansweredQuestionsCount } from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
 import { getSellerOrders } from "@/lib/orders"
 import { getSession } from "@/lib/session"
@@ -24,13 +26,17 @@ export default async function VendasPage() {
   // Sem cron neste ambiente: os prazos são varridos ao abrir a lista.
   await Promise.all([sweepDeliveryDeadline(), sweepAutoRelease()])
 
-  const orders = await getSellerOrders(session.user.id)
+  const [orders, pendingQuestions] = await Promise.all([
+    getSellerOrders(session.user.id),
+    getSellerUnansweredQuestionsCount(session.user.id),
+  ])
   const pending = orders.filter((o) => o.status === "aguardando_entrega")
 
   return (
     <div className="flex min-h-screen flex-col">
       <LiveRefresh />
       <SiteHeader />
+      <SellerTabs pendingQuestions={pendingQuestions} />
 
       <main className="flex-1">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10">

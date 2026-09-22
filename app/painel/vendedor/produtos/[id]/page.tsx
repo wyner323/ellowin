@@ -5,8 +5,9 @@ import { ArrowLeft } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { ProductForm } from "@/components/seller/product-form"
+import { SellerTabs } from "@/components/seller/seller-tabs"
 import { Button } from "@/components/ui/button"
-import { getProductForSeller } from "@/lib/marketplace"
+import { getProductForSeller, getSellerUnansweredQuestionsCount } from "@/lib/marketplace"
 import { getSession } from "@/lib/session"
 
 export const metadata: Metadata = {
@@ -25,12 +26,16 @@ export default async function EditarProdutoPage({
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
-  const product = await getProductForSeller(session.user.id, productId)
+  const [product, pendingQuestions] = await Promise.all([
+    getProductForSeller(session.user.id, productId),
+    getSellerUnansweredQuestionsCount(session.user.id),
+  ])
   if (!product) notFound()
 
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
+      <SellerTabs pendingQuestions={pendingQuestions} />
 
       <main className="flex-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10">

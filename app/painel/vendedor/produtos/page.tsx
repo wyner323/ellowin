@@ -7,8 +7,9 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { ProductStatusToggle } from "@/components/seller/product-status-toggle"
+import { SellerTabs } from "@/components/seller/seller-tabs"
 import { Button } from "@/components/ui/button"
-import { getSellerProducts } from "@/lib/marketplace"
+import { getSellerProducts, getSellerUnansweredQuestionsCount } from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
 import { getSession } from "@/lib/session"
 
@@ -20,11 +21,15 @@ export default async function MeusProdutosPage() {
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
-  const products = await getSellerProducts(session.user.id)
+  const [products, pendingQuestions] = await Promise.all([
+    getSellerProducts(session.user.id),
+    getSellerUnansweredQuestionsCount(session.user.id),
+  ])
 
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
+      <SellerTabs pendingQuestions={pendingQuestions} />
 
       <main className="flex-1">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10">

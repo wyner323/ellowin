@@ -27,13 +27,18 @@ import {
   TrendBadge,
 } from "@/components/seller/dashboard-charts"
 import { ReceivablesBreakdown } from "@/components/seller/receivables-breakdown"
+import { SellerTabs } from "@/components/seller/seller-tabs"
 import { SellerTips, type SellerTip } from "@/components/seller/seller-tips"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { db } from "@/lib/db"
 import { sellerApplication, user } from "@/lib/db/schema"
-import { getSellerDeliveryStats, getSellerStats } from "@/lib/marketplace"
+import {
+  getSellerDeliveryStats,
+  getSellerStats,
+  getSellerUnansweredQuestionsCount,
+} from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
 import { getMyDisputes, getSellerOrders } from "@/lib/orders"
 import { getSession } from "@/lib/session"
@@ -63,19 +68,21 @@ export default async function PainelVendedorPage() {
   // getSellerOrders() está dentro dele.
   await Promise.all([sweepDeliveryDeadline(), sweepAutoRelease()])
 
-  const [stats, orders, wallet, walletEntries, delivery, disputes, [profileRow]] = await Promise.all([
-    getSellerStats(session.user.id),
-    getSellerOrders(session.user.id),
-    getWalletSummary(session.user.id),
-    getWalletEntries(session.user.id, 60),
-    getSellerDeliveryStats(session.user.id),
-    getMyDisputes(session.user.id),
-    db
-      .select({ bannerUrl: user.bannerUrl })
-      .from(user)
-      .where(eq(user.id, session.user.id))
-      .limit(1),
-  ])
+  const [stats, orders, wallet, walletEntries, delivery, disputes, [profileRow], pendingQuestions] =
+    await Promise.all([
+      getSellerStats(session.user.id),
+      getSellerOrders(session.user.id),
+      getWalletSummary(session.user.id),
+      getWalletEntries(session.user.id, 60),
+      getSellerDeliveryStats(session.user.id),
+      getMyDisputes(session.user.id),
+      db
+        .select({ bannerUrl: user.bannerUrl })
+        .from(user)
+        .where(eq(user.id, session.user.id))
+        .limit(1),
+      getSellerUnansweredQuestionsCount(session.user.id),
+    ])
 
   const pending = orders.filter((o) => o.status === "aguardando_entrega")
   const openDisputes = disputes.filter(
@@ -291,6 +298,7 @@ export default async function PainelVendedorPage() {
     <div className="flex min-h-screen flex-col">
       <LiveRefresh />
       <SiteHeader />
+      <SellerTabs pendingQuestions={pendingQuestions} />
 
       <main className="flex-1">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10">

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm"
 import { db } from "@/lib/db"
 import {
   dispute,
@@ -344,6 +344,43 @@ export async function getProductQuestions(productId: number): Promise<ProductQue
     .where(eq(productQuestion.productId, productId))
     .orderBy(desc(productQuestion.createdAt))
     .limit(50)
+
+  return rows.map((r) => ({ ...r, askerName: r.askerName ?? "Usuário" }))
+}
+
+/** Conta perguntas sem resposta em qualquer anúncio do vendedor — alimenta o selo da aba "Perguntas". */
+export async function getSellerUnansweredQuestionsCount(sellerId: string) {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(productQuestion)
+    .innerJoin(product, eq(product.id, productQuestion.productId))
+    .where(and(eq(product.sellerId, sellerId), isNull(productQuestion.answer)))
+
+  return Number(row?.count ?? 0)
+}
+
+export type SellerQuestion = ProductQuestion & { productTitle: string; productSlug: string }
+
+/** Todas as perguntas recebidas pelo vendedor, sem resposta primeiro. */
+export async function getSellerQuestions(sellerId: string): Promise<SellerQuestion[]> {
+  const rows = await db
+    .select({
+      id: productQuestion.id,
+      question: productQuestion.question,
+      answer: productQuestion.answer,
+      answeredAt: productQuestion.answeredAt,
+      createdAt: productQuestion.createdAt,
+      askerId: productQuestion.askerId,
+      askerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
+      productTitle: product.title,
+      productSlug: product.slug,
+    })
+    .from(productQuestion)
+    .innerJoin(product, eq(product.id, productQuestion.productId))
+    .leftJoin(user, eq(user.id, productQuestion.askerId))
+    .where(eq(product.sellerId, sellerId))
+    // Postgres ordena NULL primeiro em ASC — sem resposta sobe pro topo sozinho.
+    .orderBy(asc(productQuestion.answer), desc(productQuestion.createdAt))
 
   return rows.map((r) => ({ ...r, askerName: r.askerName ?? "Usuário" }))
 }
