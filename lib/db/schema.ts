@@ -188,6 +188,8 @@ export const product = pgTable("product", {
   /** automatica | manual */
   deliveryType: text("deliveryType").notNull().default("manual"),
   deliveryTime: text("deliveryTime").notNull().default("ate 24h"),
+  /** Só preenchido quando categorySlug = "contas" — ver lib/account-origin.ts. */
+  accountOrigin: text("accountOrigin"),
   /** ativo | pausado */
   status: text("status").notNull().default("ativo"),
   ratingSum: integer("ratingSum").notNull().default(0),
@@ -224,6 +226,25 @@ export const productVariant = pgTable("product_variant", {
   deliveryNote: text("deliveryNote"),
   sortOrder: integer("sortOrder").notNull().default(0),
   active: boolean("active").notNull().default(true),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})
+
+/**
+ * Pergunta pública feita no anúncio antes da compra — visível a qualquer
+ * visitante, respondida só pelo vendedor dono do anúncio. Reduz o "tenho uma
+ * dúvida antes de comprar" sem precisar abrir um pedido/chat.
+ */
+export const productQuestion = pgTable("product_question", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId")
+    .notNull()
+    .references(() => product.id, { onDelete: "cascade" }),
+  askerId: text("askerId")
+    .notNull()
+    .references(() => user.id),
+  question: text("question").notNull(),
+  answer: text("answer"),
+  answeredAt: timestamp("answeredAt"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 })
 

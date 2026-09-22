@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { sweepDeliveryDeadline, sweepDisputeSla } from "@/lib/sla"
+import { sweepAutoRelease, sweepDeliveryDeadline, sweepDisputeSla } from "@/lib/sla"
 
 /**
  * Chamado pelo Vercel Cron (ver vercel.json). A Vercel injeta o header
@@ -15,13 +15,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 })
   }
 
-  // Os dois sweeps atuam em conjuntos de status mutuamente exclusivos
-  // (em_disputa vs. aguardando_entrega), então rodam em paralelo com
-  // segurança. allSettled em vez de Promise.all: uma falha num não pode
-  // impedir o outro de ser reportado.
-  const [disputeResult, deliveryResult] = await Promise.allSettled([
+  // Os três sweeps atuam em conjuntos de status mutuamente exclusivos
+  // (em_disputa vs. aguardando_entrega vs. entregue), então rodam em paralelo
+  // com segurança. allSettled em vez de Promise.all: uma falha num não pode
+  // impedir os outros de serem reportados.
+  const [disputeResult, deliveryResult, autoReleaseResult] = await Promise.allSettled([
     sweepDisputeSla(),
     sweepDeliveryDeadline(),
+    sweepAutoRelease(),
   ])
 
   return NextResponse.json({
@@ -30,5 +31,9 @@ export async function GET(request: Request) {
     disputeError: disputeResult.status === "rejected" ? String(disputeResult.reason) : null,
     deliveryProcessed: deliveryResult.status === "fulfilled" ? deliveryResult.value : null,
     deliveryError: deliveryResult.status === "rejected" ? String(deliveryResult.reason) : null,
+    autoReleaseProcessed:
+      autoReleaseResult.status === "fulfilled" ? autoReleaseResult.value : null,
+    autoReleaseError:
+      autoReleaseResult.status === "rejected" ? String(autoReleaseResult.reason) : null,
   })
 }

@@ -10,7 +10,7 @@ import { OrderStatusBadge } from "@/components/orders/order-status-badge"
 import { Button } from "@/components/ui/button"
 import { formatCents } from "@/lib/money"
 import { getBuyerOrders } from "@/lib/orders"
-import { sweepDeliveryDeadline } from "@/lib/sla"
+import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla"
 import { getSession } from "@/lib/session"
 
 export const metadata: Metadata = {
@@ -22,8 +22,8 @@ export default async function PedidosPage() {
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
-  // Sem cron neste ambiente: o prazo de entrega é varrido ao abrir a lista.
-  await sweepDeliveryDeadline()
+  // Sem cron neste ambiente: os prazos são varridos ao abrir a lista.
+  await Promise.all([sweepDeliveryDeadline(), sweepAutoRelease()])
 
   const orders = await getBuyerOrders(session.user.id)
 

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { formatCents } from "@/lib/money"
 import { getSellerOrders } from "@/lib/orders"
 import { getSession } from "@/lib/session"
-import { sweepDeliveryDeadline } from "@/lib/sla"
+import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla"
 
 export const metadata: Metadata = {
   title: "Minhas vendas",
@@ -21,8 +21,8 @@ export default async function VendasPage() {
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
-  // Sem cron neste ambiente: o prazo de entrega é varrido ao abrir a lista.
-  await sweepDeliveryDeadline()
+  // Sem cron neste ambiente: os prazos são varridos ao abrir a lista.
+  await Promise.all([sweepDeliveryDeadline(), sweepAutoRelease()])
 
   const orders = await getSellerOrders(session.user.id)
   const pending = orders.filter((o) => o.status === "aguardando_entrega")

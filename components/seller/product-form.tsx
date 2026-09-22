@@ -22,6 +22,7 @@ import {
   DELIVERY_TIME_OPTIONS,
   INSTANT_DELIVERY_TIME,
 } from "@/lib/delivery"
+import { ACCOUNT_ORIGIN_OPTIONS } from "@/lib/account-origin"
 
 const CATEGORIES = [
   { value: "contas", label: "Contas de jogos" },
@@ -53,6 +54,7 @@ export function ProductForm({
     description: string
     deliveryType: string
     deliveryTime: string
+    accountOrigin?: string | null
     images?: string[]
     variants: {
       id: number
@@ -77,6 +79,7 @@ export function ProductForm({
       ? INSTANT_DELIVERY_TIME
       : (product?.deliveryTime ?? DEFAULT_MANUAL_DELIVERY_TIME),
   )
+  const [accountOrigin, setAccountOrigin] = useState(product?.accountOrigin ?? "")
   const [images, setImages] = useState<string[]>(product?.images ?? [])
 
   const [rows, setRows] = useState<Row[]>(
@@ -135,6 +138,7 @@ export function ProductForm({
         description,
         deliveryType,
         deliveryTime,
+        accountOrigin,
         images,
         variants: rows,
       }
@@ -223,6 +227,31 @@ export function ProductForm({
             />
           </div>
         </div>
+
+        {categorySlug === "contas" ? (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="accountOrigin">Procedência da conta</Label>
+            <Select
+              value={accountOrigin}
+              onValueChange={(value) => setAccountOrigin(value ?? "")}
+            >
+              <SelectTrigger id="accountOrigin">
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                {ACCOUNT_ORIGIN_OPTIONS.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              O comprador vê essa informação no anúncio antes de comprar — seja honesto, é a
+              principal proteção contra conta retomada depois da venda.
+            </p>
+          </div>
+        ) : null}
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="description">O que o comprador recebe</Label>

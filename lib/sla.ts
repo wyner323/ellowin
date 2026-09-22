@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNotNull, isNull, lt } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { dispute, order } from "@/lib/db/schema"
-import { refundEscrow, withTransaction } from "@/lib/wallet"
+import { refundEscrow, releaseEscrowToSeller, withTransaction } from "@/lib/wallet"
 
 /**
  * SLA de disputas, conforme as regras acordadas:
@@ -232,6 +232,90 @@ export async function sweepDeliveryDeadline() {
           [
             ord.id,
             "Prazo de entrega encerrado sem confirmação do vendedor. O valor em custódia foi devolvido ao comprador automaticamente.",
+          ],
+        )
+      })
+
+      processed += 1
+    } catch (error) {
+      console.error(`[sla] Falha ao varrer o pedido #${row.id}:`, error)
+    }
+  }
+
+  return processed
+}
+
+/**
+ * Libera automaticamente a custódia ao vendedor quando o pedido foi entregue
+ * e o comprador nunca confirmou nem abriu disputa dentro do prazo
+ * (order.autoReleaseAt, gravado na compra — ver app/actions/orders.ts). Sem
+ * isso, um comprador que simplesmente some deixa o dinheiro parado na
+ * custódia pra sempre, já que confirmReceipt() só roda por ação do comprador.
+ * Mesmo padrão de sweepDeliveryDeadline(): sem cron neste ambiente, roda ao
+ * carregar as telas de pedidos.
+ */
+export async function sweepAutoRelease() {
+  const stale = await db
+    .select({ id: order.id })
+    .from(order)
+    .where(
+      and(
+        eq(order.status, "entregue"),
+        isNotNull(order.autoReleaseAt),
+        lt(order.autoReleaseAt, new Date()),
+      ),
+    )
+
+  if (stale.length === 0) return 0
+
+  let processed = 0
+
+  for (const row of stale) {
+    // Mesmo motivo dos sweeps acima: um pedido com problema não pode travar
+    // a varredura inteira.
+    try {
+      const [ord] = await db
+        .select()
+        .from(order)
+        .where(eq(order.id, row.id))
+        .limit(1)
+
+      if (!ord || ord.status !== "entregue") continue
+
+      await withTransaction(async (client) => {
+        await releaseEscrowToSeller(client, {
+          buyerId: ord.buyerId,
+          sellerId: ord.sellerId,
+          amountCents: ord.amountCents,
+          feeCents: ord.feeCents,
+          sellerNetCents: ord.sellerNetCents,
+          orderId: ord.id,
+          description: `${ord.productTitle} (${ord.variantLabel})`,
+        })
+
+        // Mesma trava por linha afetada dos outros sweeps: se o status mudou
+        // entre o SELECT de cima e aqui, desfaz o releaseEscrowToSeller já
+        // executado.
+        const updated = await client.query(
+          `UPDATE "order" SET "status" = 'concluido', "completedAt" = now()
+            WHERE "id" = $1 AND "status" = 'entregue'`,
+          [ord.id],
+        )
+        if (updated.rowCount === 0) {
+          throw new Error(`pedido #${ord.id} saiu de entregue durante a liberação`)
+        }
+
+        await client.query(
+          `UPDATE "product" SET "salesCount" = "salesCount" + 1 WHERE "id" = $1`,
+          [ord.productId],
+        )
+
+        await client.query(
+          `INSERT INTO "order_message" ("orderId", "authorRole", "body")
+           VALUES ($1, 'system', $2)`,
+          [
+            ord.id,
+            "Prazo de confirmação encerrado sem ação do comprador. O valor em custódia foi liberado ao vendedor automaticamente.",
           ],
         )
       })

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { product, productImage, productVariant, sellerApplication } from "@/lib/db/schema"
 import { DEFAULT_MANUAL_DELIVERY_TIME, INSTANT_DELIVERY_TIME } from "@/lib/delivery"
+import { isValidAccountOrigin } from "@/lib/account-origin"
 import { parseToCents } from "@/lib/money"
 import { slugifyGame } from "@/lib/product-catalog"
 import { getUserId } from "@/lib/session"
@@ -25,6 +26,17 @@ function normalizeDelivery(deliveryType: string, deliveryTime: string) {
     deliveryType: "manual" as const,
     deliveryTime: deliveryTime.trim() || DEFAULT_MANUAL_DELIVERY_TIME,
   }
+}
+
+/**
+ * Só a categoria "contas" declara procedência — pra qualquer outra o valor é
+ * sempre limpo, mesmo que o cliente mande algo (nunca confia no client pra
+ * essa decisão, mesmo motivo de normalizeDelivery acima).
+ */
+function normalizeAccountOrigin(categorySlug: string, accountOrigin: string | undefined) {
+  if (categorySlug !== "contas") return null
+  const value = (accountOrigin ?? "").trim()
+  return isValidAccountOrigin(value) ? value : null
 }
 
 /**
@@ -169,6 +181,7 @@ export async function createProduct(input: {
   description: string
   deliveryType: string
   deliveryTime: string
+  accountOrigin?: string
   images?: string[]
   variants: VariantInput[]
 }): Promise<ActionResult & { slug?: string }> {
@@ -192,12 +205,19 @@ export async function createProduct(input: {
       field: "description",
       error: "Descreva o que o comprador recebe com pelo menos 20 caracteres.",
     }
+  if (input.categorySlug === "contas" && !isValidAccountOrigin((input.accountOrigin ?? "").trim()))
+    return {
+      ok: false,
+      field: "accountOrigin",
+      error: "Informe a procedência da conta.",
+    }
 
   const { error, parsed } = validateVariants(input.variants)
   if (error || !parsed) return { ok: false, field: "variants", error: error ?? undefined }
 
   const slug = await uniqueSlug(slugify(title))
   const delivery = normalizeDelivery(input.deliveryType, input.deliveryTime)
+  const accountOrigin = normalizeAccountOrigin(input.categorySlug, input.accountOrigin)
 
   const [created] = await db
     .insert(product)
@@ -210,6 +230,7 @@ export async function createProduct(input: {
       description: input.description.trim(),
       deliveryType: delivery.deliveryType,
       deliveryTime: delivery.deliveryTime,
+      accountOrigin,
     })
     .returning({ id: product.id })
 
@@ -244,6 +265,7 @@ export async function updateProduct(input: {
   description: string
   deliveryType: string
   deliveryTime: string
+  accountOrigin?: string
   images?: string[]
   variants: (VariantInput & { id?: number })[]
 }): Promise<ActionResult> {
@@ -260,11 +282,18 @@ export async function updateProduct(input: {
   const title = input.title.trim()
   if (title.length < 8)
     return { ok: false, field: "title", error: "O título precisa ter ao menos 8 caracteres." }
+  if (input.categorySlug === "contas" && !isValidAccountOrigin((input.accountOrigin ?? "").trim()))
+    return {
+      ok: false,
+      field: "accountOrigin",
+      error: "Informe a procedência da conta.",
+    }
 
   const { error, parsed } = validateVariants(input.variants)
   if (error || !parsed) return { ok: false, field: "variants", error: error ?? undefined }
 
   const delivery = normalizeDelivery(input.deliveryType, input.deliveryTime)
+  const accountOrigin = normalizeAccountOrigin(input.categorySlug, input.accountOrigin)
 
   await db
     .update(product)
@@ -275,6 +304,7 @@ export async function updateProduct(input: {
       description: input.description.trim(),
       deliveryType: delivery.deliveryType,
       deliveryTime: delivery.deliveryTime,
+      accountOrigin,
       updatedAt: new Date(),
     })
     .where(eq(product.id, owned.id))

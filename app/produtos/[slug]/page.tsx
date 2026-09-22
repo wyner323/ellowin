@@ -1,15 +1,17 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
-import { BadgeCheck, ChevronRight, Clock, Package, Zap } from "lucide-react"
+import { BadgeCheck, ChevronRight, Clock, Package, ShieldAlert, ShieldCheck, Zap } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { VariantPicker } from "@/components/product/variant-picker"
 import { ProductGallery } from "@/components/product/product-gallery"
+import { ProductQuestions } from "@/components/product/product-questions"
 import { Badge } from "@/components/ui/badge"
+import { accountOriginLabel, accountOriginRetainsRecoveryData } from "@/lib/account-origin"
 import { getCategory } from "@/lib/catalog"
-import { getProductBySlug } from "@/lib/marketplace"
+import { getProductBySlug, getProductQuestions } from "@/lib/marketplace"
 import { getSession } from "@/lib/session"
 import { getWalletSummary } from "@/lib/wallet"
 
@@ -39,11 +41,14 @@ export default async function ProductPage({
 
   const session = await getSession()
   const viewerId = session?.user?.id ?? null
-  const walletSummary = viewerId
-    ? await getWalletSummary(viewerId)
-    : { availableCents: 0, heldCents: 0 }
+  const [walletSummary, questions] = await Promise.all([
+    viewerId ? getWalletSummary(viewerId) : Promise.resolve({ availableCents: 0, heldCents: 0 }),
+    getProductQuestions(item.id),
+  ])
 
   const category = getCategory(item.categorySlug)
+  const originLabel = accountOriginLabel(item.accountOrigin)
+  const originRetainsRecovery = accountOriginRetainsRecoveryData(item.accountOrigin)
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -122,6 +127,25 @@ export default async function ProductPage({
                   </Badge>
                   <Badge variant="outline">{item.deliveryTime}</Badge>
                 </div>
+
+                {originLabel ? (
+                  <div
+                    className={
+                      originRetainsRecovery
+                        ? "flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+                        : "flex items-start gap-2 rounded-lg border border-success/30 bg-success/5 p-3 text-sm text-success"
+                    }
+                  >
+                    {originRetainsRecovery ? (
+                      <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                    )}
+                    <span>
+                      <strong>Procedência:</strong> {originLabel}
+                    </span>
+                  </div>
+                ) : null}
               </header>
 
               <section className="flex flex-col gap-3" aria-labelledby="descricao">
@@ -134,6 +158,13 @@ export default async function ProductPage({
                   </p>
                 </div>
               </section>
+
+              <ProductQuestions
+                productId={item.id}
+                questions={questions}
+                isAuthenticated={Boolean(viewerId)}
+                isOwnProduct={viewerId === item.seller.id}
+              />
 
               <section className="flex flex-col gap-3" aria-labelledby="avaliacoes">
                 <div className="flex flex-wrap items-center justify-between gap-2">

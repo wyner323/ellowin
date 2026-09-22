@@ -5,6 +5,7 @@ import {
   order,
   product,
   productImage,
+  productQuestion,
   productVariant,
   review,
   sellerApplication,
@@ -184,6 +185,8 @@ export type ProductDetail = {
   description: string
   deliveryType: string
   deliveryTime: string
+  /** Só preenchido quando categorySlug = "contas" — ver lib/account-origin.ts. */
+  accountOrigin: string | null
   status: string
   salesCount: number
   rating: number | null
@@ -223,6 +226,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       description: product.description,
       deliveryType: product.deliveryType,
       deliveryTime: product.deliveryTime,
+      accountOrigin: product.accountOrigin,
       status: product.status,
       salesCount: product.salesCount,
       ratingSum: product.ratingSum,
@@ -277,6 +281,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     description: row.description,
     deliveryType: row.deliveryType,
     deliveryTime: row.deliveryTime,
+    accountOrigin: row.accountOrigin,
     status: row.status,
     salesCount: row.salesCount,
     rating:
@@ -306,6 +311,37 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       buyerName: r.buyerName ?? "Comprador",
     })),
   }
+}
+
+export type ProductQuestion = {
+  id: number
+  question: string
+  answer: string | null
+  answeredAt: Date | null
+  createdAt: Date
+  askerId: string
+  askerName: string
+}
+
+/** Perguntas públicas de um anúncio, mais recentes primeiro. */
+export async function getProductQuestions(productId: number): Promise<ProductQuestion[]> {
+  const rows = await db
+    .select({
+      id: productQuestion.id,
+      question: productQuestion.question,
+      answer: productQuestion.answer,
+      answeredAt: productQuestion.answeredAt,
+      createdAt: productQuestion.createdAt,
+      askerId: productQuestion.askerId,
+      askerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
+    })
+    .from(productQuestion)
+    .leftJoin(user, eq(user.id, productQuestion.askerId))
+    .where(eq(productQuestion.productId, productId))
+    .orderBy(desc(productQuestion.createdAt))
+    .limit(50)
+
+  return rows.map((r) => ({ ...r, askerName: r.askerName ?? "Usuário" }))
 }
 
 /** Nota média e volume de vendas de um vendedor — o ranking de qualidade. */
