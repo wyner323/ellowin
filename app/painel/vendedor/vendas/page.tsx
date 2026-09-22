@@ -2,15 +2,14 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
 import { redirect } from "next/navigation"
-import { ArrowLeft, ChevronRight } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
-import { OrderStatusBadge } from "@/components/orders/order-status-badge"
+import { SellerOrdersList } from "@/components/seller/seller-orders-list"
 import { SellerTabs } from "@/components/seller/seller-tabs"
 import { Button } from "@/components/ui/button"
 import { getSellerUnansweredQuestionsCount } from "@/lib/marketplace"
-import { formatCents } from "@/lib/money"
 import { getSellerOrders } from "@/lib/orders"
 import { getSession } from "@/lib/session"
 import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla"
@@ -83,44 +82,7 @@ export default async function VendasPage() {
               </Button>
             </div>
           ) : (
-            <ul className="flex flex-col gap-3">
-              {orders.map((o) => (
-                <li key={o.id}>
-                  <Link
-                    href={`/pedidos/${o.id}`}
-                    className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50"
-                  >
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          Pedido #{o.id}
-                        </span>
-                        <OrderStatusBadge status={o.status} role="vendedor" />
-                      </div>
-                      <span className="truncate font-medium">{o.productTitle}</span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {o.variantLabel} · {o.buyerName ?? "Comprador"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="flex flex-col items-end">
-                        <strong className="text-lg font-bold tracking-tight">
-                          {formatCents(o.sellerNetCents)}
-                        </strong>
-                        <span className="text-[0.7rem] text-muted-foreground">
-                          líquido
-                        </span>
-                      </div>
-                      <ChevronRight
-                        className="size-4 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <SellerOrdersList orders={orders} />
           )}
         </div>
       </main>

@@ -84,17 +84,10 @@ const xAxisProps = {
   minTickGap: 24,
 }
 
-type BalancePoint = { label: string; balanceCents: number }
+type BalancePoint = { date: string; balanceCents: number }
+type BalanceChartPoint = { label: string; balanceCents: number }
 
-export function BalanceTrendChart({ data }: { data: BalancePoint[] }) {
-  if (data.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Ainda sem movimentações na carteira.
-      </p>
-    )
-  }
-
+function BalanceAreaChart({ data }: { data: BalanceChartPoint[] }) {
   return (
     <div className="h-48 w-full sm:h-56">
       <ResponsiveContainer width="100%" height="100%">
@@ -128,6 +121,81 @@ export function BalanceTrendChart({ data }: { data: BalancePoint[] }) {
         </AreaChart>
       </ResponsiveContainer>
     </div>
+  )
+}
+
+const BALANCE_PERIODS = [7, 14, 30] as const
+type BalancePeriod = (typeof BALANCE_PERIODS)[number]
+
+/**
+ * Card "Saldo ao longo do tempo" completo (título, seletor de período e o
+ * gráfico) — dono do próprio estado, mesmo padrão de `SalesPerformanceCard`.
+ * `data` vem do servidor com a data real de cada lançamento (não um label já
+ * formatado), pra o filtro por período poder recortar por data de verdade.
+ */
+export function BalanceHistoryCard({ data }: { data: BalancePoint[] }) {
+  const [period, setPeriod] = useState<BalancePeriod>(30)
+
+  if (data.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Saldo ao longo do tempo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Ainda sem movimentações na carteira.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - period)
+  const filtered = data.filter((p) => new Date(p.date) >= cutoff)
+  const chartData = filtered.map((p) => ({
+    label: new Date(p.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+    balanceCents: p.balanceCents,
+  }))
+  const delta =
+    chartData.length >= 2
+      ? chartData[chartData.length - 1].balanceCents - chartData[0].balanceCents
+      : null
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base">Saldo ao longo do tempo</CardTitle>
+          <div className="flex w-fit gap-1 rounded-lg border border-border p-0.5">
+            {BALANCE_PERIODS.map((p) => (
+              <Button
+                key={p}
+                type="button"
+                size="xs"
+                variant={period === p ? "secondary" : "ghost"}
+                onClick={() => setPeriod(p)}
+              >
+                {p}d
+              </Button>
+            ))}
+          </div>
+        </div>
+        {delta !== null ? (
+          <TrendBadge delta={delta} label="no período" formattedAbs={formatCents(Math.abs(delta))} />
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        {chartData.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Sem movimentações nesse período.
+          </p>
+        ) : (
+          <BalanceAreaChart data={chartData} />
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

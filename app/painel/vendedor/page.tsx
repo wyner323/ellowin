@@ -21,10 +21,9 @@ import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
 import { BannerUpload } from "@/components/account/banner-upload"
 import {
-  BalanceTrendChart,
+  BalanceHistoryCard,
   SalesPerformanceCard,
   TopProductsChart,
-  TrendBadge,
 } from "@/components/seller/dashboard-charts"
 import { ReceivablesBreakdown } from "@/components/seller/receivables-breakdown"
 import { SellerTabs } from "@/components/seller/seller-tabs"
@@ -93,7 +92,7 @@ export default async function PainelVendedorPage() {
   // ordem cronológica, e cada linha já carrega o saldo resultante — sem
   // agregação nenhuma.
   const balanceHistory = [...walletEntries].reverse().map((e) => ({
-    label: e.createdAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+    date: e.createdAt.toISOString(),
     balanceCents: e.balanceAfterCents,
   }))
 
@@ -129,15 +128,6 @@ export default async function PainelVendedorPage() {
     })
     return { label, count, totalCents }
   })
-
-  // Variação do saldo entre o lançamento mais antigo e o mais recente
-  // mostrados no gráfico (não é um período fixo — segue a janela real dos
-  // últimos 60 lançamentos, que pode cobrir dias ou meses dependendo do
-  // volume de movimentação).
-  const balanceDeltaCents =
-    balanceHistory.length >= 2
-      ? balanceHistory[balanceHistory.length - 1].balanceCents - balanceHistory[0].balanceCents
-      : null
 
   // A custódia fica na carteira do comprador até a liberação, então o valor a
   // receber do vendedor vem dos pedidos ainda não concluídos, não do seu saldo.
@@ -359,21 +349,7 @@ export default async function PainelVendedorPage() {
           <section className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold">Desempenho</h2>
             <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Saldo ao longo do tempo</CardTitle>
-                  {balanceDeltaCents !== null ? (
-                    <TrendBadge
-                      delta={balanceDeltaCents}
-                      label="no período"
-                      formattedAbs={formatCents(Math.abs(balanceDeltaCents))}
-                    />
-                  ) : null}
-                </CardHeader>
-                <CardContent>
-                  <BalanceTrendChart data={balanceHistory} />
-                </CardContent>
-              </Card>
+              <BalanceHistoryCard data={balanceHistory} />
               <SalesPerformanceCard
                 data={salesTimeline}
                 hasAnySale={stats.salesCount > 0}
