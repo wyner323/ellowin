@@ -2,19 +2,15 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import {
-  CircleDollarSign,
   ExternalLink,
   Gauge,
   ImageIcon,
   Package,
   PackagePlus,
-  Plus,
-  ShieldAlert,
   Sparkles,
   Star,
   Store,
   TrendingUp,
-  Zap,
 } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
@@ -26,19 +22,21 @@ import {
   TopProductsChart,
 } from "@/components/seller/dashboard-charts"
 import { ReceivablesBreakdown } from "@/components/seller/receivables-breakdown"
+import { SellerActionItems, type SellerActionItem } from "@/components/seller/seller-action-items"
+import { SellerBalanceHero } from "@/components/seller/seller-balance-hero"
+import { SellerIdentityCard } from "@/components/seller/seller-identity-card"
 import { SellerTabs } from "@/components/seller/seller-tabs"
 import { SellerTips, type SellerTip } from "@/components/seller/seller-tips"
-import { StarRating } from "@/components/marketplace/star-rating"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { db } from "@/lib/db"
 import { sellerApplication, user } from "@/lib/db/schema"
 import {
+  getSellerAccountFlagSummary,
   getSellerDeliveryStats,
   getSellerStats,
   getSellerUnansweredQuestionsCount,
 } from "@/lib/marketplace"
-import { formatCents } from "@/lib/money"
 import { getMyDisputes, getSellerOrders } from "@/lib/orders"
 import { getSession } from "@/lib/session"
 import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla"
@@ -67,21 +65,31 @@ export default async function PainelVendedorPage() {
   // getSellerOrders() está dentro dele.
   await Promise.all([sweepDeliveryDeadline(), sweepAutoRelease()])
 
-  const [stats, orders, wallet, walletEntries, delivery, disputes, [profileRow], pendingQuestions] =
-    await Promise.all([
-      getSellerStats(session.user.id),
-      getSellerOrders(session.user.id),
-      getWalletSummary(session.user.id),
-      getWalletEntries(session.user.id, 60),
-      getSellerDeliveryStats(session.user.id),
-      getMyDisputes(session.user.id),
-      db
-        .select({ bannerUrl: user.bannerUrl })
-        .from(user)
-        .where(eq(user.id, session.user.id))
-        .limit(1),
-      getSellerUnansweredQuestionsCount(session.user.id),
-    ])
+  const [
+    stats,
+    orders,
+    wallet,
+    walletEntries,
+    delivery,
+    disputes,
+    [profileRow],
+    pendingQuestions,
+    accountFlags,
+  ] = await Promise.all([
+    getSellerStats(session.user.id),
+    getSellerOrders(session.user.id),
+    getWalletSummary(session.user.id),
+    getWalletEntries(session.user.id, 60),
+    getSellerDeliveryStats(session.user.id),
+    getMyDisputes(session.user.id),
+    db
+      .select({ bannerUrl: user.bannerUrl })
+      .from(user)
+      .where(eq(user.id, session.user.id))
+      .limit(1),
+    getSellerUnansweredQuestionsCount(session.user.id),
+    getSellerAccountFlagSummary(session.user.id),
+  ])
 
   const pending = orders.filter((o) => o.status === "aguardando_entrega")
   const openDisputes = disputes.filter(
@@ -171,65 +179,67 @@ export default async function PainelVendedorPage() {
     }
   }).filter((bucket) => bucket.count > 0)
 
-  const cards = [
+  // Estatísticas secundárias, em chips compactos — o saldo disponível e o
+  // faturamento/a receber já ganharam destaque próprio em SellerBalanceHero.
+  const secondaryStats = [
     {
-      label: "Faturamento total",
-      value: formatCents(faturamentoTotalCents),
-      hint: "Vendas concluídas, líquido de taxa",
-      icon: CircleDollarSign,
-    },
-    {
-      label: "A receber",
-      value: formatCents(escrowCents),
-      hint: "Em custódia até a confirmação",
-      icon: Store,
-    },
-    {
-      label: "Saldo disponível",
-      value: formatCents(wallet.availableCents),
-      hint: "Liberado para saque",
-      icon: TrendingUp,
-    },
-    {
-      label: "Vendas concluídas",
+      label: stats.salesCount === 1 ? "venda concluída" : "vendas concluídas",
       value: String(stats.salesCount),
-      hint: `${stats.products} ${stats.products === 1 ? "anúncio" : "anúncios"}`,
       icon: Package,
     },
     {
-      label: "Velocidade de entrega",
-      value: delivery.total > 0 ? `${delivery.onTimePercent}%` : "—",
-      hint:
+      label: stats.products === 1 ? "anúncio ativo" : "anúncios ativos",
+      value: String(stats.products),
+      icon: Store,
+    },
+    {
+      label:
         delivery.total > 0
-          ? `No prazo — tempo médio: ${formatDurationHours(delivery.avgDeliveryHours!)}`
-          : "Ainda sem entregas suficientes",
+          ? `no prazo · média ${formatDurationHours(delivery.avgDeliveryHours!)}`
+          : "velocidade de entrega (poucos dados)",
+      value: delivery.total > 0 ? `${delivery.onTimePercent}%` : "—",
       icon: Gauge,
     },
   ]
 
+  // O que precisa de ação agora — disputa primeiro (mais urgente, prazo
+  // corre e pode custar a venda), depois entregas pendentes. Junta num só
+  // lugar em destaque o que antes ficava espalhado entre um banner à parte
+  // e a lista de dicas lá embaixo.
+  const actionItems: SellerActionItem[] = [
+    ...(openDisputes.length > 0
+      ? [
+          {
+            id: "disputas",
+            tone: "destructive" as const,
+            title: `${openDisputes.length} ${openDisputes.length === 1 ? "disputa aberta" : "disputas abertas"}`,
+            description:
+              "Responda em até 48h úteis — depois disso o reembolso ao comprador é automático e você perde a venda.",
+            href: `/pedidos/${openDisputes[0].orderId}/disputa`,
+            cta: "Ver disputa",
+          },
+        ]
+      : []),
+    ...(pending.length > 0
+      ? [
+          {
+            id: "entregas",
+            tone: "gold" as const,
+            title: `${pending.length} ${pending.length === 1 ? "pedido aguardando entrega" : "pedidos aguardando entrega"}`,
+            description: "Quanto antes você entrega, antes o valor entra em liberação.",
+            href: "/painel/vendedor/vendas",
+            cta: "Ver pedidos pendentes",
+          },
+        ]
+      : []),
+  ]
+
   // Recomendações geradas a partir do estado real da loja — só entra na
   // lista o que de fato se aplica a este vendedor agora, e mostramos no
-  // máximo 4 pra não virar uma parede de avisos.
+  // máximo 4 pra não virar uma parede de avisos. Disputas e entregas
+  // pendentes não entram mais aqui — já têm destaque próprio em
+  // SellerActionItems.
   const tipCandidates: Array<SellerTip & { show: boolean }> = [
-    {
-      id: "disputas",
-      show: openDisputes.length > 0,
-      icon: ShieldAlert,
-      title: "Responda as disputas abertas",
-      description:
-        "Depois de 48h úteis sem resposta, o reembolso ao comprador é automático e você perde a venda.",
-      href: openDisputes.length > 0 ? `/pedidos/${openDisputes[0].orderId}/disputa` : undefined,
-      cta: "Ver disputa",
-    },
-    {
-      id: "entregas-pendentes",
-      show: pending.length > 0,
-      icon: Zap,
-      title: "Entregue os pedidos pendentes",
-      description: `${pending.length} ${pending.length === 1 ? "pedido está" : "pedidos estão"} aguardando os dados de entrega — quanto antes você entrega, antes o valor entra em liberação.`,
-      href: "/painel/vendedor/vendas",
-      cta: "Ver pedidos pendentes",
-    },
     {
       id: "velocidade",
       show: delivery.total >= 3 && delivery.onTimePercent !== null && delivery.onTimePercent < 90,
@@ -292,59 +302,40 @@ export default async function PainelVendedorPage() {
 
       <main className="flex-1">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10">
-          <header className="flex flex-wrap items-end justify-between gap-4">
-            <div className="flex flex-col gap-1">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {application.storeName ?? "Sua loja"}
-              </h1>
-              <div className="flex items-center gap-2">
-                <StarRating rating={stats.rating} count={stats.ratingCount} />
-                <span className="text-sm text-muted-foreground">
-                  Nível {application.level}
-                </span>
-              </div>
-            </div>
+          <SellerIdentityCard
+            storeName={application.storeName ?? "Sua loja"}
+            level={application.level}
+            rating={stats.rating}
+            ratingCount={stats.ratingCount}
+            hasCertificationSeal={accountFlags.count === 0}
+          />
 
-            <Button render={<Link href="/painel/vendedor/produtos/novo" />}>
-              <Plus className="size-4" />
-              Novo anúncio
-            </Button>
-          </header>
+          <div className="grid gap-4 md:grid-cols-[1.6fr_1fr]">
+            <SellerBalanceHero
+              saldoCents={wallet.availableCents}
+              faturamentoCents={faturamentoTotalCents}
+              aReceberCents={escrowCents}
+            />
+            <SellerActionItems items={actionItems} />
+          </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {cards.map((card) => (
-              <Card key={card.label}>
-                <CardContent className="flex flex-col gap-2">
-                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <card.icon className="size-3.5" aria-hidden="true" />
-                    {card.label}
+          <div className="grid gap-3 sm:grid-cols-3">
+            {secondaryStats.map((stat) => (
+              <Card key={stat.label}>
+                <CardContent className="flex flex-row items-center gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                    <stat.icon className="size-4" aria-hidden="true" />
                   </span>
-                  <strong className="font-display text-2xl font-bold tracking-tight">
-                    {card.value}
-                  </strong>
-                  <span className="text-xs text-muted-foreground">{card.hint}</span>
+                  <div className="flex flex-col">
+                    <strong className="font-display text-lg font-bold tracking-tight">
+                      {stat.value}
+                    </strong>
+                    <span className="text-xs text-muted-foreground">{stat.label}</span>
+                  </div>
                 </CardContent>
               </Card>
             ))}
           </div>
-
-          {openDisputes.length > 0 ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
-              <p className="flex items-center gap-2 text-sm">
-                <ShieldAlert className="size-4 text-destructive" aria-hidden="true" />
-                {openDisputes.length}{" "}
-                {openDisputes.length === 1 ? "disputa aberta" : "disputas abertas"} —
-                responda em até 48h úteis para não perder o valor.
-              </p>
-              <Button
-                render={<Link href={`/pedidos/${openDisputes[0].orderId}/disputa`} />}
-                size="sm"
-                variant="outline"
-              >
-                Ver disputa
-              </Button>
-            </div>
-          ) : null}
 
           <section className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold">Desempenho</h2>

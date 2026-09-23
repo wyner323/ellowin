@@ -26,7 +26,7 @@ export function SellerTips({ tips }: { tips: SellerTip[] }) {
   }
 
   return (
-    <ul className="flex flex-col gap-3">
+    <ul className="grid gap-3 sm:grid-cols-2">
       {tips.map((tip) => (
         <li
           key={tip.id}
