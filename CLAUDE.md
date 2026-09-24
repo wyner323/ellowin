@@ -131,6 +131,8 @@ can compute a real deadline from `deliveryTime`.
 
 `components/ui/*` are shadcn-style primitives, but built on **Base UI** (`@base-ui/react`), not
 Radix — check a sibling file (e.g. `button.tsx`, `select.tsx`) before assuming a Radix API.
+**Every `<Select>` must pass an `items` prop** (`Record<value, label>`): without it Base UI
+shows the raw `value` string in the trigger after selection instead of the item's label.
 Variants use `class-variance-authority`; `cn()` (`lib/utils.ts`) is `clsx` + `tailwind-merge`.
 Domain components are grouped by feature under `components/` (`account/`, `orders/`, `seller/`,
 `disputes/`, `games/`, `marketplace/`, `wallet/`, ...).
