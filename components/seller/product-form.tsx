@@ -99,6 +99,21 @@ export function ProductForm({
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
+  const categoryItems = Object.fromEntries(CATEGORIES.map((o) => [o.value, o.label]))
+  const accountOriginItems = Object.fromEntries(
+    ACCOUNT_ORIGIN_OPTIONS.map((o) => [o.id, o.label]),
+  )
+  const deliveryTypeItems = {
+    manual: "Manual (combinada com o comprador)",
+    automatica: "Automática",
+  }
+  const deliveryTimeItems = {
+    ...(deliveryTime && !DELIVERY_TIME_OPTIONS.some((o) => o.label === deliveryTime)
+      ? { [deliveryTime]: deliveryTime }
+      : {}),
+    ...Object.fromEntries(DELIVERY_TIME_OPTIONS.map((o) => [o.label, o.label])),
+  }
+
   // Ao editar um anúncio existente, pula direto pro formulário — o picker é
   // só pra ajudar a começar do zero.
   const [pickerResolved, setPickerResolved] = useState(editing)
@@ -200,6 +215,7 @@ export function ProductForm({
           <div className="flex flex-col gap-2">
             <Label htmlFor="category">Categoria</Label>
             <Select
+              items={categoryItems}
               value={categorySlug}
               onValueChange={(value) => setCategorySlug(value ?? "")}
             >
@@ -232,6 +248,7 @@ export function ProductForm({
           <div className="flex flex-col gap-2">
             <Label htmlFor="accountOrigin">Procedência da conta</Label>
             <Select
+              items={accountOriginItems}
               value={accountOrigin}
               onValueChange={(value) => setAccountOrigin(value ?? "")}
             >
@@ -271,7 +288,11 @@ export function ProductForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
             <Label htmlFor="deliveryType">Tipo de entrega</Label>
-            <Select value={deliveryType} onValueChange={(value) => changeDeliveryType(value ?? "manual")}>
+            <Select
+              items={deliveryTypeItems}
+              value={deliveryType}
+              onValueChange={(value) => changeDeliveryType(value ?? "manual")}
+            >
               <SelectTrigger id="deliveryType">
                 <SelectValue />
               </SelectTrigger>
@@ -292,7 +313,11 @@ export function ProductForm({
                 {INSTANT_DELIVERY_TIME}
               </div>
             ) : (
-              <Select value={deliveryTime} onValueChange={(value) => setDeliveryTime(value ?? DEFAULT_MANUAL_DELIVERY_TIME)}>
+              <Select
+                items={deliveryTimeItems}
+                value={deliveryTime}
+                onValueChange={(value) => setDeliveryTime(value ?? DEFAULT_MANUAL_DELIVERY_TIME)}
+              >
                 <SelectTrigger id="deliveryTime">
                   <SelectValue />
                 </SelectTrigger>
