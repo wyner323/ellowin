@@ -14,7 +14,8 @@ the platform and only released to the seller after delivery is confirmed.
 - `pnpm build` / `pnpm start` — production build / serve.
 - `npx tsc --noEmit` — type-check. This is the main correctness gate in this repo.
 - `pnpm lint` — runs ESLint (`eslint.config.mjs`); currently passes clean. Run it alongside
-  `tsc --noEmit` before committing.
+  `tsc --noEmit` before committing. GitHub Actions (`.github/workflows/ci.yml`) runs `tsc --noEmit`,
+  `pnpm lint` and `pnpm test` on every push to `main` and on pull requests.
 - `pnpm test` — runs Vitest (`vitest run`) over pure-function unit tests in `lib/*.test.ts`
   (money math, SLA business-hour deadlines, delivery time lookup, account-origin lookup, seller
   badge thresholds). `pnpm test:watch` for interactive mode. **Coverage is intentionally narrow**:
