@@ -13,8 +13,8 @@ the platform and only released to the seller after delivery is confirmed.
 - `pnpm dev` — start the dev server (Next.js, Turbopack).
 - `pnpm build` / `pnpm start` — production build / serve.
 - `npx tsc --noEmit` — type-check. This is the main correctness gate in this repo.
-- `pnpm lint` — defined in `package.json` but **not functional**: there is no ESLint config file
-  in the repo, so this currently fails. Don't assume lint output is meaningful.
+- `pnpm lint` — runs ESLint (`eslint.config.mjs`); currently passes clean. Run it alongside
+  `tsc --noEmit` before committing.
 - `pnpm test` — runs Vitest (`vitest run`) over pure-function unit tests in `lib/*.test.ts`
   (money math, SLA business-hour deadlines, delivery time lookup, account-origin lookup, seller
   badge thresholds). `pnpm test:watch` for interactive mode. **Coverage is intentionally narrow**:
