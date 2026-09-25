@@ -69,6 +69,10 @@ Better Auth (`lib/auth.ts`) backed directly by the Postgres pool (no separate ad
 (`user` / `moderator` / `admin`) live on `user.role`; the first admin is bootstrapped by matching
 `ELLOWIN_ADMIN_EMAIL` on login (`lib/roles.ts`), not seeded in the database.
 
+Password reset (`requestPasswordReset`/`resetPassword` in `app/actions/auth.ts`, pages `/esqueci-senha` and `/redefinir-senha`) follows
+the same rule: the Better Auth HTTP endpoints are disabled, the actions rate-limit (3/email/h, 10/IP/h), always answer the same
+whether or not the email exists, the link is 1 h / single use, and a successful reset revokes all sessions and emails a notice.
+
 Login and sign-up go **only** through `loginUser`/`registerUser` in `app/actions/auth.ts`: Better
 Auth's own rate limiter runs only in its HTTP handler (not in `auth.api.*` calls, and its counter
 is per-instance memory), so those actions use the DB-backed limiter in `lib/rate-limit.ts`

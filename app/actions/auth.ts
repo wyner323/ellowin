@@ -430,6 +430,76 @@ const LOGIN_WINDOW_SECONDS = 10 * 60
 const LOGIN_MAX_PER_EMAIL = 8
 const LOGIN_MAX_PER_IP = 30
 
+/* -------------------------------------------------------------------------- */
+/*                            Redefinição de senha                            */
+/* -------------------------------------------------------------------------- */
+
+const RESET_REQUEST_MESSAGE =
+  "Se existir uma conta com esse email, enviamos um link para redefinir a senha. Ele vale por 1 hora."
+
+/**
+ * "Esqueci minha senha". A resposta é SEMPRE a mesma, exista a conta ou não, para
+ * não revelar quais emails estão cadastrados. Limites: 3 pedidos por email e
+ * 10 por IP a cada hora (o limitador do Better Auth não cobre chamadas
+ * `auth.api.*`, ver loginUser).
+ */
+export async function requestPasswordReset(input: { email: string }): Promise<ActionResult> {
+  const email = input.email.trim().toLowerCase()
+  if (!isValidEmail(email))
+    return { ok: false, field: "email", error: "Informe um email válido." }
+
+  const ip = await clientIp()
+  const [emailOk, ipOk] = await Promise.all([
+    hitRateLimit(`reset:email:${email}`, 3, 60 * 60),
+    ip ? hitRateLimit(`reset:ip:${ip}`, 10, 60 * 60) : true,
+  ])
+  if (!emailOk || !ipOk)
+    return {
+      ok: false,
+      error: "Muitos pedidos de redefinição. Aguarde um pouco e tente de novo.",
+    }
+
+  try {
+    await auth.api.requestPasswordReset({ body: { email }, headers: new Headers() })
+  } catch (error) {
+    // Falha interna (ex.: envio de email): não muda a resposta ao usuário.
+    console.error("[reset-password] falha ao pedir redefinição:", error)
+  }
+
+  return { ok: true, message: RESET_REQUEST_MESSAGE }
+}
+
+/** Define a nova senha a partir do token do link. O token é de uso único e expira em 1 hora. */
+export async function resetPassword(input: {
+  token: string
+  password: string
+}): Promise<ActionResult> {
+  if (!input.token || input.token.length > 200)
+    return { ok: false, error: "Link inválido ou expirado. Peça um novo." }
+
+  if (!isValidPassword(input.password))
+    return {
+      ok: false,
+      field: "password",
+      error: "A senha precisa ter 8+ caracteres, com letras e números.",
+    }
+
+  const ip = await clientIp()
+  if (ip && !(await hitRateLimit(`reset-confirm:ip:${ip}`, 10, 60 * 60)))
+    return { ok: false, error: "Muitas tentativas. Aguarde um pouco e tente de novo." }
+
+  try {
+    await auth.api.resetPassword({
+      body: { newPassword: input.password, token: input.token },
+      headers: new Headers(),
+    })
+  } catch {
+    return { ok: false, error: "Link inválido ou expirado. Peça um novo." }
+  }
+
+  return { ok: true, message: "Senha alterada. Entre com a nova senha." }
+}
+
 export async function loginUser(input: {
   email: string
   password: string
