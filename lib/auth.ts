@@ -4,9 +4,8 @@ import { after } from "next/server"
 import { neutralizeUnverifiedCredentials } from "@/lib/account-link"
 import { pool } from "@/lib/db"
 import { sendPasswordChangedEmail, sendPasswordResetEmail } from "@/lib/email"
+import { SITE_URL } from "@/lib/site"
 
-/** Domínio de produção. O redirect do Google precisa ser sempre o mesmo, então não dá para depender do domínio do deploy. */
-const SITE_URL = "https://ellowin.com.br"
 
 /** Login com Google só liga quando as duas chaves existem (o botão some sem elas). */
 export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)

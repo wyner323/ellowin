@@ -7,6 +7,7 @@ import { order, orderMessage, product } from "@/lib/db/schema"
 import { getOrderMessages } from "@/lib/orders"
 import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, formatCents, splitOrderAmount } from "@/lib/money"
+import { notifyOrder } from "@/lib/notify"
 import { encryptField } from "@/lib/secret-box"
 import { accountBlock, getUserId } from "@/lib/session"
 import {
@@ -128,6 +129,8 @@ export async function purchase(
       return newOrderId
     })
 
+    notifyOrder("order_created", orderId)
+
     revalidatePath("/pedidos")
     revalidatePath("/carteira")
 
@@ -181,6 +184,8 @@ export async function markDelivered(input: {
   revalidatePath(`/pedidos/${row.id}`)
   revalidatePath("/pedidos")
 
+  notifyOrder("order_delivered", row.id)
+
   return { ok: true, message: "Entrega registrada. O comprador foi notificado." }
 }
 
@@ -231,6 +236,8 @@ export async function confirmReceipt(orderId: number): Promise<ActionResult> {
   revalidatePath("/carteira")
   revalidatePath("/painel/vendedor")
 
+  notifyOrder("order_completed", row.id)
+
   return { ok: true, message: "Recebimento confirmado. Agora você pode avaliar o vendedor." }
 }
 
@@ -278,6 +285,10 @@ export async function cancelOrder(orderId: number): Promise<ActionResult> {
   revalidatePath("/pedidos")
   revalidatePath("/carteira")
   revalidatePath("/painel/vendedor/vendas")
+
+  notifyOrder("order_cancelled", row.id, {
+    cancelledBy: userId === row.buyerId ? "comprador" : "vendedor",
+  })
 
   return { ok: true, message: "Pedido cancelado e valor devolvido." }
 }

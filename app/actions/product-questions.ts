@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { product, productQuestion } from "@/lib/db/schema"
+import { notifyQuestion } from "@/lib/notify"
 import { getUserId } from "@/lib/session"
 import type { ActionResult } from "@/app/actions/auth"
 
@@ -33,11 +34,16 @@ export async function askProductQuestion(
     return { ok: false, error: "Você não pode perguntar no seu próprio anúncio." }
   }
 
-  await db.insert(productQuestion).values({
-    productId: item.id,
-    askerId: userId,
-    question: trimmed,
-  })
+  const [created] = await db
+    .insert(productQuestion)
+    .values({
+      productId: item.id,
+      askerId: userId,
+      question: trimmed,
+    })
+    .returning({ id: productQuestion.id })
+
+  notifyQuestion("question_asked", created.id)
 
   revalidatePath(`/produtos/${item.slug}`)
   return { ok: true, message: "Pergunta enviada." }
@@ -77,6 +83,8 @@ export async function answerProductQuestion(
     .update(productQuestion)
     .set({ answer: trimmed, answeredAt: new Date() })
     .where(eq(productQuestion.id, questionId))
+
+  notifyQuestion("question_answered", questionId)
 
   revalidatePath(`/produtos/${row.slug}`)
   return { ok: true, message: "Resposta publicada." }

@@ -126,6 +126,14 @@ cold starts otherwise open a fresh TCP connection per invocation).
   throw if the buyer's `heldCents` doesn't cover the amount, and the DB has `CHECK` constraints
   against negative wallet balances.
 
+### Notification emails
+
+`lib/notify.ts` sends order/dispute/question emails (`notifyOrder`, `notifyQuestion`), called right after the money/status change
+succeeds (actions and the three SLA sweeps). It runs in `after()`, never throws, dedupes per (user, kind, ref) through
+`notification_log`, and **only really sends in production** (NODE_ENV and VERCEL_ENV both production, or `ELLOWIN_NOTIFY=1`)
+— locally it just logs, because the local database is production and a test flow must not email real people. Text lives in the
+pure `lib/notification-messages.ts`; emails must never contain delivery data and only carry public names.
+
 ### Lists are paginated on the server
 
 Orders (buyer and seller), the seller's listings, the wallet statement and closed disputes use `?pagina=N` with

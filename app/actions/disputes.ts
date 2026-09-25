@@ -7,6 +7,7 @@ import { dispute, order } from "@/lib/db/schema"
 import { DISPUTE_REASONS } from "@/lib/disputes"
 import { getDisputeMessages } from "@/lib/orders"
 import { formatCents } from "@/lib/money"
+import { notifyOrder } from "@/lib/notify"
 import { getStaff } from "@/lib/roles"
 import { getUserId } from "@/lib/session"
 import { disputeDeadlines } from "@/lib/sla"
@@ -122,6 +123,8 @@ export async function openDispute(input: {
   revalidatePath("/pedidos")
   revalidatePath("/painel/vendedor/vendas")
   revalidatePath("/admin/disputas")
+
+  notifyOrder("dispute_opened", row.id)
 
   return { ok: true, message: "Disputa aberta. O chat com o vendedor está disponível.", disputeId }
 }
@@ -409,6 +412,8 @@ export async function resolveDispute(input: {
   revalidatePath(`/pedidos/${row.orderId}`)
   revalidatePath(`/pedidos/${row.orderId}/disputa`)
   revalidatePath("/carteira")
+
+  notifyOrder("dispute_resolved", row.orderId, { outcome: input.outcome })
 
   return { ok: true, message: "Disputa encerrada." }
 }

@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNotNull, isNull, lt } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { dispute, order } from "@/lib/db/schema"
+import { notifyOrder } from "@/lib/notify"
 import {
   refundEscrow,
   releaseEscrowToSeller,
@@ -161,6 +162,7 @@ export async function sweepDisputeSla() {
         )
       })
 
+      notifyOrder("dispute_auto_refunded", ord.id)
       processed += 1
     } catch (error) {
       console.error(`[sla] Falha ao varrer a disputa #${row.id}:`, error)
@@ -246,6 +248,7 @@ export async function sweepDeliveryDeadline() {
         )
       })
 
+      notifyOrder("order_refunded_deadline", ord.id)
       processed += 1
     } catch (error) {
       console.error(`[sla] Falha ao varrer o pedido #${row.id}:`, error)
@@ -330,6 +333,7 @@ export async function sweepAutoRelease() {
         )
       })
 
+      notifyOrder("order_auto_completed", ord.id)
       processed += 1
     } catch (error) {
       console.error(`[sla] Falha ao varrer o pedido #${row.id}:`, error)

@@ -431,6 +431,25 @@ export const sellerAccountFlag = pgTable("seller_account_flag", {
 ])
 
 /**
+ * Emails de acompanhamento já enviados (lib/notify.ts). O índice único em
+ * (usuário, tipo, referência) garante que o mesmo aviso não saia duas vezes,
+ * mesmo com varreduras repetidas ou cliques duplos.
+ */
+export const notificationLog = pgTable(
+  "notification_log",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    refId: text("refId").notNull(),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("notification_log_unique_idx").on(t.userId, t.kind, t.refId)],
+)
+
+/**
  * Tentativas de login/cadastro, uma linha por tentativa — base do limitador de
  * taxa em lib/rate-limit.ts. O do Better Auth não serve aqui: só roda no
  * handler HTTP (não nas chamadas `auth.api.*` das server actions) e guarda o

@@ -134,7 +134,7 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`)
 }
 
-function actionTemplate({
+export function actionTemplate({
   title,
   intro,
   buttonLabel,
@@ -174,7 +174,7 @@ function actionTemplate({
 </html>`
 }
 
-async function sendMail(to: string, subject: string, html: string, label: string): Promise<SendResult> {
+export async function sendMail(to: string, subject: string, html: string, label: string): Promise<SendResult> {
   const resend = client()
   if (!resend) {
     console.log(`[email] RESEND_API_KEY ausente, ${label} não enviado`)
