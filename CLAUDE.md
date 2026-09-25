@@ -79,6 +79,11 @@ banner) must pass `isOwnBlobUrl()` (`lib/blob-urls.ts`) — never trust just the
 `purchase`, `createProduct`/`updateProduct`/reactivating a listing, `savePayoutStep` (which approves the seller) and
 `requestWithdrawal` all require a confirmed email (`isEmailVerified()`/`emailNotVerified()` in `lib/session.ts`) — sign-up
 does not confirm it on its own.
+The seller onboarding order (store → phone → document → Pix) is enforced server-side in `app/actions/seller.ts`, not just by the
+wizard, and editing an already-approved seller never lowers their status/level. Delivery data (`order.deliveryPayload`, game
+credentials) is encrypted at rest with `lib/secret-box.ts` when `DELIVERY_ENCRYPTION_KEY` is set (plaintext otherwise, so the
+variable must exist in Vercel before it takes effect; `scripts/encrypt-delivery-payloads.mjs` migrates old rows). Only
+`getOrderDetail` reads/decrypts it — list queries must not select it.
 
 Two names exist per user, and mixing them up is a real privacy bug, not just a style issue:
 - `user.name` (and `profile.fullName`) — the legal name tied to CPF/KYC. Internal/staff use only.

@@ -1,5 +1,13 @@
+import { timingSafeEqual } from "node:crypto"
 import { NextResponse } from "next/server"
 import { sweepAutoRelease, sweepDeliveryDeadline, sweepDisputeSla } from "@/lib/sla"
+
+/** Comparação em tempo constante: `!==` vaza, pelo tempo de resposta, quantos caracteres do segredo batem. */
+function safeEqual(a: string, b: string) {
+  const x = Buffer.from(a)
+  const y = Buffer.from(b)
+  return x.length === y.length && timingSafeEqual(x, y)
+}
 
 /**
  * Chamado pelo Vercel Cron (ver vercel.json). A Vercel injeta o header
@@ -11,7 +19,7 @@ export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization")
   // Sem CRON_SECRET configurada, `Bearer ${undefined}` viraria uma string fixa
   // e adivinhável ("Bearer undefined") — falha fechado em vez de aceitar isso.
-  if (!secret || authHeader !== `Bearer ${secret}`) {
+  if (!secret || !safeEqual(authHeader ?? "", `Bearer ${secret}`)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 })
   }
 

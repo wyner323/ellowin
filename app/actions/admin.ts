@@ -4,6 +4,7 @@ import { eq, ilike, or } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { user } from "@/lib/db/schema"
+import { escapeLike } from "@/lib/pagination"
 import { requireAdmin, type Role } from "@/lib/roles"
 import type { ActionResult } from "@/app/actions/auth"
 
@@ -41,7 +42,7 @@ export async function setUserRole(input: {
 export async function searchUsers(term: string) {
   await requireAdmin()
 
-  const query = term.trim()
+  const query = escapeLike(term.trim().slice(0, 100))
 
   const base = db
     .select({

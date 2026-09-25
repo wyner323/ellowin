@@ -44,6 +44,38 @@ async function upsertApplication(
     })
 }
 
+/**
+ * Onde o cadastro de vendedor está, lido do banco. As etapas do assistente são
+ * só interface: sem conferir aqui, dava para chamar savePayoutStep direto e
+ * virar vendedor aprovado pulando telefone e documento.
+ */
+async function getApplicationProgress(userId: string) {
+  const [row] = await db
+    .select({
+      status: sellerApplication.status,
+      storeName: sellerApplication.storeName,
+      documentNumber: sellerApplication.documentNumber,
+    })
+    .from(sellerApplication)
+    .where(eq(sellerApplication.userId, userId))
+    .limit(1)
+
+  const [p] = await db
+    .select({ phoneVerified: profile.phoneVerified })
+    .from(profile)
+    .where(eq(profile.userId, userId))
+    .limit(1)
+
+  return {
+    approved: row?.status === "aprovado",
+    hasStore: Boolean(row?.storeName),
+    hasDocument: Boolean(row?.documentNumber),
+    phoneVerified: Boolean(p?.phoneVerified),
+  }
+}
+
+const MISSING_STEPS = "Conclua as etapas anteriores do cadastro (loja, telefone e documento) antes deste passo."
+
 /** Etapa 1 — dados da loja. */
 export async function saveStoreStep(input: {
   storeName: string
@@ -71,6 +103,11 @@ export async function saveStoreStep(input: {
       field: "description",
       error: "Descreva sua operação com pelo menos 30 caracteres.",
     }
+  if (storeName.length > 60)
+    return { ok: false, field: "storeName", error: "O nome da loja pode ter até 60 caracteres." }
+  if (input.description.trim().length > 1000)
+    return { ok: false, field: "description", error: "A descrição pode ter até 1000 caracteres." }
+  if (input.category.length > 40) return { ok: false, field: "category", error: "Categoria inválida." }
 
   const baseSlug = storeName
     .toLowerCase()
@@ -81,13 +118,16 @@ export async function saveStoreStep(input: {
 
   const slug = await uniqueStoreSlug(baseSlug, userId)
 
+  // Editar os dados da loja de um vendedor JÁ aprovado não pode devolvê-lo para
+  // "em andamento" (perderia o acesso ao painel e aos anúncios).
+  const { approved } = await getApplicationProgress(userId)
+
   await upsertApplication(userId, {
     storeName,
     storeSlug: slug,
     category: input.category,
     description: input.description.trim(),
-    currentStep: 2,
-    status: "em_andamento",
+    ...(approved ? {} : { currentStep: 2, status: "em_andamento" }),
   })
 
   revalidatePath("/vender")
@@ -102,6 +142,9 @@ export async function saveKycStep(input: {
   selfieName: string
 }): Promise<ActionResult> {
   const userId = await getUserId()
+
+  const progress = await getApplicationProgress(userId)
+  if (!progress.hasStore || !progress.phoneVerified) return { ok: false, error: MISSING_STEPS }
 
   if (!input.documentType)
     return { ok: false, field: "documentType", error: "Selecione o tipo de documento." }
@@ -149,14 +192,16 @@ export async function saveKycStep(input: {
     }
   if (!input.selfieName)
     return { ok: false, field: "selfieName", error: "Anexe a selfie de validação." }
+  if (input.documentFrontName.length > 200 || input.selfieName.length > 200)
+    return { ok: false, error: "Nome de arquivo muito longo." }
 
   await upsertApplication(userId, {
     documentType: input.documentType,
     documentNumber: number,
     documentFrontName: input.documentFrontName,
     selfieName: input.selfieName,
-    currentStep: 5,
-    level: 3,
+    // Não rebaixa quem já concluiu tudo.
+    ...(progress.approved ? {} : { currentStep: 5, level: 3 }),
   })
 
   revalidatePath("/vender")
@@ -175,6 +220,10 @@ export async function savePayoutStep(input: {
 
   // Este passo aprova o vendedor: sem email confirmado, não.
   if (!(await isEmailVerified(userId))) return emailNotVerified("concluir o cadastro de vendedor")
+
+  const progress = await getApplicationProgress(userId)
+  if (!progress.hasStore || !progress.phoneVerified || !progress.hasDocument)
+    return { ok: false, error: MISSING_STEPS }
 
   if (!input.pixKeyType)
     return { ok: false, field: "pixKeyType", error: "Escolha o tipo de chave PIX." }
@@ -200,6 +249,8 @@ export async function savePayoutStep(input: {
       field: "bankHolder",
       error: "Informe o titular da conta bancária.",
     }
+  if (input.bankHolder.trim().length > 100 || key.length > 140)
+    return { ok: false, error: "Titular ou chave Pix longos demais." }
   if (!input.acceptedTerms)
     return {
       ok: false,
@@ -224,9 +275,9 @@ export async function savePayoutStep(input: {
     pixKey: nextPixKey,
     bankHolder: input.bankHolder.trim(),
     acceptedTerms: true,
-    currentStep: 6,
-    level: 4,
-    status: "aprovado",
+    // Um vendedor já aprovado que só troca a chave Pix não pode perder o nível
+    // que já conquistou (havia vendedores de nível 5 voltando para 4).
+    ...(progress.approved ? {} : { currentStep: 6, level: 4, status: "aprovado" }),
   })
 
   if (pixKeyChanged) {
@@ -247,6 +298,13 @@ export async function advanceContactStep(step: number): Promise<ActionResult> {
     return { ok: false, error: "Etapa inválida." }
 
   const userId = await getUserId()
+
+  const progress = await getApplicationProgress(userId)
+  // Vendedor aprovado não volta de etapa, e o avanço para o passo do documento
+  // só vale com o telefone realmente confirmado.
+  if (progress.approved) return { ok: true }
+  if (step >= 4 && !progress.phoneVerified) return { ok: false, error: MISSING_STEPS }
+
   await upsertApplication(userId, {
     currentStep: step,
     level: step >= 4 ? 2 : 1,

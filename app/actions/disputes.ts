@@ -50,6 +50,8 @@ export async function openDispute(input: {
     return { ok: false, field: "reason", error: "Escolha o motivo da disputa." }
 
   const description = input.description.trim()
+  if (description.length > 2000)
+    return { ok: false, field: "description", error: "A descrição pode ter até 2000 caracteres." }
   if (description.length < 20)
     return {
       ok: false,
@@ -284,6 +286,8 @@ export async function resolveDispute(input: {
   if (!staff) return { ok: false, error: "Acesso restrito à moderação." }
 
   const note = input.note.trim()
+  if (note.length > 2000)
+    return { ok: false, field: "note", error: "A justificativa pode ter até 2000 caracteres." }
   if (note.length < 10)
     return {
       ok: false,

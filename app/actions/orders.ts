@@ -7,6 +7,7 @@ import { order, orderMessage, product } from "@/lib/db/schema"
 import { getOrderMessages } from "@/lib/orders"
 import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, formatCents, splitOrderAmount } from "@/lib/money"
+import { encryptField } from "@/lib/secret-box"
 import { emailNotVerified, getUserId, isEmailVerified } from "@/lib/session"
 import {
   StateConflictError,
@@ -155,6 +156,8 @@ export async function markDelivered(input: {
     return { ok: false, error: "Este pedido não está aguardando entrega." }
   if (input.payload.trim().length < 4)
     return { ok: false, field: "payload", error: "Informe os dados da entrega." }
+  if (input.payload.trim().length > 5000)
+    return { ok: false, field: "payload", error: "Os dados da entrega podem ter até 5000 caracteres." }
 
   // O status vai no WHERE: se o comprador cancelou (ou o prazo estourou) entre
   // a leitura acima e aqui, nada é atualizado e a entrega não ressuscita um
@@ -163,7 +166,8 @@ export async function markDelivered(input: {
     .update(order)
     .set({
       status: "entregue",
-      deliveryPayload: input.payload.trim(),
+      // Cifrado em repouso quando DELIVERY_ENCRYPTION_KEY existe (lib/secret-box.ts).
+      deliveryPayload: encryptField(input.payload.trim(), `order:${row.id}`),
       deliveredAt: new Date(),
     })
     .where(and(eq(order.id, row.id), eq(order.status, "aguardando_entrega")))

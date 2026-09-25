@@ -48,6 +48,8 @@ export async function submitReview(input: {
   if (existing) return { ok: false, error: "Você já avaliou este pedido." }
 
   const comment = input.comment.trim()
+  if (comment.length > 1000)
+    return { ok: false, field: "comment", error: "O comentário pode ter até 1000 caracteres." }
 
   try {
     await withTransaction(async (client) => {

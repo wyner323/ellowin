@@ -1,6 +1,7 @@
 import { aliasedTable, and, asc, desc, eq, gte, inArray, notInArray, or, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { resolvePage } from "@/lib/pagination"
+import { decryptField } from "@/lib/secret-box"
 import {
   dispute,
   disputeMessage,
@@ -57,7 +58,6 @@ const orderColumns = {
   feeCents: order.feeCents,
   sellerNetCents: order.sellerNetCents,
   status: order.status,
-  deliveryPayload: order.deliveryPayload,
   deliveredAt: order.deliveredAt,
   deliveryDueAt: order.deliveryDueAt,
   autoReleaseAt: order.autoReleaseAt,
@@ -288,6 +288,9 @@ export async function getOrderDetail(
   const [row] = await db
     .select({
       ...orderColumns,
+      // Só o detalhe carrega os dados de entrega (as listas não precisam), e é
+      // aqui que eles são decifrados — ver lib/secret-box.ts.
+      deliveryPayload: order.deliveryPayload,
       buyerName: publicNameCol(buyer),
       buyerEmail: buyer.email,
       sellerName: publicNameCol(seller),
@@ -323,6 +326,7 @@ export async function getOrderDetail(
 
   return {
     ...row,
+    deliveryPayload: row.deliveryPayload ? decryptField(row.deliveryPayload, `order:${orderId}`) : null,
     viewer: { isBuyer, isSeller, isStaff },
     review: reviewRow ?? null,
     dispute: disputeRow ?? null,
