@@ -7,7 +7,7 @@ import { order, orderMessage, product } from "@/lib/db/schema"
 import { getOrderMessages } from "@/lib/orders"
 import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, formatCents, splitOrderAmount } from "@/lib/money"
-import { getUserId } from "@/lib/session"
+import { emailNotVerified, getUserId, isEmailVerified } from "@/lib/session"
 import {
   StateConflictError,
   moveToEscrow,
@@ -37,6 +37,8 @@ export async function purchase(
 
   if (!Number.isInteger(expectedPriceCents) || expectedPriceCents < 1)
     return { ok: false, error: "Não foi possível confirmar o preço. Atualize a página." }
+
+  if (!(await isEmailVerified(buyerId))) return emailNotVerified("comprar")
 
   try {
     const orderId = await withTransaction(async (client) => {

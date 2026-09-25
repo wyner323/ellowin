@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Check, Loader2, Lock, ShieldCheck, Wallet } from "lucide-react"
 import { purchase } from "@/app/actions/orders"
 import { Button } from "@/components/ui/button"
@@ -39,7 +39,9 @@ export function VariantPicker({
   const inStock = variants.filter((v) => v.stock > 0)
   const [selectedId, setSelectedId] = useState<number | null>(inStock[0]?.id ?? null)
   const [error, setError] = useState<string | null>(null)
+  const [needsEmail, setNeedsEmail] = useState(false)
   const [pending, start] = useTransition()
+  const pathname = usePathname()
 
   const selected = variants.find((v) => v.id === selectedId) ?? null
   const insufficient = selected ? availableCents < selected.priceCents : false
@@ -52,6 +54,7 @@ export function VariantPicker({
       const result = await purchase(selected.id, selected.priceCents)
       if (!result.ok) {
         setError(result.error ?? "Não foi possível concluir a compra.")
+        setNeedsEmail(result.field === "email")
         // O vendedor mudou o preço: recarrega a página pra mostrar o valor atual.
         if (result.field === "price") router.refresh()
         return
@@ -171,9 +174,18 @@ export function VariantPicker({
         ) : null}
 
         {error ? (
-          <p role="alert" className="text-xs text-destructive">
-            {error}
-          </p>
+          <div role="alert" className="flex flex-col gap-2">
+            <p className="text-xs text-destructive">{error}</p>
+            {needsEmail ? (
+              <Button
+                render={<Link href={`/verificar-email?next=${encodeURIComponent(pathname)}`} />}
+                variant="outline"
+                className="w-full"
+              >
+                Confirmar meu email
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </div>

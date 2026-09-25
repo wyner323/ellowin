@@ -4,7 +4,7 @@ import { eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { profile, sellerApplication } from "@/lib/db/schema"
-import { getUserId } from "@/lib/session"
+import { emailNotVerified, getUserId, isEmailVerified } from "@/lib/session"
 import { isValidCpf, onlyDigits } from "@/lib/validation"
 import type { ActionResult } from "@/app/actions/auth"
 
@@ -172,6 +172,9 @@ export async function savePayoutStep(input: {
   acceptedTerms: boolean
 }): Promise<ActionResult> {
   const userId = await getUserId()
+
+  // Este passo aprova o vendedor: sem email confirmado, não.
+  if (!(await isEmailVerified(userId))) return emailNotVerified("concluir o cadastro de vendedor")
 
   if (!input.pixKeyType)
     return { ok: false, field: "pixKeyType", error: "Escolha o tipo de chave PIX." }

@@ -14,7 +14,7 @@ import {
 import { isValidAccountOrigin } from "@/lib/account-origin"
 import { parseToCents } from "@/lib/money"
 import { slugifyGame } from "@/lib/product-catalog"
-import { getUserId } from "@/lib/session"
+import { emailNotVerified, getUserId, isEmailVerified } from "@/lib/session"
 import type { ActionResult } from "@/app/actions/auth"
 
 const MAX_IMAGES = 5
@@ -206,6 +206,8 @@ export async function createProduct(input: {
     }
   }
 
+  if (!(await isEmailVerified(userId))) return emailNotVerified("anunciar")
+
   const title = input.title.trim()
   if (title.length < 8)
     return { ok: false, field: "title", error: "O título precisa ter ao menos 8 caracteres." }
@@ -298,6 +300,8 @@ export async function updateProduct(input: {
     .limit(1)
 
   if (!owned) return { ok: false, error: "Anúncio não encontrado." }
+
+  if (!(await isEmailVerified(userId))) return emailNotVerified("editar anúncios")
 
   const title = input.title.trim()
   if (title.length < 8)
@@ -446,6 +450,9 @@ export async function toggleProductStatus(productId: number): Promise<ActionResu
   if (!owned) return { ok: false, error: "Anúncio não encontrado." }
 
   const next = owned.status === "ativo" ? "pausado" : "ativo"
+
+  // Pausar é sempre permitido; só reativar (voltar a vender) exige email confirmado.
+  if (next === "ativo" && !(await isEmailVerified(userId))) return emailNotVerified("reativar o anúncio")
 
   await db
     .update(product)

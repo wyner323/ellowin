@@ -76,6 +76,9 @@ is per-instance memory), so those actions use the DB-backed limiter in `lib/rate
 `lib/auth.ts` (`disabledPaths`) so they can't be used to bypass it. OTP codes are never returned
 to the browser unless `ELLOWIN_DEMO_OTP=true`. User-supplied Blob URLs (product photos, avatar,
 banner) must pass `isOwnBlobUrl()` (`lib/blob-urls.ts`) — never trust just the Blob domain.
+`purchase`, `createProduct`/`updateProduct`/reactivating a listing, `savePayoutStep` (which approves the seller) and
+`requestWithdrawal` all require a confirmed email (`isEmailVerified()`/`emailNotVerified()` in `lib/session.ts`) — sign-up
+does not confirm it on its own.
 
 Two names exist per user, and mixing them up is a real privacy bug, not just a style issue:
 - `user.name` (and `profile.fullName`) — the legal name tied to CPF/KYC. Internal/staff use only.

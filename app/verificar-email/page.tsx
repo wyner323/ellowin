@@ -18,7 +18,8 @@ export default async function VerificarEmailPage({
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
-  const destination = next?.startsWith("/") ? next : "/conta"
+  // Só caminho interno: "//evil.com" e "/\evil.com" começam com "/" mas o navegador os trata como outro site.
+  const destination = next && /^\/(?![/\\])/.test(next) ? next : "/conta"
   if (session.user.emailVerified) redirect(destination)
 
   return (

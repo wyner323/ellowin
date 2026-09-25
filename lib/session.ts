@@ -46,6 +46,30 @@ export async function getUserId() {
   return session.user.id
 }
 
+/**
+ * O cadastro não confirma o email sozinho (o código de 6 dígitos é um passo à
+ * parte), então "email verificado" precisa ser exigido nas ações sensíveis:
+ * comprar, anunciar, virar vendedor aprovado e sacar. Lê direto do banco, não
+ * do objeto da sessão, pra refletir a confirmação feita há segundos.
+ */
+export async function isEmailVerified(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ emailVerified: user.emailVerified })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1)
+  return Boolean(row?.emailVerified)
+}
+
+/** Resposta padrão das ações que exigem email verificado (`field: "email"` deixa a tela oferecer o atalho). */
+export function emailNotVerified(action: string) {
+  return {
+    ok: false as const,
+    field: "email",
+    error: `Confirme seu email para ${action}. Enviamos um código de 6 dígitos para você.`,
+  }
+}
+
 export type AccountState = {
   id: string
   name: string
