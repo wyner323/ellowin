@@ -8,6 +8,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
 
 /* ---------------------------------------------------------------------------
@@ -38,7 +39,9 @@ export const user = pgTable("user", {
   lastActiveAt: timestamp("lastActiveAt"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
-})
+}, (t) => [
+  uniqueIndex("user_display_name_unique_idx").on(sql`lower(${t.displayName})`).where(sql`${t.displayName} is not null`),
+])
 
 export const session = pgTable("session", {
   id: text("id").primaryKey(),
@@ -51,7 +54,9 @@ export const session = pgTable("session", {
   userId: text("userId")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-})
+}, (t) => [
+  index("session_userId_idx").on(t.userId),
+])
 
 export const account = pgTable("account", {
   id: text("id").primaryKey(),
@@ -69,7 +74,9 @@ export const account = pgTable("account", {
   password: text("password"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("account_userId_idx").on(t.userId),
+])
 
 export const verification = pgTable("verification", {
   id: text("id").primaryKey(),
@@ -125,7 +132,9 @@ export const sellerApplication = pgTable("seller_application", {
   status: text("status").notNull().default("em_andamento"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
-})
+}, (t) => [
+  uniqueIndex("seller_application_store_slug_unique_idx").on(sql`lower(${t.storeSlug})`).where(sql`${t.storeSlug} is not null`),
+])
 
 export const otpCode = pgTable("otp_code", {
   id: serial("id").primaryKey(),
@@ -139,7 +148,9 @@ export const otpCode = pgTable("otp_code", {
   consumedAt: timestamp("consumedAt"),
   expiresAt: timestamp("expiresAt").notNull(),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("otp_code_lookup_idx").on(t.userId, t.channel, t.createdAt),
+])
 
 /* ---------------------------------------------------------------------------
  * Marketplace: carteira com custódia (escrow)
@@ -178,7 +189,9 @@ export const walletTransaction = pgTable("wallet_transaction", {
   balanceAfterCents: integer("balanceAfterCents").notNull(),
   description: text("description"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("wallet_tx_user_created_idx").on(t.userId, t.createdAt),
+])
 
 /* ---------------------------------------------------------------------------
  * Marketplace: produtos e variantes
@@ -206,7 +219,10 @@ export const product = pgTable("product", {
   salesCount: integer("salesCount").notNull().default(0),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("product_seller_idx").on(t.sellerId),
+  index("product_category_idx").on(t.categorySlug),
+])
 
 /**
  * Fotos do anúncio, ordenadas. A de menor `sortOrder` é a capa (aparece no
@@ -221,7 +237,9 @@ export const productImage = pgTable("product_image", {
   url: text("url").notNull(),
   sortOrder: integer("sortOrder").notNull().default(0),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("product_image_product_idx").on(t.productId, t.sortOrder),
+])
 
 /** O "item específico" que o comprador escolhe: cada variante tem preço próprio. */
 export const productVariant = pgTable("product_variant", {
@@ -236,7 +254,9 @@ export const productVariant = pgTable("product_variant", {
   sortOrder: integer("sortOrder").notNull().default(0),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("variant_product_idx").on(t.productId),
+])
 
 /**
  * Pergunta pública feita no anúncio antes da compra — visível a qualquer
@@ -255,7 +275,9 @@ export const productQuestion = pgTable("product_question", {
   answer: text("answer"),
   answeredAt: timestamp("answeredAt"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("product_question_product_idx").on(t.productId),
+])
 
 /* ---------------------------------------------------------------------------
  * Marketplace: pedidos, avaliações e disputas
@@ -290,7 +312,12 @@ export const order = pgTable("order", {
   autoReleaseAt: timestamp("autoReleaseAt"),
   completedAt: timestamp("completedAt"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("order_buyer_idx").on(t.buyerId),
+  index("order_seller_idx").on(t.sellerId),
+  index("order_status_auto_release_idx").on(t.status, t.autoReleaseAt),
+  index("order_status_delivery_due_idx").on(t.status, t.deliveryDueAt),
+])
 
 /** Uma avaliação por pedido concluído — alimenta o ranking do vendedor. */
 export const review = pgTable("review", {
@@ -311,7 +338,10 @@ export const review = pgTable("review", {
   rating: integer("rating").notNull(),
   comment: text("comment"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("review_product_idx").on(t.productId),
+  index("review_seller_idx").on(t.sellerId),
+])
 
 export const dispute = pgTable("dispute", {
   id: serial("id").primaryKey(),
@@ -335,7 +365,9 @@ export const dispute = pgTable("dispute", {
   resolution: text("resolution"),
   resolvedAt: timestamp("resolvedAt"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("dispute_status_response_due_idx").on(t.status, t.sellerResponseDueAt),
+])
 
 /**
  * Chat do pedido: comprador e vendedor combinam a entrega antes de qualquer
@@ -352,7 +384,9 @@ export const orderMessage = pgTable("order_message", {
   authorRole: text("authorRole").notNull(),
   body: text("body").notNull(),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("order_message_order_idx").on(t.orderId),
+])
 
 /** Histórico compartilhado: qualquer moderador lê o caso inteiro e dá continuidade. */
 export const disputeMessage = pgTable("dispute_message", {
@@ -367,7 +401,9 @@ export const disputeMessage = pgTable("dispute_message", {
   /** Nota interna: visível apenas para a moderação. */
   internal: boolean("internal").notNull().default(false),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("dispute_message_dispute_idx").on(t.disputeId),
+])
 
 /**
  * Registro de "conta recuperada" contra um vendedor — base do Selo de
@@ -390,7 +426,9 @@ export const sellerAccountFlag = pgTable("seller_account_flag", {
     .references(() => user.id),
   note: text("note").notNull(),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-})
+}, (t) => [
+  index("seller_account_flag_seller_idx").on(t.sellerId),
+])
 
 /**
  * Tentativas de login/cadastro, uma linha por tentativa — base do limitador de
