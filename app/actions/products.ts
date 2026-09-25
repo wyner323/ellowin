@@ -12,12 +12,21 @@ import {
   hoursForDeliveryTime,
 } from "@/lib/delivery"
 import { isValidAccountOrigin } from "@/lib/account-origin"
+import { MAX_DESCRIPTION, MAX_TITLE } from "@/lib/listing-checks"
 import { parseToCents } from "@/lib/money"
 import { slugifyGame } from "@/lib/product-catalog"
 import { emailNotVerified, getUserId, isEmailVerified } from "@/lib/session"
 import type { ActionResult } from "@/app/actions/auth"
 
 const MAX_IMAGES = 5
+
+// Tetos de tamanho (espelhados em lib/listing-checks.ts e nos maxLength do
+// formulário): sem eles um anúncio podia guardar textos e números absurdos.
+const MAX_GAME = 80
+const MAX_LABEL = 80
+const MAX_NOTE = 200
+const MAX_PRICE_CENTS = 10_000_000 // R$ 100.000,00 por item
+const MAX_STOCK = 100_000
 
 /**
  * Entrega automática é sempre instantânea — nunca confia no que o cliente
@@ -160,15 +169,25 @@ function validateVariants(variants: VariantInput[]) {
         parsed: null,
       }
     }
+    if (label.length > MAX_LABEL) {
+      return { error: `O nome do item ${index + 1} pode ter até ${MAX_LABEL} caracteres.`, parsed: null }
+    }
+    if ((v.deliveryNote ?? "").trim().length > MAX_NOTE) {
+      return { error: `A observação de "${label}" pode ter até ${MAX_NOTE} caracteres.`, parsed: null }
+    }
 
     const priceCents = parseToCents(v.price)
     if (priceCents === null || priceCents < 100) {
       return { error: `O preço de "${label}" deve ser de no mínimo R$ 1,00.`, parsed: null }
     }
 
+    if (priceCents > MAX_PRICE_CENTS) {
+      return { error: `O preço de "${label}" passa do máximo de R$ 100.000,00.`, parsed: null }
+    }
+
     const stock = Number.parseInt(v.stock, 10)
-    if (!Number.isFinite(stock) || stock < 0) {
-      return { error: `O estoque de "${label}" é inválido.`, parsed: null }
+    if (!Number.isFinite(stock) || stock < 0 || stock > MAX_STOCK) {
+      return { error: `O estoque de "${label}" é inválido (0 a ${MAX_STOCK}).`, parsed: null }
     }
 
     parsed.push({
@@ -211,6 +230,12 @@ export async function createProduct(input: {
   const title = input.title.trim()
   if (title.length < 8)
     return { ok: false, field: "title", error: "O título precisa ter ao menos 8 caracteres." }
+  if (title.length > MAX_TITLE)
+    return { ok: false, field: "title", error: `O título pode ter até ${MAX_TITLE} caracteres.` }
+  if (input.description.trim().length > MAX_DESCRIPTION)
+    return { ok: false, field: "description", error: `A descrição pode ter até ${MAX_DESCRIPTION} caracteres.` }
+  if (input.game.trim().length > MAX_GAME)
+    return { ok: false, field: "game", error: `O nome do jogo pode ter até ${MAX_GAME} caracteres.` }
   if (!input.categorySlug)
     return { ok: false, field: "categorySlug", error: "Escolha a categoria do anúncio." }
   if (input.description.trim().length < 20)
@@ -306,12 +331,18 @@ export async function updateProduct(input: {
   const title = input.title.trim()
   if (title.length < 8)
     return { ok: false, field: "title", error: "O título precisa ter ao menos 8 caracteres." }
+  if (title.length > MAX_TITLE)
+    return { ok: false, field: "title", error: `O título pode ter até ${MAX_TITLE} caracteres.` }
   if (input.description.trim().length < 20)
     return {
       ok: false,
       field: "description",
       error: "Descreva o que o comprador recebe com pelo menos 20 caracteres.",
     }
+  if (input.description.trim().length > MAX_DESCRIPTION)
+    return { ok: false, field: "description", error: `A descrição pode ter até ${MAX_DESCRIPTION} caracteres.` }
+  if (input.game.trim().length > MAX_GAME)
+    return { ok: false, field: "game", error: `O nome do jogo pode ter até ${MAX_GAME} caracteres.` }
   if (!isAcceptableDeliveryTime(input.deliveryType, input.deliveryTime, owned.deliveryTime))
     return { ok: false, field: "deliveryTime", error: "Escolha um prazo de entrega da lista." }
   if (input.categorySlug === "contas" && !isValidAccountOrigin((input.accountOrigin ?? "").trim()))

@@ -85,17 +85,18 @@ export function ProductImageUploader({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+      {/* Tiles 16:9, a mesma proporção da capa na vitrine: o que se vê aqui é o recorte real. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {value.map((url, index) => (
           <div
             key={url}
-            className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
+            className="group relative aspect-video overflow-hidden rounded-xl border border-border bg-muted"
           >
             <Image
               src={url || "/placeholder.svg"}
               alt={`Imagem ${index + 1} do anúncio`}
               fill
-              sizes="(max-width: 640px) 33vw, 160px"
+              sizes="(max-width: 640px) 50vw, 220px"
               className="object-cover"
             />
 
@@ -136,7 +137,7 @@ export function ProductImageUploader({
           ? Array.from({ length: uploading }).map((_, i) => (
               <div
                 key={`up-${i}`}
-                className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-border bg-muted/40"
+                className="flex aspect-video items-center justify-center rounded-xl border border-dashed border-border bg-muted/40"
               >
                 <Loader2 className="size-5 animate-spin text-muted-foreground" />
               </div>
@@ -148,10 +149,10 @@ export function ProductImageUploader({
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={disabled}
-            className="flex aspect-square flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+            className="flex aspect-video flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border bg-muted/30 text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5 hover:text-primary"
           >
             <ImagePlus className="size-6" aria-hidden="true" />
-            <span className="text-xs">Adicionar</span>
+            <span className="text-xs font-medium">{value.length === 0 ? "Adicionar fotos" : "Adicionar"}</span>
           </button>
         ) : null}
       </div>
