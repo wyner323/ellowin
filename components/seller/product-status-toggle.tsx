@@ -45,6 +45,7 @@ export function ProductStatusToggle({
         ) : (
           <Pause className="size-4" />
         )}
+        {paused ? "Reativar" : "Pausar"}
       </Button>
       {error ? (
         <p role="alert" className="text-xs text-destructive">

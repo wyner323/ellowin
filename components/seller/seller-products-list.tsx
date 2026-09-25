@@ -1,5 +1,3 @@
-"use client"
-
 import Link from "next/link"
 import Image from "next/image"
 import { ImageIcon, Search } from "lucide-react"
@@ -7,13 +5,17 @@ import { StarRating } from "@/components/marketplace/star-rating"
 import { ProductStatusToggle } from "@/components/seller/product-status-toggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { getCategory } from "@/lib/catalog"
 import { formatCents } from "@/lib/money"
+import { cn } from "@/lib/utils"
 
 type SellerProduct = {
   id: number
   title: string
   slug: string
   status: string
+  game: string | null
+  categorySlug: string
   coverUrl: string | null
   rating: number | null
   ratingCount: number
@@ -21,9 +23,35 @@ type SellerProduct = {
   variants: { active: boolean; stock: number; priceCents: number }[]
 }
 
+/** Campo de busca: formulário GET (?q=), o servidor filtra e pagina — sem JS no cliente. */
+export function ProductSearchForm({ query, status }: { query: string; status?: string }) {
+  return (
+    <form
+      method="get"
+      action="/painel/vendedor/produtos"
+      role="search"
+      className="flex w-full gap-2 sm:max-w-sm"
+    >
+      {status ? <input type="hidden" name="status" value={status} /> : null}
+      <Input
+        name="q"
+        defaultValue={query}
+        placeholder="Buscar por nome do anúncio"
+        className="h-9"
+        maxLength={100}
+      />
+      <Button type="submit" variant="outline" size="sm" className="h-9">
+        <Search className="size-4" aria-hidden="true" />
+        Buscar
+      </Button>
+    </form>
+  )
+}
+
 /**
- * A busca é um formulário GET (?q=): o servidor filtra e pagina, então achar
- * um anúncio funciona mesmo que ele esteja numa página que não foi carregada.
+ * Anúncios em cards com a foto de capa em destaque (é o que o comprador vê na
+ * vitrine), estado, faixa de preço, estoque e desempenho. Anúncio ativo sem
+ * estoque ganha um aviso: continua na vitrine mas ninguém consegue comprar.
  */
 export function SellerProductsList({
   products,
@@ -32,105 +60,128 @@ export function SellerProductsList({
   products: SellerProduct[]
   query: string
 }) {
+  if (products.length === 0) {
+    return (
+      <p className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+        {query ? (
+          <>Nenhum anúncio encontrado para &quot;{query}&quot;.</>
+        ) : (
+          <>Nenhum anúncio nesse filtro.</>
+        )}
+      </p>
+    )
+  }
+
   return (
-    <div className="flex flex-col gap-4">
-      <form method="get" action="/painel/vendedor/produtos" role="search" className="flex max-w-sm gap-2">
-        <Input
-          name="q"
-          defaultValue={query}
-          placeholder="Buscar por nome do anúncio"
-          className="h-9"
-          maxLength={100}
-        />
-        <Button type="submit" variant="outline" size="sm" className="h-9">
-          <Search className="size-4" aria-hidden="true" />
-          Buscar
-        </Button>
-      </form>
+    <ul className="grid gap-4 sm:grid-cols-2">
+      {products.map((p) => {
+        const active = p.variants.filter((v) => v.active)
+        const stock = active.reduce((sum, v) => sum + v.stock, 0)
+        const cheapest = active.length ? Math.min(...active.map((v) => v.priceCents)) : null
+        const isActive = p.status === "ativo"
+        const noStock = isActive && stock === 0
+        const categoryName = getCategory(p.categorySlug)?.name
 
-      {products.length === 0 ? (
-        <p className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-          Nenhum anúncio encontrado para &quot;{query}&quot;.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {products.map((p) => {
-            const active = p.variants.filter((v) => v.active)
-            const stock = active.reduce((sum, v) => sum + v.stock, 0)
-            const cheapest = active.length
-              ? Math.min(...active.map((v) => v.priceCents))
-              : null
+        return (
+          <li
+            key={p.id}
+            className={cn(
+              "flex flex-col overflow-hidden rounded-2xl border bg-card",
+              noStock ? "border-gold/40" : "border-border",
+              !isActive && "opacity-80",
+            )}
+          >
+            <div className="relative aspect-video w-full bg-muted">
+              {p.coverUrl ? (
+                <Image
+                  src={p.coverUrl}
+                  alt=""
+                  fill
+                  sizes="(min-width: 640px) 400px, 100vw"
+                  className={cn("object-cover", !isActive && "grayscale")}
+                />
+              ) : (
+                <span className="flex size-full items-center justify-center text-muted-foreground">
+                  <ImageIcon className="size-8" aria-hidden="true" />
+                </span>
+              )}
+              <div className="absolute top-3 left-3 flex gap-1.5">
+                <span
+                  className={cn(
+                    "rounded-full px-2.5 py-0.5 text-[0.7rem] font-medium backdrop-blur",
+                    isActive
+                      ? "bg-success/90 text-success-foreground"
+                      : "bg-background/85 text-muted-foreground",
+                  )}
+                >
+                  {isActive ? "Ativo" : "Pausado"}
+                </span>
+                {noStock ? (
+                  <span className="rounded-full bg-gold px-2.5 py-0.5 text-[0.7rem] font-medium text-gold-foreground">
+                    Sem estoque
+                  </span>
+                ) : null}
+              </div>
+            </div>
 
-            return (
-              <li
-                key={p.id}
-                className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
-                      {p.coverUrl ? (
-                        <Image
-                          src={p.coverUrl || "/placeholder.svg"}
-                          alt=""
-                          fill
-                          sizes="56px"
-                          className="object-cover"
-                        />
-                      ) : (
-                        <span className="flex size-full items-center justify-center text-muted-foreground">
-                          <ImageIcon className="size-5" aria-hidden="true" />
-                        </span>
-                      )}
-                    </div>
+            <div className="flex flex-1 flex-col gap-3 p-4">
+              <div className="flex flex-col gap-1">
+                <Link
+                  href={`/produtos/${p.slug}`}
+                  className="line-clamp-2 leading-snug font-medium text-pretty hover:text-primary"
+                >
+                  {p.title}
+                </Link>
+                <span className="truncate text-xs text-muted-foreground">
+                  {[p.game, categoryName].filter(Boolean).join(" · ") || "Sem categoria"}
+                </span>
+              </div>
 
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={
-                            p.status === "ativo"
-                              ? "rounded-full bg-primary/15 px-2 py-0.5 text-[0.7rem] font-medium text-primary"
-                              : "rounded-full bg-muted px-2 py-0.5 text-[0.7rem] font-medium text-muted-foreground"
-                          }
-                        >
-                          {p.status === "ativo" ? "Ativo" : "Pausado"}
-                        </span>
-                        <StarRating rating={p.rating} count={p.ratingCount} />
-                      </div>
-                      <Link
-                        href={`/produtos/${p.slug}`}
-                        className="truncate font-medium hover:text-primary"
-                      >
-                        {p.title}
-                      </Link>
-                      <span className="text-xs text-muted-foreground">
-                        {active.length} {active.length === 1 ? "item" : "itens"} ·{" "}
-                        {stock} em estoque · {p.salesCount} vendas
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {cheapest !== null ? (
-                      <strong className="font-display text-lg font-bold">
-                        {formatCents(cheapest)}
-                      </strong>
-                    ) : null}
-                    <Button
-                      render={<Link href={`/painel/vendedor/produtos/${p.id}`} />}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Editar
-                    </Button>
-                    <ProductStatusToggle productId={p.id} status={p.status} />
-                  </div>
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex flex-col">
+                  <span className="text-[0.7rem] text-muted-foreground">
+                    {active.length > 1 ? "a partir de" : "preço"}
+                  </span>
+                  <strong className="font-display text-xl leading-tight font-bold">
+                    {cheapest !== null ? formatCents(cheapest) : "—"}
+                  </strong>
                 </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </div>
+                <StarRating rating={p.rating} count={p.ratingCount} />
+              </div>
+
+              <dl className="grid grid-cols-3 gap-2 border-t border-border pt-3 text-center">
+                <div>
+                  <dt className="text-[0.7rem] text-muted-foreground">
+                    {active.length === 1 ? "Item" : "Itens"}
+                  </dt>
+                  <dd className="text-sm font-semibold tabular-nums">{active.length}</dd>
+                </div>
+                <div>
+                  <dt className="text-[0.7rem] text-muted-foreground">Em estoque</dt>
+                  <dd className={cn("text-sm font-semibold tabular-nums", noStock && "text-gold")}>
+                    {stock}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[0.7rem] text-muted-foreground">Vendas</dt>
+                  <dd className="text-sm font-semibold tabular-nums">{p.salesCount}</dd>
+                </div>
+              </dl>
+
+              <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+                <Button
+                  render={<Link href={`/painel/vendedor/produtos/${p.id}`} />}
+                  variant="outline"
+                  size="sm"
+                >
+                  Editar
+                </Button>
+                <ProductStatusToggle productId={p.id} status={p.status} />
+              </div>
+            </div>
+          </li>
+        )
+      })}
+    </ul>
   )
 }

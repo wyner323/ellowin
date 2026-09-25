@@ -18,6 +18,9 @@ export async function askProductQuestion(
   if (trimmed.length < 5) {
     return { ok: false, error: "Escreva a pergunta com pelo menos 5 caracteres." }
   }
+  if (trimmed.length > 500) {
+    return { ok: false, error: "A pergunta pode ter no máximo 500 caracteres." }
+  }
 
   const [item] = await db
     .select({ id: product.id, sellerId: product.sellerId, slug: product.slug })
@@ -50,6 +53,9 @@ export async function answerProductQuestion(
   const trimmed = answer.trim()
   if (trimmed.length < 2) {
     return { ok: false, error: "Escreva uma resposta." }
+  }
+  if (trimmed.length > 1000) {
+    return { ok: false, error: "A resposta pode ter no máximo 1000 caracteres." }
   }
 
   const [row] = await db

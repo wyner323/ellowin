@@ -8,7 +8,8 @@ import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
 import { OrderActions } from "@/components/orders/order-actions"
 import { OrderChat } from "@/components/orders/order-chat"
-import { OrderStatusBadge } from "@/components/orders/order-status-badge"
+import { OrderStatusBadge, OrderStatusIcon } from "@/components/orders/order-status-badge"
+import { OrderTimeline } from "@/components/orders/order-timeline"
 import { OpenDisputeForm } from "@/components/orders/open-dispute-form"
 import { ReviewForm } from "@/components/orders/review-form"
 import { StarRating } from "@/components/marketplace/star-rating"
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatCents } from "@/lib/money"
 import { getOrderDetail, getOrderMessages } from "@/lib/orders"
+import { orderHint } from "@/lib/order-hints"
 import { getStaff } from "@/lib/roles"
 import { getSession } from "@/lib/session"
 import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla"
@@ -51,6 +53,19 @@ export default async function PedidoPage({
   const counterparty = viewer.isBuyer
     ? (detail.storeName ?? detail.sellerName ?? "Vendedor")
     : (detail.buyerName ?? "Comprador")
+
+  const hint = orderHint({
+    status: detail.status,
+    role: viewer.isSeller ? "vendedor" : "comprador",
+    deliveryDueAt: detail.deliveryDueAt,
+    autoReleaseAt: detail.autoReleaseAt,
+  })
+  const createdLabel = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(detail.createdAt)
 
   const canReview =
     viewer.isBuyer && detail.status === "concluido" && !detail.review
@@ -87,43 +102,72 @@ export default async function PedidoPage({
             </Button>
           </div>
 
-          <header className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">Pedido #{detail.id}</span>
-              <OrderStatusBadge
-                status={detail.status}
-                role={viewer.isSeller ? "vendedor" : "comprador"}
-              />
-            </div>
+          <header className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-5 sm:p-6">
+            <div className="flex flex-wrap items-start gap-4">
+              <OrderStatusIcon status={detail.status} className="size-12" />
 
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="flex min-w-0 flex-col gap-1">
-                <h1 className="text-xl font-semibold tracking-tight text-pretty">
+              <div className="flex min-w-0 flex-1 basis-56 flex-col gap-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    Pedido #{detail.id} · {createdLabel}
+                  </span>
+                  <OrderStatusBadge
+                    status={detail.status}
+                    role={viewer.isSeller ? "vendedor" : "comprador"}
+                  />
+                </div>
+                <h1 className="font-display text-xl font-bold tracking-tight text-pretty">
                   {detail.productTitle}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  {detail.variantLabel} · {viewer.isBuyer ? "Vendedor" : "Comprador"}:{" "}
-                  {counterparty}
+                  {detail.variantLabel} · {viewer.isBuyer ? "Vendedor" : "Comprador"}: {counterparty}
                 </p>
+                {hint ? (
+                  <p
+                    className={
+                      hint.urgent
+                        ? "text-sm font-medium text-destructive"
+                        : "text-sm text-muted-foreground"
+                    }
+                  >
+                    {hint.text}
+                  </p>
+                ) : null}
               </div>
-              <strong className="font-display text-2xl font-bold tracking-tight">
-                {formatCents(detail.amountCents)}
-              </strong>
+
+              <div className="flex flex-col items-end gap-0.5">
+                <strong className="font-display text-2xl font-bold tracking-tight">
+                  {formatCents(viewer.isSeller ? detail.sellerNetCents : detail.amountCents)}
+                </strong>
+                <span className="text-xs text-muted-foreground">
+                  {viewer.isSeller ? "você recebe" : "total pago"}
+                </span>
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-5">
+              <OrderTimeline
+                status={detail.status}
+                createdAt={detail.createdAt}
+                deliveredAt={detail.deliveredAt}
+                completedAt={detail.completedAt}
+              />
             </div>
 
             {viewer.isSeller ? (
               <p className="text-xs text-muted-foreground">
-                Você recebe {formatCents(detail.sellerNetCents)} após a confirmação
-                (taxa da plataforma: {formatCents(detail.feeCents)}).
+                Valor do pedido {formatCents(detail.amountCents)} − taxa da plataforma{" "}
+                {formatCents(detail.feeCents)} = {formatCents(detail.sellerNetCents)} para o seu
+                saldo depois da confirmação.
               </p>
             ) : null}
           </header>
 
           {["aguardando_entrega", "entregue", "em_disputa"].includes(detail.status) ? (
-            <p className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+            <p className="flex items-start gap-2 rounded-2xl border border-primary/25 bg-primary/5 p-4 text-sm text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-              {formatCents(detail.amountCents)} estão retidos em custódia. O vendedor
-              só recebe depois que o comprador confirmar a entrega.
+              {formatCents(detail.amountCents)} estão retidos em custódia. O vendedor só recebe
+              depois que o comprador confirmar a entrega.
             </p>
           ) : null}
 
@@ -131,7 +175,7 @@ export default async function PedidoPage({
             const detailsPanel = (
               <div className="flex flex-col gap-6">
                 {detail.deliveryPayload ? (
-                  <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
+                  <section className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-5">
                     <h2 className="text-sm font-semibold">Dados da entrega</h2>
                     <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground">
                       {detail.deliveryPayload}
@@ -140,7 +184,7 @@ export default async function PedidoPage({
                 ) : null}
 
                 {detail.dispute ? (
-                  <section className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-5">
+                  <section className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-5">
                     <h2 className="text-sm font-semibold">Este pedido está em disputa</h2>
                     <p className="text-sm text-muted-foreground">
                       A conversa com {viewer.isBuyer ? "o vendedor" : "o comprador"} e o
@@ -157,7 +201,7 @@ export default async function PedidoPage({
                 ) : null}
 
                 {hasActions ? (
-                  <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
+                  <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
                     <h2 className="text-sm font-semibold">Ações</h2>
                     <OrderActions
                       orderId={detail.id}
@@ -172,7 +216,7 @@ export default async function PedidoPage({
                 ) : null}
 
                 {canReview ? (
-                  <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
+                  <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5">
                     <div className="flex items-center gap-3">
                       <div className="relative h-14 w-14 shrink-0">
                         <Image
@@ -195,7 +239,7 @@ export default async function PedidoPage({
                 ) : null}
 
                 {detail.review ? (
-                  <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
+                  <section className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-5">
                     <h2 className="text-sm font-semibold">Avaliação registrada</h2>
                     <StarRating rating={detail.review.rating} size="md" />
                     {detail.review.comment ? (
@@ -207,7 +251,7 @@ export default async function PedidoPage({
                 ) : null}
 
                 {!detail.deliveryPayload && !detail.dispute && !hasActions && !canReview && !detail.review ? (
-                  <p className="rounded-xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">
+                  <p className="rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">
                     Nada pendente por aqui no momento.
                   </p>
                 ) : null}

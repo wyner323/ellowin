@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, isNull, sql, type SQL } from "drizzle-orm"
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, sql, type SQL } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { escapeLike, resolvePage } from "@/lib/pagination"
 import {
@@ -366,10 +366,43 @@ export async function getSellerUnansweredQuestionsCount(sellerId: string) {
   return Number(row?.count ?? 0)
 }
 
-export type SellerQuestion = ProductQuestion & { productTitle: string; productSlug: string }
+export type SellerQuestion = ProductQuestion & {
+  productTitle: string
+  productSlug: string
+  productCoverUrl: string | null
+}
 
-/** Todas as perguntas recebidas pelo vendedor, sem resposta primeiro. */
-export async function getSellerQuestions(sellerId: string): Promise<SellerQuestion[]> {
+/**
+ * Página das perguntas recebidas pelo vendedor. `filter` recorta em
+ * pendentes/respondidas; sem filtro, as sem resposta vêm primeiro. `counts`
+ * ignora o filtro (alimenta as pílulas).
+ */
+export async function getSellerQuestionsPage(
+  sellerId: string,
+  { filter, page: requestedPage }: { filter?: "pendentes" | "respondidas"; page: number },
+) {
+  const base = eq(product.sellerId, sellerId)
+  const where =
+    filter === "pendentes"
+      ? and(base, isNull(productQuestion.answer))
+      : filter === "respondidas"
+        ? and(base, isNotNull(productQuestion.answer))
+        : base
+
+  const [counts] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      pending: sql<number>`(count(*) filter (where ${productQuestion.answer} is null))::int`,
+    })
+    .from(productQuestion)
+    .innerJoin(product, eq(product.id, productQuestion.productId))
+    .where(base)
+
+  const pending = counts?.pending ?? 0
+  const total = counts?.total ?? 0
+  const filtered = filter === "pendentes" ? pending : filter === "respondidas" ? total - pending : total
+  const { page, pages, offset, limit } = resolvePage(requestedPage, filtered)
+
   const rows = await db
     .select({
       id: productQuestion.id,
@@ -381,15 +414,28 @@ export async function getSellerQuestions(sellerId: string): Promise<SellerQuesti
       askerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
       productTitle: product.title,
       productSlug: product.slug,
+      productCoverUrl: sql<string | null>`(
+        select pi."url" from "product_image" pi
+         where pi."productId" = ${product.id}
+         order by pi."sortOrder", pi."id" limit 1
+      )`,
     })
     .from(productQuestion)
     .innerJoin(product, eq(product.id, productQuestion.productId))
     .leftJoin(user, eq(user.id, productQuestion.askerId))
-    .where(eq(product.sellerId, sellerId))
+    .where(where)
     // Postgres ordena NULL primeiro em ASC — sem resposta sobe pro topo sozinho.
-    .orderBy(asc(productQuestion.answer), desc(productQuestion.createdAt))
+    .orderBy(asc(productQuestion.answer), desc(productQuestion.createdAt), desc(productQuestion.id))
+    .limit(limit)
+    .offset(offset)
 
-  return rows.map((r) => ({ ...r, askerName: r.askerName ?? "Usuário" }))
+  return {
+    questions: rows.map((r) => ({ ...r, askerName: r.askerName ?? "Usuário" })) as SellerQuestion[],
+    counts: { total, pending, answered: total - pending },
+    filtered,
+    page,
+    pages,
+  }
 }
 
 /** Nota média e volume de vendas de um vendedor — o ranking de qualidade. */
@@ -510,29 +556,32 @@ export async function getSellerRecentReviews(sellerId: string, limit = 5) {
 }
 
 /**
- * Página dos anúncios do vendedor, com busca opcional por título. `hasAny`
- * ignora a busca: distingue "nenhum anúncio publicado" de "nenhum resultado".
+ * Página dos anúncios do vendedor, com busca por título e filtro de status
+ * opcionais. `hasAny` ignora os filtros: distingue "nenhum anúncio publicado"
+ * de "nenhum resultado".
  */
 export async function getSellerProductsPage(
   sellerId: string,
-  { q, page: requestedPage }: { q?: string; page: number },
+  {
+    q,
+    status,
+    page: requestedPage,
+  }: { q?: string; status?: "ativo" | "pausado"; page: number },
 ) {
   const term = q?.trim().slice(0, 100)
-  const where = term
-    ? and(eq(product.sellerId, sellerId), ilike(product.title, `%${escapeLike(term)}%`))
-    : eq(product.sellerId, sellerId)
+  const conditions: SQL[] = [eq(product.sellerId, sellerId)]
+  if (status) conditions.push(eq(product.status, status))
+  if (term) conditions.push(ilike(product.title, `%${escapeLike(term)}%`))
+  const where = and(...conditions)
 
-  const [counts] = await db
-    .select({
-      hasAny: sql<number>`count(*)::int`,
-      total: term
-        ? sql<number>`(count(*) filter (where ${ilike(product.title, `%${escapeLike(term)}%`)}))::int`
-        : sql<number>`count(*)::int`,
-    })
-    .from(product)
-    .where(eq(product.sellerId, sellerId))
+  const [[{ total }], [{ hasAny }]] = await Promise.all([
+    db.select({ total: sql<number>`count(*)::int` }).from(product).where(where),
+    db
+      .select({ hasAny: sql<number>`count(*)::int` })
+      .from(product)
+      .where(eq(product.sellerId, sellerId)),
+  ])
 
-  const total = counts?.total ?? 0
   const { page, pages, offset, limit } = resolvePage(requestedPage, total)
 
   const rows = await db
@@ -548,7 +597,36 @@ export async function getSellerProductsPage(
     total,
     page,
     pages,
-    hasAny: (counts?.hasAny ?? 0) > 0,
+    hasAny: hasAny > 0,
+  }
+}
+
+/**
+ * Números do topo de "Meus anúncios": quantos ativos/pausados e quantos anúncios
+ * ATIVOS estão sem nenhum item com estoque (vitrine sem o que vender).
+ */
+export async function getSellerListingSummary(sellerId: string) {
+  const [row] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      active: sql<number>`(count(*) filter (where ${product.status} = 'ativo'))::int`,
+      paused: sql<number>`(count(*) filter (where ${product.status} = 'pausado'))::int`,
+      outOfStock: sql<number>`(count(*) filter (
+        where ${product.status} = 'ativo'
+          and not exists (
+            select 1 from "product_variant" v
+             where v."productId" = ${product.id} and v."active" and v."stock" > 0
+          )
+      ))::int`,
+    })
+    .from(product)
+    .where(eq(product.sellerId, sellerId))
+
+  return {
+    total: row?.total ?? 0,
+    active: row?.active ?? 0,
+    paused: row?.paused ?? 0,
+    outOfStock: row?.outOfStock ?? 0,
   }
 }
 

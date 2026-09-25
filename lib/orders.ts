@@ -59,17 +59,38 @@ const orderColumns = {
   status: order.status,
   deliveryPayload: order.deliveryPayload,
   deliveredAt: order.deliveredAt,
+  deliveryDueAt: order.deliveryDueAt,
   autoReleaseAt: order.autoReleaseAt,
   completedAt: order.completedAt,
   createdAt: order.createdAt,
 }
 
-/** Página de compras do usuário (mais recentes primeiro). */
-export async function getBuyerOrdersPage(userId: string, requestedPage: number) {
+/**
+ * Ordem das listas: o que pede ação de quem olha vem primeiro (vendedor: entregar;
+ * comprador: confirmar o recebimento), depois disputas, e o resto do mais novo
+ * para o mais antigo. A ordenação é toda no banco, então a paginação continua estável.
+ */
+const sellerPriority = sql`case ${order.status}
+  when 'aguardando_entrega' then 0
+  when 'em_disputa' then 1
+  else 2 end`
+const buyerPriority = sql`case ${order.status}
+  when 'entregue' then 0
+  when 'em_disputa' then 1
+  when 'aguardando_entrega' then 2
+  else 3 end`
+
+/** Página de compras do usuário (mais recentes primeiro), com filtro opcional de status. */
+export async function getBuyerOrdersPage(
+  userId: string,
+  { status, page: requestedPage }: { status?: string; page: number },
+) {
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(order)
-    .where(eq(order.buyerId, userId))
+    .where(
+      status ? and(eq(order.buyerId, userId), eq(order.status, status)) : eq(order.buyerId, userId),
+    )
 
   const { page, pages, offset, limit } = resolvePage(requestedPage, total)
 
@@ -84,12 +105,47 @@ export async function getBuyerOrdersPage(userId: string, requestedPage: number) 
     .leftJoin(seller, eq(seller.id, order.sellerId))
     .leftJoin(sellerApplication, eq(sellerApplication.userId, order.sellerId))
     .leftJoin(product, eq(product.id, order.productId))
-    .where(eq(order.buyerId, userId))
-    .orderBy(desc(order.createdAt), desc(order.id))
+    .where(
+      status ? and(eq(order.buyerId, userId), eq(order.status, status)) : eq(order.buyerId, userId),
+    )
+    .orderBy(buyerPriority, desc(order.createdAt), desc(order.id))
     .limit(limit)
     .offset(offset)
 
   return { orders: await withFlags(rows), total, page, pages }
+}
+
+/**
+ * Resumo das compras para o topo da tela: contagem/valor por status (alimenta as
+ * pílulas de filtro e os cards) e quantas compras concluídas ainda esperam avaliação.
+ */
+export async function getBuyerOrderSummary(userId: string) {
+  const [byStatus, [reviews]] = await Promise.all([
+    db
+      .select({
+        status: order.status,
+        count: sql<number>`count(*)::int`,
+        totalCents: sql<number>`coalesce(sum(${order.amountCents}), 0)::int`,
+      })
+      .from(order)
+      .where(eq(order.buyerId, userId))
+      .groupBy(order.status),
+    db
+      .select({ pending: sql<number>`count(*)::int` })
+      .from(order)
+      .where(
+        and(
+          eq(order.buyerId, userId),
+          eq(order.status, "concluido"),
+          sql`not exists (select 1 from "review" r where r."orderId" = ${order.id})`,
+        ),
+      ),
+  ])
+
+  const stat = (status: string) => byStatus.find((r) => r.status === status)
+  const allCount = byStatus.reduce((n, r) => n + r.count, 0)
+
+  return { byStatus, stat, allCount, pendingReviews: reviews?.pending ?? 0 }
 }
 
 /**
@@ -129,7 +185,7 @@ export async function getSellerOrdersPage(
         ? and(eq(order.sellerId, userId), eq(order.status, status))
         : eq(order.sellerId, userId),
     )
-    .orderBy(desc(order.createdAt), desc(order.id))
+    .orderBy(sellerPriority, desc(order.createdAt), desc(order.id))
     .limit(limit)
     .offset(offset)
 
