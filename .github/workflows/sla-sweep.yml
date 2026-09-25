@@ -1,0 +1,38 @@
+name: SLA sweep
+
+# O plano Hobby da Vercel só permite cron diário (vercel.json roda às 03:00).
+# Reembolsos automáticos por prazo de entrega, por SLA de disputa e a liberação
+# automática ao vendedor dependem dessa varredura, então este agendamento chama
+# a mesma rota a cada 15 minutos. Os horários do GitHub Actions podem atrasar
+# alguns minutos em horários de pico — a varredura é idempotente, então chamar
+# a mais ou com atraso não causa problema.
+#
+# Requer o segredo de repositório CRON_SECRET (o MESMO valor da variável
+# CRON_SECRET na Vercel): Settings > Secrets and variables > Actions.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sla-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Chamar /api/cron/sla
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::warning::Segredo CRON_SECRET não configurado no GitHub; varredura não executada."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --max-time 60 --retry 2 --retry-delay 5 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://ellowin.com.br/api/cron/sla
+          echo

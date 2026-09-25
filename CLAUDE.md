@@ -115,7 +115,7 @@ cold starts otherwise open a fresh TCP connection per invocation).
 seller doesn't respond to a dispute in time. It's invoked both by `/api/cron/sla` (Vercel Cron,
 gated by `CRON_SECRET` — see the auth check before trusting this route) and opportunistically
 whenever a dispute/moderation screen loads (there's no durable job queue here, so a sweep that
-only ran on cron would lag if nobody hit the cron endpoint). Each auto-action leaves a `system`
+only ran on cron would lag if nobody hit the cron endpoint). Vercel Hobby only allows a daily cron (`vercel.json`, 03:00), so `.github/workflows/sla-sweep.yml` also calls the route every 15 minutes with the repo secret `CRON_SECRET` (same value as in Vercel); until that secret is set it just logs a warning. Each auto-action leaves a `system`
 message in the relevant chat so the outcome is auditable. If you build the planned
 "refund on missed delivery deadline" feature, this is the pattern to copy (delivery windows are
 already fixed/enumerable — see `lib/delivery.ts`).
