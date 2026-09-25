@@ -26,6 +26,8 @@ export const metadata: Metadata = {
 export default async function ContaPage() {
   const state = await getAccountState()
   if (!state) redirect("/entrar")
+  // Entrou pelo Google e ainda não informou CPF/telefone/nascimento.
+  if (!state.cpf || !state.phone) redirect("/completar-cadastro?next=/conta")
 
   const progress = verificationProgress(state)
 

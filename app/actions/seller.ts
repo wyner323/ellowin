@@ -4,7 +4,7 @@ import { eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { profile, sellerApplication } from "@/lib/db/schema"
-import { emailNotVerified, getUserId, isEmailVerified } from "@/lib/session"
+import { accountBlock, getUserId } from "@/lib/session"
 import { isValidCpf, onlyDigits } from "@/lib/validation"
 import type { ActionResult } from "@/app/actions/auth"
 
@@ -219,7 +219,10 @@ export async function savePayoutStep(input: {
   const userId = await getUserId()
 
   // Este passo aprova o vendedor: sem email confirmado, não.
-  if (!(await isEmailVerified(userId))) return emailNotVerified("concluir o cadastro de vendedor")
+  {
+    const blocked = await accountBlock(userId, "concluir o cadastro de vendedor")
+    if (blocked) return blocked
+  }
 
   const progress = await getApplicationProgress(userId)
   if (!progress.hasStore || !progress.phoneVerified || !progress.hasDocument)

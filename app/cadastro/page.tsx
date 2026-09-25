@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { RegisterWizard } from "@/components/auth/register-wizard"
+import { googleEnabled } from "@/lib/auth"
 import { getSession } from "@/lib/session"
 
 export const metadata: Metadata = {
@@ -16,7 +17,7 @@ export default async function CadastroPage() {
 
   return (
     <AuthShell>
-      <RegisterWizard />
+      <RegisterWizard googleEnabled={googleEnabled} />
     </AuthShell>
   )
 }

@@ -15,7 +15,7 @@ import { isValidAccountOrigin } from "@/lib/account-origin"
 import { MAX_DESCRIPTION, MAX_TITLE } from "@/lib/listing-checks"
 import { parseToCents } from "@/lib/money"
 import { slugifyGame } from "@/lib/product-catalog"
-import { emailNotVerified, getUserId, isEmailVerified } from "@/lib/session"
+import { accountBlock, getUserId } from "@/lib/session"
 import type { ActionResult } from "@/app/actions/auth"
 
 const MAX_IMAGES = 5
@@ -225,7 +225,10 @@ export async function createProduct(input: {
     }
   }
 
-  if (!(await isEmailVerified(userId))) return emailNotVerified("anunciar")
+  {
+    const blocked = await accountBlock(userId, "anunciar")
+    if (blocked) return blocked
+  }
 
   const title = input.title.trim()
   if (title.length < 8)
@@ -326,7 +329,10 @@ export async function updateProduct(input: {
 
   if (!owned) return { ok: false, error: "Anúncio não encontrado." }
 
-  if (!(await isEmailVerified(userId))) return emailNotVerified("editar anúncios")
+  {
+    const blocked = await accountBlock(userId, "editar anúncios")
+    if (blocked) return blocked
+  }
 
   const title = input.title.trim()
   if (title.length < 8)
@@ -483,7 +489,10 @@ export async function toggleProductStatus(productId: number): Promise<ActionResu
   const next = owned.status === "ativo" ? "pausado" : "ativo"
 
   // Pausar é sempre permitido; só reativar (voltar a vender) exige email confirmado.
-  if (next === "ativo" && !(await isEmailVerified(userId))) return emailNotVerified("reativar o anúncio")
+  if (next === "ativo") {
+    const blocked = await accountBlock(userId, "reativar o anúncio")
+    if (blocked) return blocked
+  }
 
   await db
     .update(product)

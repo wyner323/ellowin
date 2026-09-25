@@ -1,13 +1,23 @@
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
 import { after } from "next/server"
+import { neutralizeUnverifiedCredentials } from "@/lib/account-link"
 import { pool } from "@/lib/db"
 import { sendPasswordChangedEmail, sendPasswordResetEmail } from "@/lib/email"
+
+/** Domínio de produção. O redirect do Google precisa ser sempre o mesmo, então não dá para depender do domínio do deploy. */
+const SITE_URL = "https://ellowin.com.br"
+
+/** Login com Google só liga quando as duas chaves existem (o botão some sem elas). */
+export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
 
 export const auth = betterAuth({
   database: pool,
   baseURL:
     process.env.BETTER_AUTH_URL ??
+    // NODE_ENV além de VERCEL_ENV: o .env.local baixado da Vercel também traz VERCEL_ENV=production,
+    // e o `next dev` local não pode passar a usar o domínio de produção.
+    (process.env.NODE_ENV === "production" && process.env.VERCEL_ENV === "production" ? SITE_URL : undefined) ??
     (process.env.VERCEL_PROJECT_PRODUCTION_URL
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : process.env.VERCEL_URL
@@ -36,7 +46,45 @@ export const auth = betterAuth({
       await sendPasswordChangedEmail(user.email)
     },
   },
+  ...(googleEnabled
+    ? {
+        socialProviders: {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID as string,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+            // Sempre deixa a pessoa escolher a conta Google (evita entrar na errada).
+            prompt: "select_account" as const,
+          },
+        },
+      }
+    : {}),
+  account: {
+    // Mesmo email já cadastrado: o Google prova a posse do email, então as contas
+    // se juntam em vez de duplicar (ver neutralizeUnverifiedCredentials).
+    accountLinking: { enabled: true, trustedProviders: ["google"] },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        // A foto do Google fica de fora: as imagens do site só podem vir do nosso
+        // Blob (next/image, CSP e isOwnBlobUrl). A pessoa escolhe uma em "Minha conta".
+        before: async (user) => ({ data: { ...user, image: null } }),
+      },
+    },
+    account: {
+      create: {
+        before: async (account) => {
+          if (account.providerId === "google") {
+            await neutralizeUnverifiedCredentials(account.userId)
+          }
+        },
+      },
+    },
+  },
   trustedOrigins: [
+    SITE_URL,
+    `https://www.${SITE_URL.replace("https://", "")}`,
+    ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL] : []),
     ...(process.env.V0_RUNTIME_URL ? [process.env.V0_RUNTIME_URL] : []),
     ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
     ...(process.env.VERCEL_PROJECT_PRODUCTION_URL

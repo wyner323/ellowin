@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
+import { GoogleButton, OrDivider } from "@/components/auth/google-button"
 import {
   cpfRegion,
   formatBirthDate,
@@ -46,7 +47,7 @@ type Form = {
 
 const STEPS = ["Identificação", "Documento", "Acesso"]
 
-export function RegisterWizard() {
+export function RegisterWizard({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [step, setStep] = useState(0)
@@ -147,6 +148,13 @@ export function RegisterWizard() {
         {step === 1 && "O CPF é validado pelos dígitos verificadores e não pode se repetir na plataforma."}
         {step === 2 && "Última etapa: escolha uma senha forte e aceite os termos."}
       </p>
+
+      {step === 0 && googleEnabled && (
+        <div className="mt-6 flex flex-col gap-4">
+          <GoogleButton label="Cadastrar com Google" />
+          <OrDivider />
+        </div>
+      )}
 
       <div className="mt-8 flex flex-col gap-5">
         {step === 0 && (

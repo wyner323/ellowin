@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { EmailVerification } from "@/components/auth/email-verification"
+import { safeNext } from "@/lib/safe-redirect"
 import { getSession } from "@/lib/session"
 
 export const metadata: Metadata = {
@@ -18,8 +19,7 @@ export default async function VerificarEmailPage({
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
-  // Só caminho interno: "//evil.com" e "/\evil.com" começam com "/" mas o navegador os trata como outro site.
-  const destination = next && /^\/(?![/\\])/.test(next) ? next : "/conta"
+  const destination = safeNext(next)
   if (session.user.emailVerified) redirect(destination)
 
   return (

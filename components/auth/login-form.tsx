@@ -8,8 +8,15 @@ import { loginUser } from "@/app/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { GoogleButton, OrDivider } from "@/components/auth/google-button"
 
-export function LoginForm() {
+export function LoginForm({
+  googleEnabled = false,
+  googleError = false,
+}: {
+  googleEnabled?: boolean
+  googleError?: boolean
+}) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -38,6 +45,22 @@ export function LoginForm() {
           Acesse sua conta para acompanhar compras, vendas e saques.
         </p>
       </div>
+
+      {googleError && (
+        <p
+          role="alert"
+          className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          Não foi possível entrar com o Google. Tente de novo ou use seu email e senha.
+        </p>
+      )}
+
+      {googleEnabled && (
+        <>
+          <GoogleButton />
+          <OrDivider />
+        </>
+      )}
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="email">Email</Label>

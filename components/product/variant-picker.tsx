@@ -39,7 +39,7 @@ export function VariantPicker({
   const inStock = variants.filter((v) => v.stock > 0)
   const [selectedId, setSelectedId] = useState<number | null>(inStock[0]?.id ?? null)
   const [error, setError] = useState<string | null>(null)
-  const [needsEmail, setNeedsEmail] = useState(false)
+  const [needs, setNeeds] = useState<"email" | "profile" | null>(null)
   const [pending, start] = useTransition()
   const pathname = usePathname()
 
@@ -54,7 +54,7 @@ export function VariantPicker({
       const result = await purchase(selected.id, selected.priceCents)
       if (!result.ok) {
         setError(result.error ?? "Não foi possível concluir a compra.")
-        setNeedsEmail(result.field === "email")
+        setNeeds(result.field === "email" || result.field === "profile" ? result.field : null)
         // O vendedor mudou o preço: recarrega a página pra mostrar o valor atual.
         if (result.field === "price") router.refresh()
         return
@@ -176,13 +176,17 @@ export function VariantPicker({
         {error ? (
           <div role="alert" className="flex flex-col gap-2">
             <p className="text-xs text-destructive">{error}</p>
-            {needsEmail ? (
+            {needs ? (
               <Button
-                render={<Link href={`/verificar-email?next=${encodeURIComponent(pathname)}`} />}
+                render={
+                  <Link
+                    href={`${needs === "email" ? "/verificar-email" : "/completar-cadastro"}?next=${encodeURIComponent(pathname)}`}
+                  />
+                }
                 variant="outline"
                 className="w-full"
               >
-                Confirmar meu email
+                {needs === "email" ? "Confirmar meu email" : "Completar meu cadastro"}
               </Button>
             ) : null}
           </div>

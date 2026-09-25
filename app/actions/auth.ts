@@ -431,6 +431,115 @@ const LOGIN_MAX_PER_EMAIL = 8
 const LOGIN_MAX_PER_IP = 30
 
 /* -------------------------------------------------------------------------- */
+/*                 Completar cadastro (quem entrou pelo Google)               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Quem entra pelo Google chega só com nome e email. Este passo coleta o que o
+ * cadastro normal já exige (nome legal, CPF único, telefone, nascimento ≥ 18 anos,
+ * aceite dos termos); enquanto não for feito, comprar/vender/sacar ficam bloqueados
+ * (`accountBlock` em lib/session.ts).
+ */
+export async function completeProfile(input: {
+  fullName: string
+  displayName?: string
+  phone: string
+  cpf: string
+  birthDate: string
+  acceptedTerms: boolean
+}): Promise<ActionResult> {
+  const userId = await getUserId()
+
+  const fullName = input.fullName.trim()
+  const displayName = input.displayName?.trim() || null
+  const cpf = onlyDigits(input.cpf)
+  const phone = onlyDigits(input.phone)
+
+  if (!isValidFullName(fullName))
+    return { ok: false, field: "fullName", error: "Informe seu nome completo." }
+  if (displayName && !isValidDisplayName(displayName))
+    return {
+      ok: false,
+      field: "displayName",
+      error: "Use de 2 a 20 caracteres — letras, números, espaço, _ ou -.",
+    }
+  if (!isValidPhone(phone))
+    return { ok: false, field: "phone", error: "Informe um celular válido com DDD." }
+  if (!isValidCpf(cpf))
+    return {
+      ok: false,
+      field: "cpf",
+      error: "CPF inválido — os dígitos verificadores não conferem.",
+    }
+  if (!isValidBirthDate(input.birthDate))
+    return {
+      ok: false,
+      field: "birthDate",
+      error: "Você precisa ter 18 anos ou mais para usar a Ellowin.",
+    }
+  if (!input.acceptedTerms)
+    return { ok: false, field: "acceptedTerms", error: "É necessário aceitar os termos de uso." }
+
+  if (!(await hitRateLimit(`complete-profile:${userId}`, 10, 60 * 60)))
+    return { ok: false, error: "Muitas tentativas. Aguarde um pouco e tente de novo." }
+
+  const [existingCpf] = await db
+    .select({ userId: profile.userId })
+    .from(profile)
+    .where(eq(profile.cpf, cpf))
+    .limit(1)
+  if (existingCpf && existingCpf.userId !== userId)
+    return {
+      ok: false,
+      field: "cpf",
+      error: "Este CPF já está vinculado a uma conta Ellowin.",
+    }
+
+  if (displayName) {
+    const [existingNick] = await db
+      .select({ id: user.id })
+      .from(user)
+      .where(sql`lower(${user.displayName}) = lower(${displayName})`)
+      .limit(1)
+    if (existingNick && existingNick.id !== userId)
+      return { ok: false, field: "displayName", error: "Esse apelido já está em uso. Escolha outro." }
+  }
+
+  try {
+    await db
+      .insert(profile)
+      .values({
+        userId,
+        fullName,
+        phone,
+        cpf,
+        birthDate: input.birthDate,
+        // Mesmo critério do cadastro por email: só o cálculo do dígito verificador
+        // (não há serviço de verificação de CPF ainda).
+        cpfVerified: true,
+      })
+      .onConflictDoUpdate({
+        target: profile.userId,
+        set: { fullName, phone, cpf, birthDate: input.birthDate, cpfVerified: true, updatedAt: new Date() },
+      })
+
+    // `user.name` é o nome legal (o mesmo do CPF); o do Google pode ser um apelido.
+    await db
+      .update(user)
+      .set({ name: fullName, ...(displayName ? { displayName } : {}), updatedAt: new Date() })
+      .where(eq(user.id, userId))
+  } catch (error) {
+    // Corrida com outro cadastro usando o mesmo CPF/apelido (índices únicos no banco).
+    if (error && typeof error === "object" && "code" in error && error.code === "23505")
+      return { ok: false, error: "Esse CPF ou apelido acabou de ser usado por outra conta." }
+    throw error
+  }
+
+  revalidatePath("/", "layout")
+  return { ok: true }
+}
+
+/* -------------------------------------------------------------------------- */
 /*                            Redefinição de senha                            */
 /* -------------------------------------------------------------------------- */
 

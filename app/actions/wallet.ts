@@ -6,7 +6,7 @@ import { db } from "@/lib/db"
 import { sellerApplication, walletTransaction } from "@/lib/db/schema"
 import { formatCents, parseToCents } from "@/lib/money"
 import { hitRateLimit } from "@/lib/rate-limit"
-import { emailNotVerified, getUserId, isEmailVerified } from "@/lib/session"
+import { accountBlock, getUserId } from "@/lib/session"
 import { creditAvailable, debitAvailable, withTransaction } from "@/lib/wallet"
 import type { ActionResult } from "@/app/actions/auth"
 
@@ -72,7 +72,10 @@ export async function requestWithdrawal(amount: string): Promise<ActionResult> {
   if (cents === null || cents < 1000)
     return { ok: false, field: "amount", error: "O saque mínimo é R$ 10,00." }
 
-  if (!(await isEmailVerified(userId))) return emailNotVerified("sacar")
+  {
+    const blocked = await accountBlock(userId, "sacar")
+    if (blocked) return blocked
+  }
 
   const [seller] = await db
     .select({

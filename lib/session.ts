@@ -61,6 +61,35 @@ export async function isEmailVerified(userId: string): Promise<boolean> {
   return Boolean(row?.emailVerified)
 }
 
+/**
+ * Cadastro completo: CPF, telefone e data de nascimento. Quem entra pelo Google
+ * chega só com nome e email, então isso precisa ser exigido nas mesmas ações
+ * sensíveis (o CPF único é uma das proteções da plataforma).
+ */
+export async function isProfileComplete(userId: string): Promise<boolean> {
+  const [p] = await db
+    .select({ cpf: profile.cpf, phone: profile.phone, birthDate: profile.birthDate })
+    .from(profile)
+    .where(eq(profile.userId, userId))
+    .limit(1)
+  return Boolean(p?.cpf && p.phone && p.birthDate)
+}
+
+export function profileIncomplete(action: string) {
+  return {
+    ok: false as const,
+    field: "profile",
+    error: `Complete seu cadastro (CPF, telefone e data de nascimento) para ${action}.`,
+  }
+}
+
+/** Uma checagem só para as ações sensíveis: email confirmado E cadastro completo. Devolve o erro, ou null se pode seguir. */
+export async function accountBlock(userId: string, action: string) {
+  if (!(await isEmailVerified(userId))) return emailNotVerified(action)
+  if (!(await isProfileComplete(userId))) return profileIncomplete(action)
+  return null
+}
+
 /** Resposta padrão das ações que exigem email verificado (`field: "email"` deixa a tela oferecer o atalho). */
 export function emailNotVerified(action: string) {
   return {

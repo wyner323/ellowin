@@ -69,6 +69,14 @@ Better Auth (`lib/auth.ts`) backed directly by the Postgres pool (no separate ad
 (`user` / `moderator` / `admin`) live on `user.role`; the first admin is bootstrapped by matching
 `ELLOWIN_ADMIN_EMAIL` on login (`lib/roles.ts`), not seeded in the database.
 
+Google login (`socialProviders.google` in `lib/auth.ts`, only enabled when `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` exist; button hidden
+otherwise): production baseURL is pinned to `https://ellowin.com.br` (only when NODE_ENV and VERCEL_ENV are both production — the
+pulled `.env.local` also has VERCEL_ENV=production, so NODE_ENV is what keeps `next dev` local). Google users arrive without
+CPF/phone/birth date, so `/completar-cadastro` (`completeProfile`) collects them and `accountBlock()` (email verified **and**
+profile complete, in `lib/session.ts`) gates buy/list/become-seller/withdraw. The Google photo is dropped on user creation (images
+must come from our Blob), and linking Google to an existing account with an UNVERIFIED email wipes its password/sessions first
+(`lib/account-link.ts`) so a pre-registered attacker password can't survive.
+
 Password reset (`requestPasswordReset`/`resetPassword` in `app/actions/auth.ts`, pages `/esqueci-senha` and `/redefinir-senha`) follows
 the same rule: the Better Auth HTTP endpoints are disabled, the actions rate-limit (3/email/h, 10/IP/h), always answer the same
 whether or not the email exists, the link is 1 h / single use, and a successful reset revokes all sessions and emails a notice.
