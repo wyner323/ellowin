@@ -126,6 +126,14 @@ cold starts otherwise open a fresh TCP connection per invocation).
   throw if the buyer's `heldCents` doesn't cover the amount, and the DB has `CHECK` constraints
   against negative wallet balances.
 
+### Wallet reconciliation
+
+`lib/reconcile.ts` (read-only, 10 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =
+deposits − withdrawals − fees, no negatives) runs at the end of every `/api/cron/sla` call and on `/admin/conferencia` (admin only). If
+anything fails, `lib/reconcile-alert.ts` logs it and emails the admins at most once a day per set of problems. Orders 1–5 are legacy
+demo seed (seller credited with no buyer debit) and are accounted for by `LEGACY_SEED_ORDER_IDS`; any new inconsistency is real.
+When you add a new wallet `kind` or a new way money moves, update the checks.
+
 ### Notification emails
 
 `lib/notify.ts` sends order/dispute/question emails (`notifyOrder`, `notifyQuestion`), called right after the money/status change

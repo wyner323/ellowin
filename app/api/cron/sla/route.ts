@@ -1,5 +1,7 @@
 import { timingSafeEqual } from "node:crypto"
 import { NextResponse } from "next/server"
+import { runWalletReconciliation } from "@/lib/reconcile"
+import { alertIfReconciliationBroken } from "@/lib/reconcile-alert"
 import { sweepAutoRelease, sweepDeliveryDeadline, sweepDisputeSla } from "@/lib/sla"
 
 /** Comparação em tempo constante: `!==` vaza, pelo tempo de resposta, quantos caracteres do segredo batem. */
@@ -33,8 +35,18 @@ export async function GET(request: Request) {
     sweepAutoRelease(),
   ])
 
+  // Depois das varreduras (que movem dinheiro): confere se a carteira continua batendo.
+  // Só lê; se algo não bater, alerta os admins (no máximo 1 email por dia por problema).
+  const reconciliation = await runWalletReconciliation()
+    .then(async (report) => {
+      await alertIfReconciliationBroken(report)
+      return { ok: report.ok, findings: report.findings.map((f) => ({ check: f.check, count: f.rows.length })) }
+    })
+    .catch((error) => ({ ok: false as const, error: String(error) }))
+
   return NextResponse.json({
     ok: true,
+    reconciliation,
     disputeProcessed: disputeResult.status === "fulfilled" ? disputeResult.value : null,
     disputeError: disputeResult.status === "rejected" ? String(disputeResult.reason) : null,
     deliveryProcessed: deliveryResult.status === "fulfilled" ? deliveryResult.value : null,
