@@ -11,6 +11,10 @@ export const auth = betterAuth({
       : process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
         : process.env.V0_RUNTIME_URL),
+  // Login e cadastro só pelas server actions (app/actions/auth.ts), que aplicam o
+  // limitador em banco e a validação de CPF/perfil. Pelo handler HTTP eles
+  // ignorariam ambos.
+  disabledPaths: ["/sign-in/email", "/sign-up/email"],
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,

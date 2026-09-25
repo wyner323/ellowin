@@ -5,7 +5,12 @@ import { and, asc, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { product, productImage, productVariant, sellerApplication } from "@/lib/db/schema"
-import { DEFAULT_MANUAL_DELIVERY_TIME, INSTANT_DELIVERY_TIME } from "@/lib/delivery"
+import { isOwnBlobUrl } from "@/lib/blob-urls"
+import {
+  DEFAULT_MANUAL_DELIVERY_TIME,
+  INSTANT_DELIVERY_TIME,
+  hoursForDeliveryTime,
+} from "@/lib/delivery"
 import { isValidAccountOrigin } from "@/lib/account-origin"
 import { parseToCents } from "@/lib/money"
 import { slugifyGame } from "@/lib/product-catalog"
@@ -40,29 +45,36 @@ function normalizeAccountOrigin(categorySlug: string, accountOrigin: string | un
 }
 
 /**
- * Só aceitamos URLs de imagem que vieram do nosso próprio Blob. Isso impede que
- * alguém injete uma URL externa arbitrária no anúncio pelo payload.
+ * Só aceitamos URLs de imagem que ESTE vendedor subiu (produtos/<id>/…). Checar
+ * só o domínio deixava passar a foto de outro vendedor — e como remover uma
+ * foto do anúncio apaga o arquivo do Blob, dava pra destruir a imagem alheia.
  */
-function sanitizeImages(images: string[] | undefined): string[] {
+function sanitizeImages(images: string[] | undefined, userId: string): string[] {
   if (!Array.isArray(images)) return []
   const seen = new Set<string>()
   const clean: string[] = []
 
   for (const raw of images) {
-    if (typeof raw !== "string" || seen.has(raw)) continue
-    try {
-      const url = new URL(raw)
-      if (url.protocol === "https:" && url.hostname.endsWith(".public.blob.vercel-storage.com")) {
-        seen.add(raw)
-        clean.push(raw)
-      }
-    } catch {
-      // URL inválida: ignora.
-    }
+    if (seen.has(raw) || !isOwnBlobUrl(raw, "produtos", userId)) continue
+    seen.add(raw)
+    clean.push(raw)
     if (clean.length >= MAX_IMAGES) break
   }
 
   return clean
+}
+
+/**
+ * O prazo manual precisa ser uma das opções fixas (DELIVERY_TIME_OPTIONS): um
+ * texto livre não vira prazo em horas, e sem prazo o reembolso automático por
+ * atraso nunca dispara. `current` deixa um anúncio antigo manter o valor legado
+ * que já tinha até o vendedor escolher outro.
+ */
+function isAcceptableDeliveryTime(deliveryType: string, deliveryTime: string, current?: string) {
+  if (deliveryType === "automatica") return true
+  const value = deliveryTime.trim()
+  if (!value) return true // cai no padrão em normalizeDelivery
+  return hoursForDeliveryTime(value) !== null || value === current
 }
 
 /** Regrava as fotos do produto na ordem recebida (0 = capa). */
@@ -212,6 +224,9 @@ export async function createProduct(input: {
       error: "Informe a procedência da conta.",
     }
 
+  if (!isAcceptableDeliveryTime(input.deliveryType, input.deliveryTime))
+    return { ok: false, field: "deliveryTime", error: "Escolha um prazo de entrega da lista." }
+
   const { error, parsed } = validateVariants(input.variants)
   if (error || !parsed) return { ok: false, field: "variants", error: error ?? undefined }
 
@@ -245,7 +260,7 @@ export async function createProduct(input: {
     })),
   )
 
-  await replaceProductImages(created.id, sanitizeImages(input.images))
+  await replaceProductImages(created.id, sanitizeImages(input.images, userId))
 
   const storeSlug = await getStoreSlug(userId)
   revalidatePath("/painel/vendedor/produtos")
@@ -272,7 +287,12 @@ export async function updateProduct(input: {
   const userId = await getUserId()
 
   const [owned] = await db
-    .select({ id: product.id, slug: product.slug, categorySlug: product.categorySlug })
+    .select({
+      id: product.id,
+      slug: product.slug,
+      categorySlug: product.categorySlug,
+      deliveryTime: product.deliveryTime,
+    })
     .from(product)
     .where(and(eq(product.id, input.productId), eq(product.sellerId, userId)))
     .limit(1)
@@ -282,6 +302,14 @@ export async function updateProduct(input: {
   const title = input.title.trim()
   if (title.length < 8)
     return { ok: false, field: "title", error: "O título precisa ter ao menos 8 caracteres." }
+  if (input.description.trim().length < 20)
+    return {
+      ok: false,
+      field: "description",
+      error: "Descreva o que o comprador recebe com pelo menos 20 caracteres.",
+    }
+  if (!isAcceptableDeliveryTime(input.deliveryType, input.deliveryTime, owned.deliveryTime))
+    return { ok: false, field: "deliveryTime", error: "Escolha um prazo de entrega da lista." }
   if (input.categorySlug === "contas" && !isValidAccountOrigin((input.accountOrigin ?? "").trim()))
     return {
       ok: false,
@@ -365,7 +393,7 @@ export async function updateProduct(input: {
     )
 
   // Sincroniza as fotos: regrava na nova ordem e apaga do Blob as que saíram.
-  const nextImages = sanitizeImages(input.images)
+  const nextImages = sanitizeImages(input.images, userId)
   const previous = await db
     .select({ url: productImage.url })
     .from(productImage)
@@ -374,7 +402,11 @@ export async function updateProduct(input: {
 
   await replaceProductImages(owned.id, nextImages)
 
-  const removed = previous.map((p) => p.url).filter((url) => !nextImages.includes(url))
+  // Só apaga do Blob o que é do próprio vendedor, mesmo que o banco já tenha
+  // uma URL alheia de antes desta validação existir.
+  const removed = previous
+    .map((p) => p.url)
+    .filter((url) => !nextImages.includes(url) && isOwnBlobUrl(url, "produtos", userId))
   if (removed.length) {
     // Falha ao apagar o arquivo não deve derrubar o salvamento do anúncio.
     try {

@@ -6,6 +6,7 @@ import { db } from "@/lib/db"
 import { user } from "@/lib/db/schema"
 import { getUserId } from "@/lib/session"
 import { isValidAccentColor } from "@/lib/accent-colors"
+import { isOwnBlobUrl } from "@/lib/blob-urls"
 import { isValidBio, isValidDisplayName } from "@/lib/validation"
 import type { ActionResult } from "@/app/actions/auth"
 
@@ -47,6 +48,9 @@ export async function updateDisplayName(input: { displayName: string }): Promise
 /** Troca a foto de perfil. A URL já chega pronta do upload no Blob. */
 export async function updateAvatar(input: { imageUrl: string }): Promise<ActionResult> {
   const userId = await getUserId()
+
+  if (!isOwnBlobUrl(input.imageUrl, "avatars", userId))
+    return { ok: false, error: "Imagem inválida. Envie a foto de novo." }
 
   await db
     .update(user)
@@ -109,6 +113,9 @@ export async function updateAccentColor(input: { accentColor: string }): Promise
 /** Troca o banner da loja pública. Só faz sentido para vendedores aprovados. */
 export async function updateBanner(input: { imageUrl: string }): Promise<ActionResult> {
   const userId = await getUserId()
+
+  if (!isOwnBlobUrl(input.imageUrl, "banners", userId))
+    return { ok: false, error: "Imagem inválida. Envie o banner de novo." }
 
   await db
     .update(user)

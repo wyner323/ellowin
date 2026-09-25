@@ -1,11 +1,13 @@
 "use server"
 
-import { and, desc, eq, isNull, sql } from "drizzle-orm"
+import { randomInt } from "node:crypto"
+import { and, desc, eq, isNull, lt, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { otpCode, profile, user } from "@/lib/db/schema"
 import { sendEmailOtp, sendPhoneOtpByEmail } from "@/lib/email"
+import { clearRateLimit, clientIp, hitRateLimit } from "@/lib/rate-limit"
 import { getSession, getUserId } from "@/lib/session"
 import {
   isValidBirthDate,
@@ -36,8 +38,18 @@ const MAX_ATTEMPTS = 5
 const RESEND_COOLDOWN_SECONDS = 30
 
 function generateCode() {
-  return String(Math.floor(100000 + Math.random() * 900000))
+  // crypto.randomInt: Math.random() não é criptograficamente seguro e o estado
+  // dele pode ser inferido a partir de saídas anteriores.
+  return String(randomInt(100000, 1000000))
 }
+
+/**
+ * Só mostra o código na tela (modo demonstração) se for pedido explicitamente
+ * por ELLOWIN_DEMO_OTP=true. Por padrão, uma falha no envio do email NÃO pode
+ * entregar o código ao navegador — isso permitiria "verificar" qualquer email
+ * ou telefone só derrubando o envio.
+ */
+const SHOW_DEMO_CODE = process.env.ELLOWIN_DEMO_OTP === "true"
 
 /* -------------------------------------------------------------------------- */
 /*                            Cadastro de usuário                             */
@@ -53,6 +65,14 @@ export async function registerUser(input: {
   password: string
   acceptedTerms: boolean
 }): Promise<ActionResult> {
+  // Cadastro em massa (contas descartáveis, CPFs gerados): 5 por hora por IP.
+  const ip = await clientIp()
+  if (ip && !(await hitRateLimit(`register:ip:${ip}`, 5, 60 * 60)))
+    return {
+      ok: false,
+      error: "Muitos cadastros a partir deste endereço. Tente novamente mais tarde.",
+    }
+
   const fullName = input.fullName.trim()
   const displayName = input.displayName?.trim() || null
   const email = input.email.trim().toLowerCase()
@@ -179,13 +199,20 @@ export async function registerUser(input: {
   const otpResult = await issueOtp(created.id, "email", email)
 
   revalidatePath("/")
-  if (!otpResult.sent)
+  if (!otpResult.sent) {
+    if (SHOW_DEMO_CODE)
+      return {
+        ok: true,
+        demoCode: otpResult.code,
+        message:
+          "O envio de email não está disponível, então o código aparece aqui em modo demonstração.",
+      }
     return {
       ok: true,
-      demoCode: otpResult.code,
       message:
-        "O envio de email não está disponível, então o código aparece aqui em modo demonstração.",
+        "Conta criada, mas não conseguimos enviar o código agora. Peça um novo código na próxima tela.",
     }
+  }
 
   return { ok: true }
 }
@@ -249,13 +276,16 @@ export async function resendEmailCode(): Promise<ActionResult> {
     return { ok: false, error: `Aguarde ${wait}s antes de pedir um novo código.` }
 
   const result = await issueOtp(session.user.id, "email", session.user.email)
-  if (!result.sent)
-    return {
-      ok: true,
-      demoCode: result.code,
-      message:
-        "O envio de email não está disponível, então o código aparece aqui em modo demonstração.",
-    }
+  if (!result.sent) {
+    if (SHOW_DEMO_CODE)
+      return {
+        ok: true,
+        demoCode: result.code,
+        message:
+          "O envio de email não está disponível, então o código aparece aqui em modo demonstração.",
+      }
+    return { ok: false, error: "Não foi possível enviar o código agora. Tente novamente em instantes." }
+  }
 
   return { ok: true, message: "Enviamos um novo código para o seu email." }
 }
@@ -278,13 +308,16 @@ export async function sendPhoneCode(): Promise<ActionResult> {
     return { ok: false, error: `Aguarde ${wait}s antes de pedir um novo código.` }
 
   const result = await issueOtp(userId, "phone", p.phone)
-  if (!result.sent)
-    return {
-      ok: true,
-      demoCode: result.code,
-      message:
-        "O envio de email não está disponível, então o código aparece aqui em modo demonstração.",
-    }
+  if (!result.sent) {
+    if (SHOW_DEMO_CODE)
+      return {
+        ok: true,
+        demoCode: result.code,
+        message:
+          "O envio de email não está disponível, então o código aparece aqui em modo demonstração.",
+      }
+    return { ok: false, error: "Não foi possível enviar o código agora. Tente novamente em instantes." }
+  }
 
   return {
     ok: true,
@@ -318,28 +351,43 @@ async function consumeOtp(
     return { ok: false, error: "Nenhum código ativo. Solicite um novo." }
   if (row.expiresAt.getTime() < Date.now())
     return { ok: false, error: "Código expirado. Solicite um novo." }
-  if (row.attempts >= MAX_ATTEMPTS)
+  // A tentativa é contada ANTES de comparar e de forma atômica (o WHERE
+  // confere o teto): contar depois, com o valor lido acima, deixaria requisições
+  // paralelas chutarem o código várias vezes antes de qualquer contagem subir.
+  const [bumped] = await db
+    .update(otpCode)
+    .set({ attempts: sql`${otpCode.attempts} + 1` })
+    .where(
+      and(
+        eq(otpCode.id, row.id),
+        lt(otpCode.attempts, MAX_ATTEMPTS),
+        isNull(otpCode.consumedAt),
+      ),
+    )
+    .returning({ attempts: otpCode.attempts })
+
+  if (!bumped)
     return {
       ok: false,
       error: "Tentativas esgotadas para este código. Solicite um novo.",
     }
 
   if (row.code !== clean) {
-    await db
-      .update(otpCode)
-      .set({ attempts: row.attempts + 1 })
-      .where(eq(otpCode.id, row.id))
-    const left = MAX_ATTEMPTS - (row.attempts + 1)
+    const left = MAX_ATTEMPTS - bumped.attempts
     return {
       ok: false,
       error: `Código incorreto. ${left} tentativa${left === 1 ? "" : "s"} restante${left === 1 ? "" : "s"}.`,
     }
   }
 
-  await db
+  // Só um dos acertos simultâneos consome o código.
+  const [consumed] = await db
     .update(otpCode)
     .set({ consumedAt: new Date() })
-    .where(eq(otpCode.id, row.id))
+    .where(and(eq(otpCode.id, row.id), isNull(otpCode.consumedAt)))
+    .returning({ id: otpCode.id })
+
+  if (!consumed) return { ok: false, error: "Este código já foi usado. Solicite um novo." }
 
   return { ok: true }
 }
@@ -378,25 +426,42 @@ export async function verifyPhoneCode(code: string): Promise<ActionResult> {
 /*                                  Sessão                                    */
 /* -------------------------------------------------------------------------- */
 
+const LOGIN_WINDOW_SECONDS = 10 * 60
+const LOGIN_MAX_PER_EMAIL = 8
+const LOGIN_MAX_PER_IP = 30
+
 export async function loginUser(input: {
   email: string
   password: string
 }): Promise<ActionResult> {
+  const email = input.email.trim().toLowerCase().slice(0, 254)
+
+  // auth.api.signInEmail não passa pelo limitador do Better Auth (ele só roda no
+  // handler HTTP), então o freio contra tentativa de senha em massa é este:
+  // por email (senha chutada a partir de vários IPs) e por IP (vários emails
+  // de um IP só).
+  const emailKey = `login:email:${email}`
+  const ip = await clientIp()
+  const [emailOk, ipOk] = await Promise.all([
+    hitRateLimit(emailKey, LOGIN_MAX_PER_EMAIL, LOGIN_WINDOW_SECONDS),
+    ip ? hitRateLimit(`login:ip:${ip}`, LOGIN_MAX_PER_IP, LOGIN_WINDOW_SECONDS) : true,
+  ])
+  if (!emailOk || !ipOk)
+    return {
+      ok: false,
+      error: "Muitas tentativas de login. Aguarde alguns minutos e tente novamente.",
+    }
+
   try {
     await auth.api.signInEmail({
-      body: { email: input.email.trim().toLowerCase(), password: input.password },
+      body: { email, password: input.password },
       headers: new Headers(),
     })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : ""
-    if (/rate.?limit|too many/i.test(message))
-      return {
-        ok: false,
-        error: "Muitas tentativas de login. Aguarde um minuto e tente novamente.",
-      }
+  } catch {
     return { ok: false, error: "Email ou senha incorretos." }
   }
 
+  await clearRateLimit(emailKey)
   revalidatePath("/")
   return { ok: true }
 }

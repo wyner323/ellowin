@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm"
 import {
   boolean,
   check,
+  index,
   integer,
   pgTable,
   serial,
@@ -388,3 +389,19 @@ export const sellerAccountFlag = pgTable("seller_account_flag", {
   note: text("note").notNull(),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 })
+
+/**
+ * Tentativas de login/cadastro, uma linha por tentativa — base do limitador de
+ * taxa em lib/rate-limit.ts. O do Better Auth não serve aqui: só roda no
+ * handler HTTP (não nas chamadas `auth.api.*` das server actions) e guarda o
+ * contador em memória, que não é compartilhada entre as instâncias serverless.
+ */
+export const authAttempt = pgTable(
+  "auth_attempt",
+  {
+    id: serial("id").primaryKey(),
+    key: text("key").notNull(),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+  },
+  (t) => [index("auth_attempt_key_created_idx").on(t.key, t.createdAt)],
+)
