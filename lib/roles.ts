@@ -33,6 +33,7 @@ export async function getCurrentStaff(): Promise<Staff | null> {
       name: user.name,
       email: user.email,
       role: user.role,
+      emailVerified: user.emailVerified,
     })
     .from(user)
     .where(eq(user.id, session.user.id))
@@ -43,7 +44,14 @@ export async function getCurrentStaff(): Promise<Staff | null> {
   let role = normalizeRole(row.role)
 
   const bootstrapEmail = process.env.ELLOWIN_ADMIN_EMAIL?.trim().toLowerCase()
-  if (bootstrapEmail && role === "user" && row.email.toLowerCase() === bootstrapEmail) {
+  // Exige email verificado: o cadastro não confirma o email, então sem isso
+  // quem registrasse primeiro o endereço do admin viraria admin.
+  if (
+    bootstrapEmail &&
+    role === "user" &&
+    row.emailVerified &&
+    row.email.toLowerCase() === bootstrapEmail
+  ) {
     await db.update(user).set({ role: "admin" }).where(eq(user.id, row.id))
     role = "admin"
   }

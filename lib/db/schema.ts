@@ -116,6 +116,8 @@ export const sellerApplication = pgTable("seller_application", {
   selfieName: text("selfieName"),
   pixKeyType: text("pixKeyType"),
   pixKey: text("pixKey"),
+  /** Última vez que a chave Pix mudou — saque fica bloqueado por 24h depois (ver requestWithdrawal). */
+  pixKeyChangedAt: timestamp("pixKeyChangedAt"),
   bankHolder: text("bankHolder"),
   acceptedTerms: boolean("acceptedTerms").notNull().default(false),
   currentStep: integer("currentStep").notNull().default(1),

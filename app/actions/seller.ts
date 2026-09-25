@@ -204,15 +204,34 @@ export async function savePayoutStep(input: {
       error: "Aceite os termos do programa de vendedores.",
     }
 
+  const nextPixKey = input.pixKeyType === "cpf" ? onlyDigits(key) : key
+
+  // Trocar a chave Pix é o passo clássico de sequestro de conta: quem toma a
+  // sessão troca a chave e saca. Marcamos o momento da troca (relógio do banco)
+  // e requestWithdrawal bloqueia saques por 24h depois dela.
+  const [current] = await db
+    .select({ pixKey: sellerApplication.pixKey })
+    .from(sellerApplication)
+    .where(eq(sellerApplication.userId, userId))
+    .limit(1)
+  const pixKeyChanged = current?.pixKey !== nextPixKey
+
   await upsertApplication(userId, {
     pixKeyType: input.pixKeyType,
-    pixKey: input.pixKeyType === "cpf" ? onlyDigits(key) : key,
+    pixKey: nextPixKey,
     bankHolder: input.bankHolder.trim(),
     acceptedTerms: true,
     currentStep: 6,
     level: 4,
     status: "aprovado",
   })
+
+  if (pixKeyChanged) {
+    await db
+      .update(sellerApplication)
+      .set({ pixKeyChangedAt: sql`now()` })
+      .where(eq(sellerApplication.userId, userId))
+  }
 
   revalidatePath("/vender")
   revalidatePath("/conta")

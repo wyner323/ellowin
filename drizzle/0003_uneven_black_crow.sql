@@ -1,0 +1,1 @@
+ALTER TABLE "seller_application" ADD COLUMN "pixKeyChangedAt" timestamp;
