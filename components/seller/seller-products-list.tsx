@@ -1,9 +1,8 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ImageIcon } from "lucide-react"
+import { ImageIcon, Search } from "lucide-react"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { ProductStatusToggle } from "@/components/seller/product-status-toggle"
 import { Button } from "@/components/ui/button"
@@ -22,30 +21,40 @@ type SellerProduct = {
   variants: { active: boolean; stock: number; priceCents: number }[]
 }
 
-export function SellerProductsList({ products }: { products: SellerProduct[] }) {
-  const [query, setQuery] = useState("")
-
-  const trimmed = query.trim().toLowerCase()
-  const filtered = trimmed
-    ? products.filter((p) => p.title.toLowerCase().includes(trimmed))
-    : products
-
+/**
+ * A busca é um formulário GET (?q=): o servidor filtra e pagina, então achar
+ * um anúncio funciona mesmo que ele esteja numa página que não foi carregada.
+ */
+export function SellerProductsList({
+  products,
+  query,
+}: {
+  products: SellerProduct[]
+  query: string
+}) {
   return (
     <div className="flex flex-col gap-4">
-      <Input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Buscar por nome do anúncio"
-        className="h-9 max-w-sm"
-      />
+      <form method="get" action="/painel/vendedor/produtos" role="search" className="flex max-w-sm gap-2">
+        <Input
+          name="q"
+          defaultValue={query}
+          placeholder="Buscar por nome do anúncio"
+          className="h-9"
+          maxLength={100}
+        />
+        <Button type="submit" variant="outline" size="sm" className="h-9">
+          <Search className="size-4" aria-hidden="true" />
+          Buscar
+        </Button>
+      </form>
 
-      {filtered.length === 0 ? (
+      {products.length === 0 ? (
         <p className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-          Nenhum anúncio encontrado para &quot;{query.trim()}&quot;.
+          Nenhum anúncio encontrado para &quot;{query}&quot;.
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {filtered.map((p) => {
+          {products.map((p) => {
             const active = p.variants.filter((v) => v.active)
             const stock = active.reduce((sum, v) => sum + v.stock, 0)
             const cheapest = active.length

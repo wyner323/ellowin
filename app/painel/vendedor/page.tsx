@@ -37,11 +37,11 @@ import {
   getSellerStats,
   getSellerUnansweredQuestionsCount,
 } from "@/lib/marketplace"
-import { getMyDisputes, getSellerOrders } from "@/lib/orders"
+import { getMyOpenDisputes, getSellerOrderAggregates } from "@/lib/orders"
 import { getSession } from "@/lib/session"
 import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla"
 import { formatDurationHours } from "@/lib/time"
-import { getWalletEntries, getWalletSummary } from "@/lib/wallet"
+import { getDailyBalanceHistory, getWalletSummary } from "@/lib/wallet"
 import { eq } from "drizzle-orm"
 
 export const metadata: Metadata = {
@@ -61,27 +61,27 @@ export default async function PainelVendedorPage() {
 
   if (!application || application.status !== "aprovado") redirect("/vender")
 
-  // Sem cron neste ambiente: varre antes do Promise.all abaixo, já que
-  // getSellerOrders() está dentro dele.
+  // Varre antes do Promise.all abaixo: as agregações de pedidos dependem do
+  // status já atualizado.
   await Promise.all([sweepDeliveryDeadline(), sweepAutoRelease()])
 
   const [
     stats,
-    orders,
+    aggregates,
     wallet,
-    walletEntries,
+    balanceHistory,
     delivery,
-    disputes,
+    openDisputes,
     [profileRow],
     pendingQuestions,
     accountFlags,
   ] = await Promise.all([
     getSellerStats(session.user.id),
-    getSellerOrders(session.user.id),
+    getSellerOrderAggregates(session.user.id),
     getWalletSummary(session.user.id),
-    getWalletEntries(session.user.id, 60),
+    getDailyBalanceHistory(session.user.id, 30),
     getSellerDeliveryStats(session.user.id),
-    getMyDisputes(session.user.id),
+    getMyOpenDisputes(session.user.id),
     db
       .select({ bannerUrl: user.bannerUrl })
       .from(user)
@@ -91,38 +91,26 @@ export default async function PainelVendedorPage() {
     getSellerAccountFlagSummary(session.user.id),
   ])
 
-  const pending = orders.filter((o) => o.status === "aguardando_entrega")
-  const openDisputes = disputes.filter(
-    (d) => d.status === "aberta" || d.status === "em_analise",
-  )
-
-  // Ledger já vem em ordem decrescente; inverte pra desenhar o gráfico em
-  // ordem cronológica, e cada linha já carrega o saldo resultante — sem
-  // agregação nenhuma.
-  const balanceHistory = [...walletEntries].reverse().map((e) => ({
-    date: e.createdAt.toISOString(),
-    balanceCents: e.balanceAfterCents,
-  }))
+  // Tudo abaixo vem de agregações SQL (getSellerOrderAggregates): o painel não
+  // carrega mais todos os pedidos só para somar e agrupar em JS.
+  const pendingCount = aggregates.stat("aguardando_entrega")?.count ?? 0
 
   // Vendas concluídas dos últimos 60 dias, agrupadas por dia (dias sem venda
-  // ficam zerados pra manter o eixo contínuo) — deriva de `orders`, já
-  // buscado acima pra calcular `escrowCents`, sem query nova. 60 dias é o
-  // dobro do maior período selecionável no card (30d), pra sempre sobrar um
-  // "período anterior" completo pra comparar (o recorte por período e a
-  // comparação em si acontecem no client, em SalesPerformanceCard).
+  // ficam zerados pra manter o eixo contínuo). 60 dias é o dobro do maior
+  // período selecionável no card (30d), pra sempre sobrar um "período
+  // anterior" completo pra comparar (o recorte e a comparação acontecem no
+  // client, em SalesPerformanceCard).
   const salesByDay = new Map<string, { count: number; totalCents: number }>()
   for (let i = 59; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i)
     salesByDay.set(d.toISOString().slice(0, 10), { count: 0, totalCents: 0 })
   }
-  for (const o of orders) {
-    if (o.status !== "concluido" || !o.completedAt) continue
-    const key = o.completedAt.toISOString().slice(0, 10)
-    const bucket = salesByDay.get(key)
+  for (const row of aggregates.salesByDay) {
+    const bucket = salesByDay.get(row.day)
     if (bucket) {
-      bucket.count += 1
-      bucket.totalCents += o.sellerNetCents
+      bucket.count += row.count
+      bucket.totalCents += row.totalCents
     }
   }
   const salesTimeline = Array.from(salesByDay, ([date, { count, totalCents }]) => {
@@ -137,47 +125,29 @@ export default async function PainelVendedorPage() {
     return { label, count, totalCents }
   })
 
-  // A custódia fica na carteira do comprador até a liberação, então o valor a
-  // receber do vendedor vem dos pedidos ainda não concluídos, não do seu saldo.
-  const escrowCents = orders
-    .filter((o) =>
-      ["aguardando_entrega", "entregue", "em_disputa"].includes(o.status),
-    )
-    .reduce((total, o) => total + o.sellerNetCents, 0)
+  // Mesmo total do card "A receber", quebrado por etapa — pra o vendedor ver em
+  // qual parte do fluxo o dinheiro está parado. A custódia fica na carteira do
+  // comprador até a liberação, então o valor a receber vem dos pedidos ainda
+  // não concluídos, não do saldo do vendedor.
+  const RECEIVABLE_STATUSES = ["aguardando_entrega", "entregue", "em_disputa"] as const
+  const receivableBreakdown = RECEIVABLE_STATUSES.map((status) => ({
+    status,
+    count: aggregates.stat(status)?.count ?? 0,
+    totalCents: aggregates.stat(status)?.totalCents ?? 0,
+  })).filter((bucket) => bucket.count > 0)
+  const escrowCents = receivableBreakdown.reduce((total, b) => total + b.totalCents, 0)
 
   // Faturamento líquido acumulado — só vendas já concluídas (repasse
   // liberado), diferente do "a receber" (ainda em custódia) e do "saldo
   // disponível" (o que sobrou depois de saques já feitos).
-  const faturamentoTotalCents = orders
-    .filter((o) => o.status === "concluido")
-    .reduce((total, o) => total + o.sellerNetCents, 0)
+  const faturamentoTotalCents = aggregates.stat("concluido")?.totalCents ?? 0
 
-  // Ranking dos anúncios que mais faturaram, agrupando pelas próprias linhas
-  // de pedido (productTitle já vem congelado no pedido) — sem query extra.
-  const revenueByProduct = new Map<string, { title: string; totalCents: number; count: number }>()
-  for (const o of orders) {
-    if (o.status !== "concluido") continue
-    const key = String(o.productId ?? o.productTitle)
-    const bucket = revenueByProduct.get(key) ?? { title: o.productTitle, totalCents: 0, count: 0 }
-    bucket.totalCents += o.sellerNetCents
-    bucket.count += 1
-    revenueByProduct.set(key, bucket)
-  }
-  const topProducts = Array.from(revenueByProduct.values())
-    .sort((a, b) => b.totalCents - a.totalCents)
-    .slice(0, 5)
-
-  // Mesmo total do card "A receber", só que quebrado por etapa — pra o
-  // vendedor ver em qual parte do fluxo o dinheiro está parado.
-  const RECEIVABLE_STATUSES = ["aguardando_entrega", "entregue", "em_disputa"] as const
-  const receivableBreakdown = RECEIVABLE_STATUSES.map((status) => {
-    const matching = orders.filter((o) => o.status === status)
-    return {
-      status,
-      count: matching.length,
-      totalCents: matching.reduce((total, o) => total + o.sellerNetCents, 0),
-    }
-  }).filter((bucket) => bucket.count > 0)
+  // Ranking dos anúncios que mais faturaram (productTitle já vem congelado no pedido).
+  const topProducts = aggregates.topProducts.map((p) => ({
+    title: p.title,
+    totalCents: p.totalCents,
+    count: p.count,
+  }))
 
   // Estatísticas secundárias, em chips compactos — o saldo disponível e o
   // faturamento/a receber já ganharam destaque próprio em SellerBalanceHero.
@@ -220,12 +190,12 @@ export default async function PainelVendedorPage() {
           },
         ]
       : []),
-    ...(pending.length > 0
+    ...(pendingCount > 0
       ? [
           {
             id: "entregas",
             tone: "gold" as const,
-            title: `${pending.length} ${pending.length === 1 ? "pedido aguardando entrega" : "pedidos aguardando entrega"}`,
+            title: `${pendingCount} ${pendingCount === 1 ? "pedido aguardando entrega" : "pedidos aguardando entrega"}`,
             description: "Quanto antes você entrega, antes o valor entra em liberação.",
             href: "/painel/vendedor/vendas",
             cta: "Ver pedidos pendentes",
@@ -403,9 +373,9 @@ export default async function PainelVendedorPage() {
             >
               <span className="font-medium">
                 Minhas vendas
-                {pending.length > 0 ? (
+                {pendingCount > 0 ? (
                   <span className="ml-2 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
-                    {pending.length} a entregar
+                    {pendingCount} a entregar
                   </span>
                 ) : null}
               </span>

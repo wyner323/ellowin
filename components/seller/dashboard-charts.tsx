@@ -130,8 +130,10 @@ type BalancePeriod = (typeof BALANCE_PERIODS)[number]
 /**
  * Card "Saldo ao longo do tempo" completo (título, seletor de período e o
  * gráfico) — dono do próprio estado, mesmo padrão de `SalesPerformanceCard`.
- * `data` vem do servidor com a data real de cada lançamento (não um label já
- * formatado), pra o filtro por período poder recortar por data de verdade.
+ * `data` vem do servidor com UM ponto por dia (saldo ao fim do dia, YYYY-MM-DD,
+ * dias sem movimento repetem o saldo anterior) — antes era um ponto por
+ * lançamento e o eixo repetia a mesma data várias vezes. O recorte por período
+ * é pelos últimos N dias da série.
  */
 export function BalanceHistoryCard({ data }: { data: BalancePoint[] }) {
   const [period, setPeriod] = useState<BalancePeriod>(30)
@@ -151,13 +153,14 @@ export function BalanceHistoryCard({ data }: { data: BalancePoint[] }) {
     )
   }
 
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - period)
-  const filtered = data.filter((p) => new Date(p.date) >= cutoff)
-  const chartData = filtered.map((p) => ({
-    label: new Date(p.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
-    balanceCents: p.balanceCents,
-  }))
+  // A série é diária e contínua até hoje: os últimos `period` pontos são os
+  // últimos `period` dias (a conta pode ter menos, se for mais nova).
+  const chartData = data.slice(-period).map((p) => {
+    // Rótulo direto da string YYYY-MM-DD: `new Date("YYYY-MM-DD")` seria UTC
+    // meia-noite e poderia mostrar o dia anterior no fuso local.
+    const [, m, d] = p.date.split("-")
+    return { label: `${d}/${m}`, balanceCents: p.balanceCents }
+  })
   const delta =
     chartData.length >= 2
       ? chartData[chartData.length - 1].balanceCents - chartData[0].balanceCents

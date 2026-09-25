@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
 import { ChevronRight } from "lucide-react"
 import { OrderStatusBadge } from "@/components/orders/order-status-badge"
 import {
@@ -23,11 +23,20 @@ type SellerOrder = {
   sellerNetCents: number
 }
 
-export function SellerOrdersList({ orders }: { orders: SellerOrder[] }) {
-  const [status, setStatus] = useState("todos")
-
-  const filtered =
-    status === "todos" ? orders : orders.filter((o) => o.status === status)
+/**
+ * O filtro de status vai para a URL (?status=) e a filtragem acontece no
+ * servidor: com paginação, filtrar só a página carregada esconderia pedidos das
+ * outras páginas.
+ */
+export function SellerOrdersList({
+  orders,
+  status,
+}: {
+  orders: SellerOrder[]
+  status: string
+}) {
+  const router = useRouter()
+  const pathname = usePathname()
 
   const selectItems = { todos: "Todos os status", ...ORDER_STATUS_LABEL }
 
@@ -36,7 +45,9 @@ export function SellerOrdersList({ orders }: { orders: SellerOrder[] }) {
       <Select
         items={selectItems}
         value={status}
-        onValueChange={(value) => setStatus(value ?? "todos")}
+        onValueChange={(value) =>
+          router.push(value && value !== "todos" ? `${pathname}?status=${value}` : pathname)
+        }
       >
         <SelectTrigger className="w-fit min-w-48" id="statusFilter">
           <SelectValue />
@@ -50,13 +61,13 @@ export function SellerOrdersList({ orders }: { orders: SellerOrder[] }) {
         </SelectContent>
       </Select>
 
-      {filtered.length === 0 ? (
+      {orders.length === 0 ? (
         <p className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
           Nenhum pedido com esse status.
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {filtered.map((o) => (
+          {orders.map((o) => (
             <li key={o.id}>
               <Link
                 href={`/pedidos/${o.id}`}

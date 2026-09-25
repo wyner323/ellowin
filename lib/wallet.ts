@@ -1,7 +1,8 @@
 import type { PoolClient } from "@neondatabase/serverless"
-import { desc, eq } from "drizzle-orm"
+import { desc, eq, sql } from "drizzle-orm"
 import { db, pool } from "@/lib/db"
 import { wallet, walletTransaction } from "@/lib/db/schema"
+import { resolvePage } from "@/lib/pagination"
 
 /**
  * Carteira com custódia (escrow).
@@ -340,11 +341,50 @@ export async function getWalletSummary(userId: string) {
   }
 }
 
-export async function getWalletEntries(userId: string, limit = 30) {
-  return db
+/** Página do extrato (mais recentes primeiro). */
+export async function getWalletEntriesPage(userId: string, requestedPage: number) {
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(walletTransaction)
+    .where(eq(walletTransaction.userId, userId))
+
+  const { page, pages, offset, limit } = resolvePage(requestedPage, total)
+
+  const entries = await db
     .select()
     .from(walletTransaction)
     .where(eq(walletTransaction.userId, userId))
-    .orderBy(desc(walletTransaction.createdAt))
+    .orderBy(desc(walletTransaction.createdAt), desc(walletTransaction.id))
     .limit(limit)
+    .offset(offset)
+
+  return { entries, total, page, pages }
+}
+
+/**
+ * Saldo disponível ao FIM de cada dia dos últimos `days` dias (UTC), uma linha
+ * por dia — não uma por lançamento. Um dia sem movimento repete o saldo do
+ * anterior (o saldo continua o mesmo), e dias antes do primeiro lançamento da
+ * conta ficam de fora. É o que alimenta o gráfico "Saldo ao longo do tempo".
+ */
+export async function getDailyBalanceHistory(userId: string, days = 30) {
+  const { rows } = await pool.query<{ day: string; balanceCents: number | null }>(
+    `SELECT to_char(d, 'YYYY-MM-DD') AS "day",
+            (SELECT t."balanceAfterCents"
+               FROM "wallet_transaction" t
+              WHERE t."userId" = $1 AND t."createdAt" < d + interval '1 day'
+              ORDER BY t."createdAt" DESC, t."id" DESC
+              LIMIT 1) AS "balanceCents"
+       FROM generate_series(
+              ((now() at time zone 'utc')::date - ($2::int - 1))::timestamp,
+              (now() at time zone 'utc')::date::timestamp,
+              interval '1 day'
+            ) AS d
+      ORDER BY d`,
+    [userId, days],
+  )
+
+  return rows
+    .filter((r) => r.balanceCents !== null)
+    .map((r) => ({ date: r.day, balanceCents: Number(r.balanceCents) }))
 }

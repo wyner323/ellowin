@@ -8,7 +8,9 @@ import { WalletForms } from "@/components/wallet/wallet-forms"
 import { Badge } from "@/components/ui/badge"
 import { formatCents } from "@/lib/money"
 import { getSession } from "@/lib/session"
-import { getWalletEntries, getWalletSummary } from "@/lib/wallet"
+import { Pagination } from "@/components/pagination"
+import { parsePage } from "@/lib/pagination"
+import { getWalletEntriesPage, getWalletSummary } from "@/lib/wallet"
 
 export const metadata: Metadata = {
   title: "Carteira",
@@ -26,15 +28,21 @@ const KIND_LABEL: Record<string, string> = {
   taxa: "Taxa da plataforma",
 }
 
-export default async function CarteiraPage() {
+export default async function CarteiraPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pagina?: string }>
+}) {
+  const sp = await searchParams
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
   const userId = session.user.id
-  const [summary, entries] = await Promise.all([
+  const [summary, statement] = await Promise.all([
     getWalletSummary(userId),
-    getWalletEntries(userId),
+    getWalletEntriesPage(userId, parsePage(sp.pagina)),
   ])
+  const { entries } = statement
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -142,6 +150,13 @@ export default async function CarteiraPage() {
                 ))}
               </ul>
             )}
+
+            <Pagination
+              page={statement.page}
+              pages={statement.pages}
+              total={statement.total}
+              basePath="/carteira"
+            />
           </section>
         </div>
       </main>

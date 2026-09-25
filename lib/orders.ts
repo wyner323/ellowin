@@ -1,5 +1,6 @@
-import { aliasedTable, and, asc, desc, eq, inArray, or, sql } from "drizzle-orm"
+import { aliasedTable, and, asc, desc, eq, gte, inArray, notInArray, or, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
+import { resolvePage } from "@/lib/pagination"
 import {
   dispute,
   disputeMessage,
@@ -63,7 +64,15 @@ const orderColumns = {
   createdAt: order.createdAt,
 }
 
-export async function getBuyerOrders(userId: string) {
+/** Página de compras do usuário (mais recentes primeiro). */
+export async function getBuyerOrdersPage(userId: string, requestedPage: number) {
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(order)
+    .where(eq(order.buyerId, userId))
+
+  const { page, pages, offset, limit } = resolvePage(requestedPage, total)
+
   const rows = await db
     .select({
       ...orderColumns,
@@ -76,12 +85,36 @@ export async function getBuyerOrders(userId: string) {
     .leftJoin(sellerApplication, eq(sellerApplication.userId, order.sellerId))
     .leftJoin(product, eq(product.id, order.productId))
     .where(eq(order.buyerId, userId))
-    .orderBy(desc(order.createdAt))
+    .orderBy(desc(order.createdAt), desc(order.id))
+    .limit(limit)
+    .offset(offset)
 
-  return withFlags(rows)
+  return { orders: await withFlags(rows), total, page, pages }
 }
 
-export async function getSellerOrders(userId: string) {
+/**
+ * Página de vendas do vendedor, com filtro opcional de status. `allCount` e
+ * `pendingCount` ignoram o filtro: alimentam o estado vazio ("nunca vendeu") e
+ * o "N pedidos aguardam entrega" do cabeçalho.
+ */
+export async function getSellerOrdersPage(
+  userId: string,
+  { status, page: requestedPage }: { status?: string; page: number },
+) {
+  const [counts] = await db
+    .select({
+      allCount: sql<number>`count(*)::int`,
+      pendingCount: sql<number>`(count(*) filter (where ${order.status} = 'aguardando_entrega'))::int`,
+      filteredCount: status
+        ? sql<number>`(count(*) filter (where ${order.status} = ${status}))::int`
+        : sql<number>`count(*)::int`,
+    })
+    .from(order)
+    .where(eq(order.sellerId, userId))
+
+  const total = counts?.filteredCount ?? 0
+  const { page, pages, offset, limit } = resolvePage(requestedPage, total)
+
   const rows = await db
     .select({
       ...orderColumns,
@@ -91,10 +124,71 @@ export async function getSellerOrders(userId: string) {
     .from(order)
     .leftJoin(buyer, eq(buyer.id, order.buyerId))
     .leftJoin(product, eq(product.id, order.productId))
-    .where(eq(order.sellerId, userId))
-    .orderBy(desc(order.createdAt))
+    .where(
+      status
+        ? and(eq(order.sellerId, userId), eq(order.status, status))
+        : eq(order.sellerId, userId),
+    )
+    .orderBy(desc(order.createdAt), desc(order.id))
+    .limit(limit)
+    .offset(offset)
 
-  return withFlags(rows)
+  return {
+    orders: await withFlags(rows),
+    total,
+    page,
+    pages,
+    allCount: counts?.allCount ?? 0,
+    pendingCount: counts?.pendingCount ?? 0,
+  }
+}
+
+/**
+ * Números do painel do vendedor calculados no banco — antes o painel carregava
+ * TODOS os pedidos só para somar/agrupar em JS. Datas em UTC (como `toISOString`).
+ */
+export async function getSellerOrderAggregates(userId: string) {
+  const [byStatus, salesByDay, topProducts] = await Promise.all([
+    db
+      .select({
+        status: order.status,
+        count: sql<number>`count(*)::int`,
+        totalCents: sql<number>`coalesce(sum(${order.sellerNetCents}), 0)::int`,
+      })
+      .from(order)
+      .where(eq(order.sellerId, userId))
+      .groupBy(order.status),
+    db
+      .select({
+        day: sql<string>`to_char(${order.completedAt}, 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+        totalCents: sql<number>`coalesce(sum(${order.sellerNetCents}), 0)::int`,
+      })
+      .from(order)
+      .where(
+        and(
+          eq(order.sellerId, userId),
+          eq(order.status, "concluido"),
+          gte(order.completedAt, sql`now() - interval '60 days'`),
+        ),
+      )
+      .groupBy(sql`to_char(${order.completedAt}, 'YYYY-MM-DD')`),
+    db
+      .select({
+        title: sql<string>`max(${order.productTitle})`,
+        totalCents: sql<number>`coalesce(sum(${order.sellerNetCents}), 0)::int`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(order)
+      .where(and(eq(order.sellerId, userId), eq(order.status, "concluido")))
+      .groupBy(order.productId)
+      .orderBy(desc(sql`sum(${order.sellerNetCents})`))
+      .limit(5),
+  ])
+
+  const stat = (status: string) => byStatus.find((r) => r.status === status)
+
+  return { byStatus, stat, salesByDay, topProducts }
 }
 
 /** Anexa "tem avaliação" e "tem disputa" numa consulta só, evitando N+1. */
@@ -234,10 +328,19 @@ export async function getDisputeByOrder(orderId: number) {
 }
 
 /** Fila de disputas da moderação, com dados do pedido e das partes. */
-export async function getDisputeQueue(statusFilter?: string[]) {
-  const conditions = statusFilter?.length
-    ? [inArray(dispute.status, statusFilter)]
-    : []
+export async function getDisputeQueue(
+  opts: {
+    statuses?: string[]
+    excludeStatuses?: string[]
+    limit?: number
+    offset?: number
+    /** Histórico (encerradas): mais recentes primeiro. A fila em aberto segue por prazo de resolução. */
+    newestFirst?: boolean
+  } = {},
+) {
+  const conditions = []
+  if (opts.statuses?.length) conditions.push(inArray(dispute.status, opts.statuses))
+  if (opts.excludeStatuses?.length) conditions.push(notInArray(dispute.status, opts.excludeStatuses))
 
   return db
     .select({
@@ -263,7 +366,22 @@ export async function getDisputeQueue(statusFilter?: string[]) {
     .leftJoin(buyer, eq(buyer.id, order.buyerId))
     .leftJoin(seller, eq(seller.id, order.sellerId))
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(asc(dispute.resolutionDueAt))
+    .orderBy(
+      ...(opts.newestFirst
+        ? [desc(dispute.createdAt), desc(dispute.id)]
+        : [asc(dispute.resolutionDueAt), asc(dispute.id)]),
+    )
+    .limit(opts.limit ?? 1000)
+    .offset(opts.offset ?? 0)
+}
+
+/** Quantas disputas existem fora dos status dados (ex.: encerradas = tudo que não é aberta/em_analise). */
+export async function countDisputesExcluding(excludeStatuses: string[]) {
+  const [row] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(dispute)
+    .where(notInArray(dispute.status, excludeStatuses))
+  return row?.total ?? 0
 }
 
 export async function getDisputeDetail(disputeId: number) {
@@ -291,8 +409,8 @@ export async function getDisputeDetail(disputeId: number) {
   return row ?? null
 }
 
-/** Disputas em que o usuário é parte (comprador ou vendedor). */
-export async function getMyDisputes(userId: string) {
+/** Disputas ABERTAS em que o usuário é parte (comprador ou vendedor). */
+export async function getMyOpenDisputes(userId: string) {
   return db
     .select({
       id: dispute.id,
@@ -306,6 +424,12 @@ export async function getMyDisputes(userId: string) {
     })
     .from(dispute)
     .innerJoin(order, eq(order.id, dispute.orderId))
-    .where(or(eq(order.buyerId, userId), eq(order.sellerId, userId)))
+    .where(
+      and(
+        or(eq(order.buyerId, userId), eq(order.sellerId, userId)),
+        inArray(dispute.status, ["aberta", "em_analise"]),
+      ),
+    )
     .orderBy(desc(dispute.createdAt))
+    .limit(50)
 }

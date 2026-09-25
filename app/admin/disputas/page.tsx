@@ -4,7 +4,9 @@ import { LiveRefresh } from "@/components/live-refresh"
 import { SlaBadge } from "@/components/disputes/sla-panel"
 import { DISPUTE_REASONS } from "@/lib/disputes"
 import { formatCents } from "@/lib/money"
-import { DISPUTE_STATUS_LABEL, getDisputeQueue } from "@/lib/orders"
+import { Pagination } from "@/components/pagination"
+import { DISPUTE_STATUS_LABEL, countDisputesExcluding, getDisputeQueue } from "@/lib/orders"
+import { PAGE_SIZE, parsePage, resolvePage } from "@/lib/pagination"
 import { sweepDisputeSla } from "@/lib/sla"
 
 const OPEN_STATUSES = ["aberta", "em_analise"]
@@ -13,13 +15,27 @@ function reasonLabel(value: string) {
   return DISPUTE_REASONS.find((r) => r.value === value)?.label ?? value
 }
 
-export default async function FilaDisputasPage() {
+export default async function FilaDisputasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pagina?: string }>
+}) {
+  const sp = await searchParams
   // A trava de SLA roda ao abrir a fila: sem cron, este é o gatilho natural.
   await sweepDisputeSla()
 
-  const all = await getDisputeQueue()
-  const open = all.filter((d) => OPEN_STATUSES.includes(d.status))
-  const closed = all.filter((d) => !OPEN_STATUSES.includes(d.status))
+  // A fila de trabalho (em aberto) aparece inteira; o histórico de encerradas é paginado.
+  const closedTotal = await countDisputesExcluding(OPEN_STATUSES)
+  const closedPage = resolvePage(parsePage(sp.pagina), closedTotal)
+  const [open, closed] = await Promise.all([
+    getDisputeQueue({ statuses: OPEN_STATUSES }),
+    getDisputeQueue({
+      excludeStatuses: OPEN_STATUSES,
+      newestFirst: true,
+      limit: PAGE_SIZE,
+      offset: closedPage.offset,
+    }),
+  ])
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10">
@@ -104,7 +120,7 @@ export default async function FilaDisputasPage() {
         )}
       </section>
 
-      {closed.length > 0 ? (
+      {closedTotal > 0 ? (
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold">Encerradas</h2>
           <ul className="flex flex-col gap-2">
@@ -128,6 +144,12 @@ export default async function FilaDisputasPage() {
               </li>
             ))}
           </ul>
+          <Pagination
+            page={closedPage.page}
+            pages={closedPage.pages}
+            total={closedTotal}
+            basePath="/admin/disputas"
+          />
         </section>
       ) : null}
     </div>

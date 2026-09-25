@@ -1,5 +1,6 @@
-import { and, asc, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm"
+import { and, asc, desc, eq, ilike, inArray, isNull, sql, type SQL } from "drizzle-orm"
 import { db } from "@/lib/db"
+import { escapeLike, resolvePage } from "@/lib/pagination"
 import {
   dispute,
   order,
@@ -508,13 +509,50 @@ export async function getSellerRecentReviews(sellerId: string, limit = 5) {
     .limit(limit)
 }
 
-export async function getSellerProducts(sellerId: string) {
+/**
+ * Página dos anúncios do vendedor, com busca opcional por título. `hasAny`
+ * ignora a busca: distingue "nenhum anúncio publicado" de "nenhum resultado".
+ */
+export async function getSellerProductsPage(
+  sellerId: string,
+  { q, page: requestedPage }: { q?: string; page: number },
+) {
+  const term = q?.trim().slice(0, 100)
+  const where = term
+    ? and(eq(product.sellerId, sellerId), ilike(product.title, `%${escapeLike(term)}%`))
+    : eq(product.sellerId, sellerId)
+
+  const [counts] = await db
+    .select({
+      hasAny: sql<number>`count(*)::int`,
+      total: term
+        ? sql<number>`(count(*) filter (where ${ilike(product.title, `%${escapeLike(term)}%`)}))::int`
+        : sql<number>`count(*)::int`,
+    })
+    .from(product)
+    .where(eq(product.sellerId, sellerId))
+
+  const total = counts?.total ?? 0
+  const { page, pages, offset, limit } = resolvePage(requestedPage, total)
+
   const rows = await db
     .select()
     .from(product)
-    .where(eq(product.sellerId, sellerId))
-    .orderBy(desc(product.createdAt))
+    .where(where)
+    .orderBy(desc(product.createdAt), desc(product.id))
+    .limit(limit)
+    .offset(offset)
 
+  return {
+    products: await withVariantsAndCover(rows),
+    total,
+    page,
+    pages,
+    hasAny: (counts?.hasAny ?? 0) > 0,
+  }
+}
+
+async function withVariantsAndCover(rows: (typeof product.$inferSelect)[]) {
   if (rows.length === 0) return []
 
   const productIds = rows.map((r) => r.id)

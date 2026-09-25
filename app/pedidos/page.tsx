@@ -9,7 +9,9 @@ import { LiveRefresh } from "@/components/live-refresh"
 import { OrderStatusBadge } from "@/components/orders/order-status-badge"
 import { Button } from "@/components/ui/button"
 import { formatCents } from "@/lib/money"
-import { getBuyerOrders } from "@/lib/orders"
+import { Pagination } from "@/components/pagination"
+import { getBuyerOrdersPage } from "@/lib/orders"
+import { parsePage } from "@/lib/pagination"
 import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla"
 import { getSession } from "@/lib/session"
 
@@ -18,14 +20,22 @@ export const metadata: Metadata = {
   description: "Acompanhe suas compras, confirme entregas e avalie vendedores na Ellowin.",
 }
 
-export default async function PedidosPage() {
+export default async function PedidosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pagina?: string }>
+}) {
+  const sp = await searchParams
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
   // Sem cron neste ambiente: os prazos são varridos ao abrir a lista.
   await Promise.all([sweepDeliveryDeadline(), sweepAutoRelease()])
 
-  const orders = await getBuyerOrders(session.user.id)
+  const { orders, total, page, pages } = await getBuyerOrdersPage(
+    session.user.id,
+    parsePage(sp.pagina),
+  )
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -42,7 +52,7 @@ export default async function PedidosPage() {
             </p>
           </header>
 
-          {orders.length === 0 ? (
+          {total === 0 ? (
             <div className="mt-8 flex flex-col items-center gap-4 rounded-xl border border-border bg-card p-10 text-center">
               <div className="relative h-28 w-28">
                 <Image
@@ -103,6 +113,14 @@ export default async function PedidosPage() {
               ))}
             </ul>
           )}
+
+          <Pagination
+            page={page}
+            pages={pages}
+            total={total}
+            basePath="/pedidos"
+            className="mt-6"
+          />
         </div>
       </main>
 

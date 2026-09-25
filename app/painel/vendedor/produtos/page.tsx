@@ -8,19 +8,27 @@ import { SiteFooter } from "@/components/site-footer"
 import { SellerProductsList } from "@/components/seller/seller-products-list"
 import { SellerTabs } from "@/components/seller/seller-tabs"
 import { Button } from "@/components/ui/button"
-import { getSellerProducts, getSellerUnansweredQuestionsCount } from "@/lib/marketplace"
+import { Pagination } from "@/components/pagination"
+import { getSellerProductsPage, getSellerUnansweredQuestionsCount } from "@/lib/marketplace"
+import { parsePage } from "@/lib/pagination"
 import { getSession } from "@/lib/session"
 
 export const metadata: Metadata = {
   title: "Meus anúncios",
 }
 
-export default async function MeusProdutosPage() {
+export default async function MeusProdutosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; pagina?: string }>
+}) {
+  const sp = await searchParams
+  const q = typeof sp.q === "string" ? sp.q.trim().slice(0, 100) : ""
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
-  const [products, pendingQuestions] = await Promise.all([
-    getSellerProducts(session.user.id),
+  const [list, pendingQuestions] = await Promise.all([
+    getSellerProductsPage(session.user.id, { q, page: parsePage(sp.pagina) }),
     getSellerUnansweredQuestionsCount(session.user.id),
   ])
 
@@ -56,7 +64,7 @@ export default async function MeusProdutosPage() {
             </Button>
           </header>
 
-          {products.length === 0 ? (
+          {!list.hasAny ? (
             <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-card p-10 text-center">
               <div className="relative h-28 w-28">
                 <Image
@@ -78,7 +86,16 @@ export default async function MeusProdutosPage() {
               </Button>
             </div>
           ) : (
-            <SellerProductsList products={products} />
+            <>
+              <SellerProductsList products={list.products} query={q} />
+              <Pagination
+                page={list.page}
+                pages={list.pages}
+                total={list.total}
+                basePath="/painel/vendedor/produtos"
+                params={{ q: q || undefined }}
+              />
+            </>
           )}
         </div>
       </main>

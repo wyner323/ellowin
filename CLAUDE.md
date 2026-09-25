@@ -109,6 +109,14 @@ cold starts otherwise open a fresh TCP connection per invocation).
   throw if the buyer's `heldCents` doesn't cover the amount, and the DB has `CHECK` constraints
   against negative wallet balances.
 
+### Lists are paginated on the server
+
+Orders (buyer and seller), the seller's listings, the wallet statement and closed disputes use `?pagina=N` with
+`PAGE_SIZE` (20) from `lib/pagination.ts`: `parsePage()` for the URL, `resolvePage()` for the clamped page/offset, the
+`<Pagination>` component for the links. Filters (`?status=`, `?q=`) are also server-side so they span every page —
+don't filter only the loaded page in a client component. The seller dashboard must not load every order: use the SQL
+aggregates in `getSellerOrderAggregates()`, and the balance chart uses `getDailyBalanceHistory()` (one point per day).
+
 ### SLA / auto-refund pattern
 
 `lib/sla.ts` computes business-hour deadlines and `sweepDisputeSla()` auto-refunds a buyer if the
