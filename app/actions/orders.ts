@@ -8,7 +8,14 @@ import { getOrderMessages } from "@/lib/orders"
 import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, splitOrderAmount } from "@/lib/money"
 import { getUserId } from "@/lib/session"
-import { moveToEscrow, releaseEscrowToSeller, refundEscrow, withTransaction } from "@/lib/wallet"
+import {
+  StateConflictError,
+  moveToEscrow,
+  refundEscrow,
+  releaseEscrowToSeller,
+  transitionOrder,
+  withTransaction,
+} from "@/lib/wallet"
 import type { ActionResult } from "@/app/actions/auth"
 
 /**
@@ -132,14 +139,21 @@ export async function markDelivered(input: {
   if (input.payload.trim().length < 4)
     return { ok: false, field: "payload", error: "Informe os dados da entrega." }
 
-  await db
+  // O status vai no WHERE: se o comprador cancelou (ou o prazo estourou) entre
+  // a leitura acima e aqui, nada é atualizado e a entrega não ressuscita um
+  // pedido já reembolsado.
+  const delivered = await db
     .update(order)
     .set({
       status: "entregue",
       deliveryPayload: input.payload.trim(),
       deliveredAt: new Date(),
     })
-    .where(eq(order.id, row.id))
+    .where(and(eq(order.id, row.id), eq(order.status, "aguardando_entrega")))
+    .returning({ id: order.id })
+
+  if (delivered.length === 0)
+    return { ok: false, error: "Este pedido não está mais aguardando entrega." }
 
   revalidatePath("/painel/vendedor/vendas")
   revalidatePath(`/pedidos/${row.id}`)
@@ -165,27 +179,30 @@ export async function confirmReceipt(orderId: number): Promise<ActionResult> {
   if (row.status !== "entregue")
     return { ok: false, error: "Só é possível confirmar um pedido já entregue." }
 
-  await withTransaction(async (client) => {
-    await releaseEscrowToSeller(client, {
-      buyerId: row.buyerId,
-      sellerId: row.sellerId,
-      amountCents: row.amountCents,
-      feeCents: row.feeCents,
-      sellerNetCents: row.sellerNetCents,
-      orderId: row.id,
-      description: `${row.productTitle} (${row.variantLabel})`,
+  try {
+    await withTransaction(async (client) => {
+      await transitionOrder(client, row.id, ["entregue"], "concluido", { completed: true })
+
+      await releaseEscrowToSeller(client, {
+        buyerId: row.buyerId,
+        sellerId: row.sellerId,
+        amountCents: row.amountCents,
+        feeCents: row.feeCents,
+        sellerNetCents: row.sellerNetCents,
+        orderId: row.id,
+        description: `${row.productTitle} (${row.variantLabel})`,
+      })
+
+      await client.query(
+        `UPDATE "product" SET "salesCount" = "salesCount" + 1 WHERE "id" = $1`,
+        [row.productId],
+      )
     })
-
-    await client.query(
-      `UPDATE "order" SET "status" = 'concluido', "completedAt" = now() WHERE "id" = $1`,
-      [row.id],
-    )
-
-    await client.query(
-      `UPDATE "product" SET "salesCount" = "salesCount" + 1 WHERE "id" = $1`,
-      [row.productId],
-    )
-  })
+  } catch (error) {
+    if (error instanceof StateConflictError)
+      return { ok: false, error: "Este pedido já foi processado. Atualize a página." }
+    throw error
+  }
 
   revalidatePath(`/pedidos/${row.id}`)
   revalidatePath("/pedidos")
@@ -210,25 +227,30 @@ export async function cancelOrder(orderId: number): Promise<ActionResult> {
   if (row.status !== "aguardando_entrega")
     return { ok: false, error: "Este pedido não pode mais ser cancelado." }
 
-  await withTransaction(async (client) => {
-    await refundEscrow(
-      client,
-      row.buyerId,
-      row.amountCents,
-      row.id,
-      `Cancelamento do pedido #${row.id}`,
-    )
+  try {
+    await withTransaction(async (client) => {
+      await transitionOrder(client, row.id, ["aguardando_entrega"], "cancelado", {
+        completed: true,
+      })
 
-    await client.query(
-      `UPDATE "order" SET "status" = 'cancelado', "completedAt" = now() WHERE "id" = $1`,
-      [row.id],
-    )
+      await refundEscrow(
+        client,
+        row.buyerId,
+        row.amountCents,
+        row.id,
+        `Cancelamento do pedido #${row.id}`,
+      )
 
-    await client.query(
-      `UPDATE "product_variant" SET "stock" = "stock" + 1 WHERE "id" = $1`,
-      [row.variantId],
-    )
-  })
+      await client.query(
+        `UPDATE "product_variant" SET "stock" = "stock" + 1 WHERE "id" = $1`,
+        [row.variantId],
+      )
+    })
+  } catch (error) {
+    if (error instanceof StateConflictError)
+      return { ok: false, error: "Este pedido não pode mais ser cancelado. Atualize a página." }
+    throw error
+  }
 
   revalidatePath(`/pedidos/${row.id}`)
   revalidatePath("/pedidos")

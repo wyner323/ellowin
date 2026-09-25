@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm"
 import {
   boolean,
+  check,
   integer,
   pgTable,
   serial,
@@ -154,7 +156,11 @@ export const wallet = pgTable("wallet", {
   heldCents: integer("heldCents").notNull().default(0),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
-})
+}, (t) => [
+  // Rede de segurança: mesmo que um bug de aplicação tente, o banco recusa saldo negativo.
+  check("wallet_available_nonneg", sql`${t.availableCents} >= 0`),
+  check("wallet_held_nonneg", sql`${t.heldCents} >= 0`),
+])
 
 /** Extrato imutável: uma linha por movimentação, nunca atualizada. */
 export const walletTransaction = pgTable("wallet_transaction", {

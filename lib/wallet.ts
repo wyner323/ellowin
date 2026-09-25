@@ -49,6 +49,38 @@ export async function withTransaction<T>(
   }
 }
 
+/** O pedido/disputa não estava mais no status esperado — outra chamada chegou primeiro. */
+export class StateConflictError extends Error {
+  constructor(message = "O estado do pedido mudou. Atualize a página e tente de novo.") {
+    super(message)
+    this.name = "StateConflictError"
+  }
+}
+
+/**
+ * Passo obrigatório e PRIMEIRO de toda transação que move dinheiro de um pedido:
+ * troca o status só se ele ainda estiver em `from`. O UPDATE trava a linha, então
+ * uma segunda chamada simultânea espera, reavalia o WHERE e encontra 0 linhas.
+ * Checar o status antes da transação (fora do lock) deixa duas chamadas
+ * paralelas passarem juntas e liquidar o mesmo pedido duas vezes.
+ */
+export async function transitionOrder(
+  client: PoolClient,
+  orderId: number,
+  from: string[],
+  to: string,
+  { completed = false }: { completed?: boolean } = {},
+) {
+  const result = await client.query(
+    `UPDATE "order"
+        SET "status" = $2,
+            "completedAt" = CASE WHEN $3::boolean THEN now() ELSE "completedAt" END
+      WHERE "id" = $1 AND "status" = ANY($4::text[])`,
+    [orderId, to, completed, from],
+  )
+  if (result.rowCount === 0) throw new StateConflictError()
+}
+
 /** Garante que a carteira existe e devolve a linha travada para escrita. */
 export async function lockWallet(
   client: PoolClient,
@@ -213,8 +245,14 @@ export async function releaseEscrowToSeller(
   // O comprador NÃO recebe lançamento aqui: o débito dele já foi registrado
   // como "custodia" no momento da compra. Só zeramos a custódia — lançar de
   // novo faria o extrato somar o mesmo valor duas vezes.
+  // Se a custódia não cobre o valor, esse pedido já foi liquidado por outro
+  // caminho — falhar aqui (e desfazer a transação) em vez de zerar em silêncio,
+  // senão o vendedor seria pago duas vezes com dinheiro que não existe.
   const buyerWallet = await lockWallet(client, args.buyerId)
-  const held = Math.max(0, buyerWallet.heldCents - args.amountCents)
+  if (buyerWallet.heldCents < args.amountCents) {
+    throw new Error("Custódia insuficiente para liberar este pedido")
+  }
+  const held = buyerWallet.heldCents - args.amountCents
 
   await setBalances(client, args.buyerId, buyerWallet.availableCents, held)
 
@@ -264,7 +302,12 @@ export async function refundEscrow(
   description: string,
 ) {
   const w = await lockWallet(client, buyerId)
-  const held = Math.max(0, w.heldCents - amountCents)
+  // Mesmo motivo de releaseEscrowToSeller: sem custódia suficiente, o pedido já
+  // foi reembolsado/liberado — não devolver o dinheiro uma segunda vez.
+  if (w.heldCents < amountCents) {
+    throw new Error("Custódia insuficiente para reembolsar este pedido")
+  }
+  const held = w.heldCents - amountCents
   const available = w.availableCents + amountCents
 
   await setBalances(client, buyerId, available, held)

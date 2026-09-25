@@ -1,7 +1,12 @@
 import { and, eq, inArray, isNotNull, isNull, lt } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { dispute, order } from "@/lib/db/schema"
-import { refundEscrow, releaseEscrowToSeller, withTransaction } from "@/lib/wallet"
+import {
+  refundEscrow,
+  releaseEscrowToSeller,
+  transitionOrder,
+  withTransaction,
+} from "@/lib/wallet"
 
 /**
  * SLA de disputas, conforme as regras acordadas:
@@ -116,29 +121,34 @@ export async function sweepDisputeSla() {
       if (!ord || ord.status !== "em_disputa") continue
 
       await withTransaction(async (client) => {
+        // Mesma trava de resolveDispute: a disputa só fecha se ainda estiver
+        // aberta e sem resposta do vendedor, e o pedido só sai de em_disputa uma
+        // vez. Se um moderador decidiu (ou o vendedor respondeu) no meio, aborta.
+        const closed = await client.query(
+          `UPDATE "dispute"
+              SET "status" = 'resolvida_comprador',
+                  "resolution" = $2,
+                  "resolvedAt" = now()
+            WHERE "id" = $1
+              AND "status" IN ('aberta', 'em_analise')
+              AND "sellerFirstResponseAt" IS NULL`,
+          [
+            row.id,
+            "Reembolso automático: o vendedor não respondeu dentro das 48h úteis do SLA.",
+          ],
+        )
+        if (closed.rowCount === 0) {
+          throw new Error(`disputa #${row.id} já foi resolvida ou respondida durante o reembolso`)
+        }
+
+        await transitionOrder(client, ord.id, ["em_disputa"], "reembolsado", { completed: true })
+
         await refundEscrow(
           client,
           ord.buyerId,
           ord.amountCents,
           ord.id,
           `Reembolso automático por SLA — pedido #${ord.id}`,
-        )
-
-        await client.query(
-          `UPDATE "order" SET "status" = 'reembolsado', "completedAt" = now() WHERE "id" = $1`,
-          [ord.id],
-        )
-
-        await client.query(
-          `UPDATE "dispute"
-              SET "status" = 'resolvida_comprador',
-                  "resolution" = $2,
-                  "resolvedAt" = now()
-            WHERE "id" = $1`,
-          [
-            row.id,
-            "Reembolso automático: o vendedor não respondeu dentro das 48h úteis do SLA.",
-          ],
         )
 
         await client.query(

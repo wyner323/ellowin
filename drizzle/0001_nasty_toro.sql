@@ -1,0 +1,2 @@
+ALTER TABLE "wallet" ADD CONSTRAINT "wallet_available_nonneg" CHECK ("wallet"."availableCents" >= 0);--> statement-breakpoint
+ALTER TABLE "wallet" ADD CONSTRAINT "wallet_held_nonneg" CHECK ("wallet"."heldCents" >= 0);

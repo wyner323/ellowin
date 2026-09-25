@@ -10,7 +10,13 @@ import { formatCents } from "@/lib/money"
 import { getStaff } from "@/lib/roles"
 import { getUserId } from "@/lib/session"
 import { disputeDeadlines } from "@/lib/sla"
-import { refundEscrow, releaseEscrowToSeller, withTransaction } from "@/lib/wallet"
+import {
+  StateConflictError,
+  refundEscrow,
+  releaseEscrowToSeller,
+  transitionOrder,
+  withTransaction,
+} from "@/lib/wallet"
 import type { ActionResult } from "@/app/actions/auth"
 
 /**
@@ -54,47 +60,61 @@ export async function openDispute(input: {
   const openedAt = new Date()
   const deadlines = disputeDeadlines(openedAt)
 
-  const disputeId = await withTransaction(async (client) => {
-    const inserted = await client.query<{ id: number }>(
-      `INSERT INTO "dispute"
-         ("orderId", "openedBy", "reason", "description", "status",
-          "firstContactDueAt", "sellerResponseDueAt", "resolutionDueAt")
-       VALUES ($1, $2, $3, $4, 'aberta', $5, $6, $7)
-       RETURNING "id"`,
-      [
-        row.id,
-        buyerId,
-        input.reason,
-        description,
-        deadlines.firstContactDueAt,
-        deadlines.sellerResponseDueAt,
-        deadlines.resolutionDueAt,
-      ],
-    )
+  let disputeId: number
+  try {
+    disputeId = await withTransaction(async (client) => {
+      // Primeiro passo: só abre disputa se o pedido ainda estiver nesses status.
+      // Sem isso, uma disputa aberta em paralelo com a confirmação de recebimento
+      // cairia num pedido já pago ao vendedor.
+      await transitionOrder(client, row.id, ["aguardando_entrega", "entregue"], "em_disputa")
 
-    const newId = inserted.rows[0].id
+      const inserted = await client.query<{ id: number }>(
+        `INSERT INTO "dispute"
+           ("orderId", "openedBy", "reason", "description", "status",
+            "firstContactDueAt", "sellerResponseDueAt", "resolutionDueAt")
+         VALUES ($1, $2, $3, $4, 'aberta', $5, $6, $7)
+         RETURNING "id"`,
+        [
+          row.id,
+          buyerId,
+          input.reason,
+          description,
+          deadlines.firstContactDueAt,
+          deadlines.sellerResponseDueAt,
+          deadlines.resolutionDueAt,
+        ],
+      )
 
-    await client.query(`UPDATE "order" SET "status" = 'em_disputa' WHERE "id" = $1`, [
-      row.id,
-    ])
+      const newId = inserted.rows[0].id
 
-    await client.query(
-      `INSERT INTO "dispute_message" ("disputeId", "authorRole", "body")
-       VALUES ($1, 'system', $2)`,
-      [
-        newId,
-        `Disputa aberta. ${formatCents(row.amountCents)} referentes a este pedido seguem bloqueados em custódia. O vendedor tem 48h úteis para resolver e o suporte da Ellowin entra em contato em até 24h.`,
-      ],
-    )
+      await client.query(
+        `INSERT INTO "dispute_message" ("disputeId", "authorRole", "body")
+         VALUES ($1, 'system', $2)`,
+        [
+          newId,
+          `Disputa aberta. ${formatCents(row.amountCents)} referentes a este pedido seguem bloqueados em custódia. O vendedor tem 48h úteis para resolver e o suporte da Ellowin entra em contato em até 24h.`,
+        ],
+      )
 
-    await client.query(
-      `INSERT INTO "dispute_message" ("disputeId", "authorId", "authorRole", "body")
-       VALUES ($1, $2, 'buyer', $3)`,
-      [newId, buyerId, description],
-    )
+      await client.query(
+        `INSERT INTO "dispute_message" ("disputeId", "authorId", "authorRole", "body")
+         VALUES ($1, $2, 'buyer', $3)`,
+        [newId, buyerId, description],
+      )
 
-    return newId
-  })
+      return newId
+    })
+  } catch (error) {
+    if (error instanceof StateConflictError)
+      return {
+        ok: false,
+        error: "Este pedido não está mais em uma etapa que permita abrir disputa.",
+      }
+    // dispute.orderId é UNIQUE: um segundo clique simultâneo cai aqui.
+    if (isUniqueViolation(error))
+      return { ok: false, error: "Já existe uma disputa para este pedido." }
+    throw error
+  }
 
   revalidatePath(`/pedidos/${row.id}`)
   revalidatePath("/pedidos")
@@ -103,6 +123,12 @@ export async function openDispute(input: {
 
   return { ok: true, message: "Disputa aberta. O chat com o vendedor está disponível.", disputeId }
 }
+
+function isUniqueViolation(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "23505")
+}
+
+const MAX_MESSAGE_LENGTH = 2000
 
 type Participation = {
   role: "buyer" | "seller" | "moderator"
@@ -159,6 +185,8 @@ export async function postDisputeMessage(input: {
 
   const body = input.body.trim()
   if (body.length < 2) return { ok: false, field: "body", error: "Escreva uma mensagem." }
+  if (body.length > MAX_MESSAGE_LENGTH)
+    return { ok: false, field: "body", error: "Mensagem muito longa (máximo 2000 caracteres)." }
 
   if (
     participation.disputeStatus.startsWith("resolvida") ||
@@ -287,78 +315,90 @@ export async function resolveDispute(input: {
   if (row.status.startsWith("resolvida") || row.status === "cancelada")
     return { ok: false, error: "Esta disputa já foi encerrada." }
 
-  await withTransaction(async (client) => {
-    if (input.outcome === "comprador") {
-      await refundEscrow(
+  // Conflito de interesse: quem é parte do pedido não decide a própria disputa.
+  if (staff.id === row.buyerId || staff.id === row.sellerId)
+    return { ok: false, error: "Você é parte deste pedido e não pode decidir esta disputa." }
+
+  try {
+    await withTransaction(async (client) => {
+      // Primeiro passo: fecha a disputa só se ainda estiver aberta e move o pedido
+      // só se ainda estiver em disputa. Duas decisões simultâneas (ou uma decisão
+      // junto com o reembolso automático por SLA) não conseguem pagar duas vezes.
+      const closed = await client.query(
+        `UPDATE "dispute"
+            SET "status" = $2,
+                "resolution" = $3,
+                "moderatorId" = coalesce("moderatorId", $4),
+                "resolvedAt" = now()
+          WHERE "id" = $1 AND "status" IN ('aberta', 'em_analise')`,
+        [
+          row.disputeId,
+          input.outcome === "comprador" ? "resolvida_comprador" : "resolvida_vendedor",
+          note,
+          staff.id,
+        ],
+      )
+      if (closed.rowCount === 0) throw new StateConflictError()
+
+      await transitionOrder(
         client,
-        row.buyerId,
-        row.amountCents,
         row.orderId,
-        `Reembolso por decisão de disputa — pedido #${row.orderId}`,
+        ["em_disputa"],
+        input.outcome === "comprador" ? "reembolsado" : "concluido",
+        { completed: true },
       )
 
-      await client.query(
-        `UPDATE "order" SET "status" = 'reembolsado', "completedAt" = now() WHERE "id" = $1`,
-        [row.orderId],
-      )
+      if (input.outcome === "comprador") {
+        await refundEscrow(
+          client,
+          row.buyerId,
+          row.amountCents,
+          row.orderId,
+          `Reembolso por decisão de disputa — pedido #${row.orderId}`,
+        )
 
-      // Só faz sentido marcar quando a disputa foi a favor do comprador —
-      // não flagamos um vendedor que venceu o caso.
-      if (input.accountRecovered) {
+        // Só faz sentido marcar quando a disputa foi a favor do comprador —
+        // não flagamos um vendedor que venceu o caso.
+        if (input.accountRecovered) {
+          await client.query(
+            `INSERT INTO "seller_account_flag" ("sellerId", "disputeId", "moderatorId", "note")
+             VALUES ($1, $2, $3, $4)`,
+            [row.sellerId, row.disputeId, staff.id, note],
+          )
+        }
+      } else {
+        await releaseEscrowToSeller(client, {
+          buyerId: row.buyerId,
+          sellerId: row.sellerId,
+          amountCents: row.amountCents,
+          feeCents: row.feeCents,
+          sellerNetCents: row.sellerNetCents,
+          orderId: row.orderId,
+          description: `Liberação por decisão de disputa — ${row.productTitle} (${row.variantLabel})`,
+        })
+
         await client.query(
-          `INSERT INTO "seller_account_flag" ("sellerId", "disputeId", "moderatorId", "note")
-           VALUES ($1, $2, $3, $4)`,
-          [row.sellerId, row.disputeId, staff.id, note],
+          `UPDATE "product" SET "salesCount" = "salesCount" + 1 WHERE "id" = $1`,
+          [row.productId],
         )
       }
-    } else {
-      await releaseEscrowToSeller(client, {
-        buyerId: row.buyerId,
-        sellerId: row.sellerId,
-        amountCents: row.amountCents,
-        feeCents: row.feeCents,
-        sellerNetCents: row.sellerNetCents,
-        orderId: row.orderId,
-        description: `Liberação por decisão de disputa — ${row.productTitle} (${row.variantLabel})`,
-      })
 
       await client.query(
-        `UPDATE "order" SET "status" = 'concluido', "completedAt" = now() WHERE "id" = $1`,
-        [row.orderId],
+        `INSERT INTO "dispute_message" ("disputeId", "authorRole", "body")
+         VALUES ($1, 'system', $2)`,
+        [
+          row.disputeId,
+          input.outcome === "comprador"
+            ? `Disputa encerrada a favor do comprador. ${formatCents(row.amountCents)} devolvidos. Justificativa: ${note}`
+            : `Disputa encerrada a favor do vendedor. ${formatCents(row.sellerNetCents)} liberados. Justificativa: ${note}`,
+        ],
       )
-
-      await client.query(
-        `UPDATE "product" SET "salesCount" = "salesCount" + 1 WHERE "id" = $1`,
-        [row.productId],
-      )
-    }
-
-    await client.query(
-      `UPDATE "dispute"
-          SET "status" = $2,
-              "resolution" = $3,
-              "moderatorId" = coalesce("moderatorId", $4),
-              "resolvedAt" = now()
-        WHERE "id" = $1`,
-      [
-        row.disputeId,
-        input.outcome === "comprador" ? "resolvida_comprador" : "resolvida_vendedor",
-        note,
-        staff.id,
-      ],
-    )
-
-    await client.query(
-      `INSERT INTO "dispute_message" ("disputeId", "authorRole", "body")
-       VALUES ($1, 'system', $2)`,
-      [
-        row.disputeId,
-        input.outcome === "comprador"
-          ? `Disputa encerrada a favor do comprador. ${formatCents(row.amountCents)} devolvidos. Justificativa: ${note}`
-          : `Disputa encerrada a favor do vendedor. ${formatCents(row.sellerNetCents)} liberados. Justificativa: ${note}`,
-      ],
-    )
-  })
+    })
+  } catch (error) {
+    if (error instanceof StateConflictError)
+      return { ok: false, error: "Esta disputa já foi encerrada por outra decisão." }
+    throw error
+  }
 
   revalidatePath(`/admin/disputas/${input.disputeId}`)
   revalidatePath("/admin/disputas")
