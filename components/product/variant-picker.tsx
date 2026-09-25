@@ -21,7 +21,8 @@ type Variant = {
  * Seleção do item específico, no estilo GGMax: o comprador escolhe uma das
  * opções do anúncio e cada uma tem preço e estoque próprios.
  *
- * Só o `id` da variante é enviado ao servidor — o preço é recalculado lá.
+ * O servidor recalcula o preço cobrado; o preço exibido vai junto só como
+ * confirmação do que o comprador viu (a compra é recusada se ele mudou).
  */
 export function VariantPicker({
   variants,
@@ -48,9 +49,11 @@ export function VariantPicker({
     setError(null)
 
     start(async () => {
-      const result = await purchase(selected.id)
+      const result = await purchase(selected.id, selected.priceCents)
       if (!result.ok) {
         setError(result.error ?? "Não foi possível concluir a compra.")
+        // O vendedor mudou o preço: recarrega a página pra mostrar o valor atual.
+        if (result.field === "price") router.refresh()
         return
       }
       router.push(`/pedidos/${result.orderId}`)

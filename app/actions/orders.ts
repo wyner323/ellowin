@@ -6,7 +6,7 @@ import { db } from "@/lib/db"
 import { order, orderMessage, product } from "@/lib/db/schema"
 import { getOrderMessages } from "@/lib/orders"
 import { hoursForDeliveryTime } from "@/lib/delivery"
-import { AUTO_RELEASE_DAYS, splitOrderAmount } from "@/lib/money"
+import { AUTO_RELEASE_DAYS, formatCents, splitOrderAmount } from "@/lib/money"
 import { getUserId } from "@/lib/session"
 import {
   StateConflictError,
@@ -18,15 +18,25 @@ import {
 } from "@/lib/wallet"
 import type { ActionResult } from "@/app/actions/auth"
 
+class PriceChangedError extends Error {}
+
 /**
  * Compra de uma variante.
  *
- * O preço NUNCA vem do cliente: só o `variantId` é aceito e o valor é lido do
- * banco dentro da transação, com a linha travada. Isso impede tanto a
- * manipulação de preço quanto duas compras simultâneas do último item.
+ * O preço cobrado NUNCA vem do cliente: é lido do banco dentro da transação,
+ * com a linha travada. Isso impede tanto a manipulação de preço quanto duas
+ * compras simultâneas do último item. `expectedPriceCents` é só a confirmação
+ * do preço que o comprador VIU na tela: se o vendedor reajustou o item entre a
+ * página carregar e o clique, a compra é recusada em vez de cobrar mais caro.
  */
-export async function purchase(variantId: number): Promise<ActionResult & { orderId?: number }> {
+export async function purchase(
+  variantId: number,
+  expectedPriceCents: number,
+): Promise<ActionResult & { orderId?: number }> {
   const buyerId = await getUserId()
+
+  if (!Number.isInteger(expectedPriceCents) || expectedPriceCents < 1)
+    return { ok: false, error: "Não foi possível confirmar o preço. Atualize a página." }
 
   try {
     const orderId = await withTransaction(async (client) => {
@@ -59,6 +69,10 @@ export async function purchase(variantId: number): Promise<ActionResult & { orde
       if (variant.stock < 1) throw new Error("Item esgotado.")
       if (variant.sellerId === buyerId)
         throw new Error("Você não pode comprar o seu próprio anúncio.")
+      if (variant.priceCents !== expectedPriceCents)
+        throw new PriceChangedError(
+          `O preço deste item mudou para ${formatCents(variant.priceCents)}. Confira o novo valor e compre de novo.`,
+        )
 
       const { amountCents, feeCents, sellerNetCents } = splitOrderAmount(variant.priceCents)
 
@@ -116,7 +130,8 @@ export async function purchase(variantId: number): Promise<ActionResult & { orde
     return { ok: true, message: "Compra realizada. O valor ficou em custódia.", orderId }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível concluir a compra."
-    return { ok: false, error: message }
+    // field "price" avisa a tela pra recarregar os valores atuais.
+    return { ok: false, error: message, ...(error instanceof PriceChangedError ? { field: "price" } : {}) }
   }
 }
 

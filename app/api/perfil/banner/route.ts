@@ -1,18 +1,9 @@
 import { put } from "@vercel/blob"
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/lib/session"
+import { EXT_BY_TYPE, checkImageUpload, tooManyUploads, uploadAllowed } from "@/lib/upload-guard"
 
 /** Upload do banner da loja pública. Mesmo padrão do upload de avatar. */
-
-const MAX_BYTES = 5 * 1024 * 1024
-const ALLOWED = ["image/webp", "image/jpeg", "image/png", "image/avif"]
-
-const EXT_BY_TYPE: Record<string, string> = {
-  "image/webp": "webp",
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/avif": "avif",
-}
 
 export async function POST(request: NextRequest) {
   const session = await getSession()
@@ -20,34 +11,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
   }
 
+  if (!(await uploadAllowed(session.user.id, "banner"))) return tooManyUploads()
+
   try {
     const formData = await request.formData()
-    const file = formData.get("file")
+    const checked = await checkImageUpload(formData.get("file"))
+    if (!checked.ok) return checked.response
 
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: "Nenhum arquivo enviado." }, { status: 400 })
-    }
-
-    if (!ALLOWED.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Formato inválido. Use JPG, PNG ou WebP." },
-        { status: 400 },
-      )
-    }
-
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json(
-        { error: "A imagem é muito grande (máx. 5 MB)." },
-        { status: 400 },
-      )
-    }
-
-    const ext = EXT_BY_TYPE[file.type]
+    const ext = EXT_BY_TYPE[checked.mime]
     // Nome fixo por usuário: sem um `?v=` novo a cada troca, a URL não muda e
     // o navegador/otimizador de imagem continua servindo o banner antigo em cache.
-    const blob = await put(`banners/${session.user.id}.${ext}`, file, {
+    const blob = await put(`banners/${session.user.id}.${ext}`, checked.file, {
       access: "public",
-      contentType: file.type,
+      contentType: checked.mime,
       allowOverwrite: true,
     })
 

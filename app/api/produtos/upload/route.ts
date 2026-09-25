@@ -1,60 +1,52 @@
 import { put } from "@vercel/blob"
+import { eq } from "drizzle-orm"
 import { type NextRequest, NextResponse } from "next/server"
+import { db } from "@/lib/db"
+import { sellerApplication } from "@/lib/db/schema"
 import { getSession } from "@/lib/session"
+import { EXT_BY_TYPE, checkImageUpload, tooManyUploads, uploadAllowed } from "@/lib/upload-guard"
 
 /**
  * Upload de foto de anúncio.
  *
- * Só vendedores logados sobem imagens. O arquivo já chega comprimido do
- * navegador (WebP, máx. 1600px), mas ainda validamos tipo e tamanho no
- * servidor — nunca confie só no cliente. As imagens vão para um Blob público
- * porque são fotos de vitrine, feitas para serem vistas por qualquer visitante.
+ * Só vendedores aprovados sobem imagens (mesma regra de createProduct). O
+ * arquivo já chega comprimido do navegador (WebP, máx. 1600px), mas o servidor
+ * revalida tamanho e o CONTEÚDO real do arquivo — nunca confie só no cliente.
+ * As imagens vão para um Blob público porque são fotos de vitrine, feitas para
+ * serem vistas por qualquer visitante.
  */
-
-// Teto de segurança pós-compressão; o normal é ficar bem abaixo disso.
-const MAX_BYTES = 5 * 1024 * 1024
-const ALLOWED = ["image/webp", "image/jpeg", "image/png", "image/avif"]
-
 export async function POST(request: NextRequest) {
   const session = await getSession()
   if (!session?.user) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
   }
 
+  const [seller] = await db
+    .select({ status: sellerApplication.status })
+    .from(sellerApplication)
+    .where(eq(sellerApplication.userId, session.user.id))
+    .limit(1)
+
+  if (seller?.status !== "aprovado") {
+    return NextResponse.json(
+      { error: "Conclua o cadastro de vendedor antes de enviar fotos." },
+      { status: 403 },
+    )
+  }
+
+  if (!(await uploadAllowed(session.user.id, "produtos"))) return tooManyUploads()
+
   try {
     const formData = await request.formData()
-    const file = formData.get("file")
+    const checked = await checkImageUpload(formData.get("file"))
+    if (!checked.ok) return checked.response
 
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: "Nenhum arquivo enviado." }, { status: 400 })
-    }
-
-    if (!ALLOWED.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Formato inválido. Use JPG, PNG ou WebP." },
-        { status: 400 },
-      )
-    }
-
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json(
-        { error: "A imagem é muito grande (máx. 5 MB)." },
-        { status: 400 },
-      )
-    }
-
-    // Extensão vem do MIME já validado acima, nunca do nome enviado pelo
-    // cliente — evita path traversal / injeção via file.name malicioso.
-    const EXT_BY_TYPE: Record<string, string> = {
-      "image/webp": "webp",
-      "image/jpeg": "jpg",
-      "image/png": "png",
-      "image/avif": "avif",
-    }
-    const ext = EXT_BY_TYPE[file.type]
-    const blob = await put(`produtos/${session.user.id}/${crypto.randomUUID()}.${ext}`, file, {
+    // Extensão e contentType vêm do tipo detectado no conteúdo, nunca do nome ou
+    // do MIME declarado pelo cliente — evita path traversal / injeção via file.name.
+    const ext = EXT_BY_TYPE[checked.mime]
+    const blob = await put(`produtos/${session.user.id}/${crypto.randomUUID()}.${ext}`, checked.file, {
       access: "public",
-      contentType: file.type,
+      contentType: checked.mime,
     })
 
     return NextResponse.json({ url: blob.url })
