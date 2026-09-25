@@ -69,6 +69,14 @@ Better Auth (`lib/auth.ts`) backed directly by the Postgres pool (no separate ad
 (`user` / `moderator` / `admin`) live on `user.role`; the first admin is bootstrapped by matching
 `ELLOWIN_ADMIN_EMAIL` on login (`lib/roles.ts`), not seeded in the database.
 
+Login and sign-up go **only** through `loginUser`/`registerUser` in `app/actions/auth.ts`: Better
+Auth's own rate limiter runs only in its HTTP handler (not in `auth.api.*` calls, and its counter
+is per-instance memory), so those actions use the DB-backed limiter in `lib/rate-limit.ts`
+(`auth_attempt` table) and `/api/auth/sign-in/email` + `/sign-up/email` are disabled in
+`lib/auth.ts` (`disabledPaths`) so they can't be used to bypass it. OTP codes are never returned
+to the browser unless `ELLOWIN_DEMO_OTP=true`. User-supplied Blob URLs (product photos, avatar,
+banner) must pass `isOwnBlobUrl()` (`lib/blob-urls.ts`) — never trust just the Blob domain.
+
 Two names exist per user, and mixing them up is a real privacy bug, not just a style issue:
 - `user.name` (and `profile.fullName`) — the legal name tied to CPF/KYC. Internal/staff use only.
 - `user.displayName` — the public nickname (unique, case-insensitive). This is what must render
@@ -90,6 +98,13 @@ cold starts otherwise open a fresh TCP connection per invocation).
   stay correct under concurrent purchases. Money is always integer cents; never introduce floats
   into a balance calculation. New escrow-affecting code should go through `lib/wallet.ts`
   functions, not ad hoc SQL.
+- **Any transaction that moves an order's money must start with `transitionOrder()`** (an
+  `UPDATE "order" ... WHERE status = <expected>` that throws `StateConflictError` on 0 rows).
+  Checking `order.status` in a plain SELECT before the transaction is not enough: two parallel
+  requests both pass it and settle the same order twice (this was a real money-minting bug in
+  `confirmReceipt`/`cancelOrder`/`resolveDispute`). `releaseEscrowToSeller`/`refundEscrow` also
+  throw if the buyer's `heldCents` doesn't cover the amount, and the DB has `CHECK` constraints
+  against negative wallet balances.
 
 ### SLA / auto-refund pattern
 
