@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm"
+import * as Sentry from "@sentry/nextjs"
 import { db } from "@/lib/db"
 import { notificationLog, user } from "@/lib/db/schema"
 import { actionTemplate, sendMail } from "@/lib/email"
@@ -16,6 +17,16 @@ export async function alertIfReconciliationBroken(report: ReconciliationReport) 
 
   const summary = report.findings.map((f) => `• ${f.description} (${f.rows.length})`).join("\n")
   console.error("[reconcile] a carteira NÃO bate:\n" + summary)
+
+  // Independente do email: sempre que a carteira não bate é um evento sério.
+  // Agrupado por quais checagens falharam, não pelo texto — dias diferentes
+  // com o mesmo problema caem no mesmo issue no Sentry.
+  Sentry.captureMessage("Conferência da carteira encontrou inconsistências", {
+    level: "fatal",
+    tags: { area: "reconcile" },
+    fingerprint: ["reconcile-broken", ...report.findings.map((f) => f.check).sort()],
+    extra: { findings: report.findings.map((f) => ({ check: f.check, count: f.rows.length })) },
+  })
 
   if (!notificationsLive()) return { alerted: false }
 

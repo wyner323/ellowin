@@ -21,7 +21,7 @@ import {
 } from "@/lib/orders"
 import { parsePage } from "@/lib/pagination"
 import { getSession } from "@/lib/session"
-import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla"
+import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla-sweeps"
 
 export const metadata: Metadata = {
   title: "Minhas vendas",

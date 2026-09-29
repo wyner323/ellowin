@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto"
 import { NextResponse } from "next/server"
 import { runWalletReconciliation } from "@/lib/reconcile"
 import { alertIfReconciliationBroken } from "@/lib/reconcile-alert"
-import { sweepAutoRelease, sweepDeliveryDeadline, sweepDisputeSla } from "@/lib/sla"
+import { sweepAutoRelease, sweepDeliveryDeadline, sweepDisputeSla } from "@/lib/sla-sweeps"
 
 /** Comparação em tempo constante: `!==` vaza, pelo tempo de resposta, quantos caracteres do segredo batem. */
 function safeEqual(a: string, b: string) {

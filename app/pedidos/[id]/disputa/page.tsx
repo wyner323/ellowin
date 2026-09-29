@@ -14,7 +14,7 @@ import { formatCents } from "@/lib/money"
 import { DISPUTE_STATUS_LABEL, getDisputeMessages, getOrderDetail } from "@/lib/orders"
 import { getStaff } from "@/lib/roles"
 import { getSession } from "@/lib/session"
-import { sweepDisputeSla } from "@/lib/sla"
+import { sweepDisputeSla } from "@/lib/sla-sweeps"
 
 export const metadata: Metadata = {
   title: "Disputa do pedido",

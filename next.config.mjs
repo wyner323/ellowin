@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs/config"
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -27,4 +29,14 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: true,
+  // Upload de source map exige um token de organização (SENTRY_AUTH_TOKEN).
+  // Sem ele o build continua normal — só os stack traces no Sentry ficam
+  // minificados até a variável existir na Vercel.
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  disableLogger: true,
+  automaticVercelMonitors: false,
+})

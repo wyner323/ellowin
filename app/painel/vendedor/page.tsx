@@ -39,7 +39,7 @@ import {
 } from "@/lib/marketplace"
 import { getMyOpenDisputes, getSellerOrderAggregates } from "@/lib/orders"
 import { getSession } from "@/lib/session"
-import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla"
+import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla-sweeps"
 import { formatDurationHours } from "@/lib/time"
 import { getDailyBalanceHistory, getWalletSummary } from "@/lib/wallet"
 import { eq } from "drizzle-orm"

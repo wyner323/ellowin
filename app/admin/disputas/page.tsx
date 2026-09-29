@@ -7,7 +7,7 @@ import { formatCents } from "@/lib/money"
 import { Pagination } from "@/components/pagination"
 import { DISPUTE_STATUS_LABEL, countDisputesExcluding, getDisputeQueue } from "@/lib/orders"
 import { PAGE_SIZE, parsePage, resolvePage } from "@/lib/pagination"
-import { sweepDisputeSla } from "@/lib/sla"
+import { sweepDisputeSla } from "@/lib/sla-sweeps"
 
 const OPEN_STATUSES = ["aberta", "em_analise"]
 

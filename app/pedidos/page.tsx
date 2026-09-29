@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { formatCents } from "@/lib/money"
 import { ORDER_STATUS_LABEL, getBuyerOrderSummary, getBuyerOrdersPage } from "@/lib/orders"
 import { parsePage } from "@/lib/pagination"
-import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla"
+import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla-sweeps"
 import { getSession } from "@/lib/session"
 
 export const metadata: Metadata = {

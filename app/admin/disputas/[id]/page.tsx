@@ -16,7 +16,7 @@ import {
   getOrderDetail,
 } from "@/lib/orders"
 import { requireStaff } from "@/lib/roles"
-import { sweepDisputeSla } from "@/lib/sla"
+import { sweepDisputeSla } from "@/lib/sla-sweeps"
 
 export default async function CasoDisputaPage({
   params,

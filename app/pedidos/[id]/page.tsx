@@ -21,7 +21,7 @@ import { getOrderDetail, getOrderMessages } from "@/lib/orders"
 import { orderHint } from "@/lib/order-hints"
 import { getStaff } from "@/lib/roles"
 import { getSession } from "@/lib/session"
-import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla"
+import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla-sweeps"
 
 export const metadata: Metadata = {
   title: "Detalhe do pedido",

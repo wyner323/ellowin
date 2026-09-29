@@ -1,4 +1,5 @@
 import { after } from "next/server"
+import * as Sentry from "@sentry/nextjs"
 import { eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { notificationLog, order, product, productQuestion, user } from "@/lib/db/schema"
@@ -32,7 +33,10 @@ export function notificationsLive() {
 
 function schedule(task: () => Promise<void>) {
   const run = () =>
-    task().catch((error) => console.error("[notify] falha ao notificar:", error))
+    task().catch((error) => {
+      console.error("[notify] falha ao notificar:", error)
+      Sentry.captureException(error, { tags: { area: "notify" } })
+    })
   try {
     after(run)
   } catch {

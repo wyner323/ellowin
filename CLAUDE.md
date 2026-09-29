@@ -18,7 +18,8 @@ the platform and only released to the seller after delivery is confirmed.
   `pnpm lint` and `pnpm test` on every push to `main` and on pull requests.
 - `pnpm test` — runs Vitest (`vitest run`) over pure-function unit tests in `lib/*.test.ts`
   (money math, SLA business-hour deadlines, delivery time lookup, account-origin lookup, seller
-  badge thresholds). `pnpm test:watch` for interactive mode. **Coverage is intentionally narrow**:
+  badge thresholds, Sentry event scrubbing). `pnpm test:watch` for interactive mode.
+  **Coverage is intentionally narrow**:
   only functions with zero I/O are tested — nothing in `lib/wallet.ts` (escrow) or any server
   action has a test yet, because there is no separate test database (only one `DATABASE_URL`,
   pointing at production) and running DB-touching tests against it would be unsafe. Provisioning
@@ -171,14 +172,22 @@ aggregates in `getSellerOrderAggregates()`, and the balance chart uses `getDaily
 
 ### SLA / auto-refund pattern
 
-`lib/sla.ts` computes business-hour deadlines and `sweepDisputeSla()` auto-refunds a buyer if the
-seller doesn't respond to a dispute in time. It's invoked both by `/api/cron/sla` (Vercel Cron,
-gated by `CRON_SECRET` — see the auth check before trusting this route) and opportunistically
-whenever a dispute/moderation screen loads (there's no durable job queue here, so a sweep that
-only ran on cron would lag if nobody hit the cron endpoint). Vercel Hobby only allows a daily cron (`vercel.json`, 03:00), so `.github/workflows/sla-sweep.yml` also calls the route every 15 minutes with the repo secret `CRON_SECRET` (same value as in Vercel); until that secret is set it just logs a warning. Each auto-action leaves a `system`
-message in the relevant chat so the outcome is auditable. If you build the planned
-"refund on missed delivery deadline" feature, this is the pattern to copy (delivery windows are
-already fixed/enumerable — see `lib/delivery.ts`).
+`lib/sla.ts` is **pure only** (business-hour deadline math, `slaState()`, `formatDeadline()`) —
+it's imported by a client component (`components/disputes/sla-panel.tsx`), so it must never pull
+in `db`, `lib/wallet.ts`, or anything server-only. The three sweep functions
+(`sweepDisputeSla`, `sweepDeliveryDeadline`, `sweepAutoRelease`) that actually touch the database
+and move money live in **`lib/sla-sweeps.ts`** instead — always import sweeps from there, never
+from `lib/sla.ts`. (This split exists because the two were briefly merged and it broke the
+production bundle — see the note at the bottom of `lib/sla.ts`.) Sweeps are invoked both by
+`/api/cron/sla` (Vercel Cron, gated by `CRON_SECRET` — see the auth check before trusting this
+route) and opportunistically whenever a dispute/moderation/orders screen loads (there's no durable
+job queue here, so a sweep that only ran on cron would lag if nobody hit the cron endpoint). Vercel
+Hobby only allows a daily cron (`vercel.json`, 03:00), so `.github/workflows/sla-sweep.yml` also
+calls the route every 15 minutes with the repo secret `CRON_SECRET` (same value as in Vercel);
+until that secret is set it just logs a warning. Each auto-action leaves a `system` message in the
+relevant chat so the outcome is auditable. If you build the planned "refund on missed delivery
+deadline" feature, this is the pattern to copy (delivery windows are already fixed/enumerable —
+see `lib/delivery.ts`).
 
 ### Storefront blends real and demo data
 
@@ -231,3 +240,28 @@ Styling is Tailwind v4 (`app/globals.css`, oklch tokens under `@theme inline`), 
 `proxy.ts` (Next 16's renamed `middleware.ts`) sets a per-request CSP nonce and applies it to all
 routes except static assets. If you add an inline `<script>`, it needs that nonce
 (`headers().get("x-nonce")`) or it will be blocked in production.
+
+### Error monitoring (Sentry)
+
+`@sentry/nextjs` is wired in (`next.config.mjs` via `withSentryConfig` from the `/config`
+subpath — the main package export doesn't have it in this version) but is **inert by default**:
+`lib/sentry-shared.ts` reads `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` and sets `enabled: false` when
+neither is set, so nothing is sent and the build/deploy can't break for lack of a Sentry account.
+To activate it: create a Sentry project and set the DSN env var in Vercel; optionally
+`SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN` for source-map upload (readable stack traces)
+and `SENTRY_TRACES_SAMPLE_RATE` for performance tracing (0 by default). Runtime init lives in
+`instrumentation.ts` (server/edge, picks the config by `NEXT_RUNTIME`) and
+`instrumentation-client.ts` (browser); `app/global-error.tsx` catches root-layout render errors.
+Given this app handles CPF/wallet/delivery data: `sendDefaultPii: false`, Session Replay is
+deliberately **not** enabled, and every event passes through `scrubSensitiveData()`
+(`lib/sentry-scrub.ts`) which redacts sensitive keys (cpf, senha, pixKey, deliveryPayload, tokens,
+etc.) before it leaves the process. `lib/notify.ts` and `lib/reconcile-alert.ts` report failures
+to it; add `Sentry.captureException`/`captureMessage` calls to new server-side failure paths the
+same way.
+
+**Note: CI does not run `next build`** (`.github/workflows/ci.yml` only runs `tsc --noEmit`,
+`pnpm lint`, `pnpm test`) — none of those catch Next's client/server module-boundary errors (e.g.
+a client component transitively importing server-only code like `next/server`'s `after()`). That
+class of bug only surfaces in an actual `next build`/`pnpm build`, which is why `lib/sla.ts` had to
+be split from `lib/sla-sweeps.ts` (see above). Run `pnpm build` locally before pushing anything
+that touches imports shared between client and server code, since CI won't catch it.
