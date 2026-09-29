@@ -47,10 +47,16 @@ const sections = [
     ],
   },
   {
-    title: "6. Dados pessoais",
+    title: "6. Dados pessoais e privacidade (LGPD)",
     body: [
-      "Coletamos apenas os dados necessários para identificar as partes, prevenir fraudes e cumprir obrigações legais.",
-      "Documentos enviados para verificação são usados exclusivamente na análise de identidade e não são compartilhados com outros usuários.",
+      "Coletamos apenas os dados necessários para identificar as partes, viabilizar a compra e venda, prevenir fraudes e cumprir obrigações legais: nome completo, CPF, data de nascimento, telefone, email, e — para vendedores — documento de identidade e chave Pix.",
+      "O CPF e o documento de identidade têm base legal no cumprimento de obrigação legal e regulatória (prevenção à fraude e à lavagem de dinheiro) e no legítimo interesse da Ellowin em manter um ambiente de negociação seguro. Os demais dados de cadastro têm base na execução do contrato entre você e a Ellowin.",
+      "Documentos enviados para verificação (KYC) são usados exclusivamente na análise de identidade e nunca são exibidos a outros usuários — nem mesmo ao vendedor ou comprador da outra ponta de uma negociação.",
+      "O texto exibido no seu perfil, na loja e nas avaliações é sempre o apelido que você escolhe (\"nome de exibição\"), nunca o nome legal.",
+      "Os dados de entrega de um pedido (login, senha e códigos de uma conta de jogo, por exemplo) ficam cifrados no banco de dados e só aparecem, dentro do site, para o comprador daquele pedido específico — nunca por email.",
+      "Guardamos os dados de uma conta encerrada pelo tempo exigido por lei para fins fiscais, contábeis e de prevenção a fraude (tipicamente 5 anos após a última movimentação financeira), mesmo depois de uma solicitação de exclusão — o que muda é que o perfil deixa de ser público e de poder ser usado para novo login.",
+      "Você pode, a qualquer momento: acessar e corrigir seus dados em \"Minha conta\"; pedir a portabilidade dos seus dados; revogar consentimentos que dependam dele; e solicitar a exclusão (anonimização) da sua conta pela própria página \"Minha conta\", quando não houver pedido em andamento, anúncio ativo ou saldo na carteira.",
+      "Dúvidas, reclamações ou pedidos sobre seus dados pessoais que não puderem ser resolvidos pela própria conta podem ser enviados pela central de segurança.",
     ],
   },
 ]

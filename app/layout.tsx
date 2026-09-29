@@ -3,6 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Unbounded } from 'next/font/google'
 import { DesignLab } from '@/components/dev/design-lab'
 import { Toaster } from '@/components/ui/sonner'
+import { SITE_URL } from '@/lib/site'
+
 import './globals.css'
 
 const inter = Inter({
@@ -18,7 +20,16 @@ const unbounded = Unbounded({
 })
 
 export const metadata: Metadata = {
-  title: 'Ellowin — Marketplace de produtos digitais para games',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'Ellowin — Marketplace de produtos digitais para games',
+    template: '%s — Ellowin',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'pt_BR',
+    siteName: 'Ellowin',
+  },
   description:
     'Compre e venda contas de jogos, moedas, gift cards e boosting com pagamento intermediado. Cadastro verificado por CPF e email.',
   generator: 'v0.app',

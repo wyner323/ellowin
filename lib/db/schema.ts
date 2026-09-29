@@ -37,6 +37,14 @@ export const user = pgTable("user", {
   role: text("role").notNull().default("user"),
   /** Última atividade autenticada — status online/offline no perfil público. Atualizado (com throttle) em getUserId(). */
   lastActiveAt: timestamp("lastActiveAt"),
+  /**
+   * Conta anonimizada a pedido do titular (LGPD, direito de exclusão) — ver
+   * lib/account-deletion.ts. `name`/`email`/`displayName` viram placeholders,
+   * login fica impossível, mas a linha permanece (pedidos e avaliações
+   * apontam para ela) e o CPF/documento continuam guardados pelo prazo legal
+   * de retenção fiscal e antifraude.
+   */
+  deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 }, (t) => [

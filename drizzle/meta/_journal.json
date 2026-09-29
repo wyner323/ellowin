@@ -43,6 +43,13 @@
       "when": 1790357890310,
       "tag": "0005_exotic_lionheart",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790686770008,
+      "tag": "0006_daily_hammerhead",
+      "breakpoints": true
     }
   ]
 }

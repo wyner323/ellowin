@@ -5,8 +5,11 @@ import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { user } from "@/lib/db/schema"
 import { getUserId } from "@/lib/session"
+import { anonymizeAccount, getDeletionBlockers } from "@/lib/account-deletion"
 import { isValidAccentColor } from "@/lib/accent-colors"
 import { isOwnBlobUrl } from "@/lib/blob-urls"
+import { sendAccountDeletedEmail } from "@/lib/email"
+import { hitRateLimit } from "@/lib/rate-limit"
 import { isValidBio, isValidDisplayName } from "@/lib/validation"
 import type { ActionResult } from "@/app/actions/auth"
 
@@ -137,4 +140,33 @@ export async function removeBanner(): Promise<ActionResult> {
 
   revalidatePath("/", "layout")
   return { ok: true }
+}
+
+const DELETION_PHRASE = "excluir minha conta"
+
+/**
+ * Exclusão (anonimização) da própria conta — ver lib/account-deletion.ts. Exige
+ * digitar a frase de confirmação exata: é uma ação irreversível e sem volta,
+ * então não basta um clique.
+ */
+export async function requestAccountDeletion(input: { confirm: string }): Promise<ActionResult> {
+  const userId = await getUserId()
+
+  if (input.confirm.trim().toLowerCase() !== DELETION_PHRASE)
+    return { ok: false, field: "confirm", error: `Digite exatamente "${DELETION_PHRASE}" para confirmar.` }
+
+  if (!(await hitRateLimit(`delete-account:${userId}`, 3, 60 * 60)))
+    return { ok: false, error: "Muitas tentativas. Aguarde um pouco e tente de novo." }
+
+  const blockers = await getDeletionBlockers(userId)
+  if (blockers.length > 0) return { ok: false, error: blockers[0].message }
+
+  const [row] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1)
+  const email = row?.email
+
+  await anonymizeAccount(userId)
+  if (email) await sendAccountDeletedEmail(email).catch(() => {})
+
+  revalidatePath("/", "layout")
+  return { ok: true, message: "Conta excluída. Você será desconectado." }
 }

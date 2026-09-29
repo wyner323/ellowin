@@ -228,3 +228,18 @@ export function sendPasswordChangedEmail(to: string) {
     "aviso de senha alterada",
   )
 }
+
+/** Confirmação de que a conta foi excluída (anonimizada) — a única prova que a pessoa recebe, já que o login deixa de funcionar. */
+export function sendAccountDeletedEmail(to: string) {
+  return sendMail(
+    to,
+    "Sua conta Ellowin foi excluída",
+    actionTemplate({
+      title: "Conta excluída",
+      intro:
+        "Confirmamos a exclusão da sua conta Ellowin, a seu pedido. Seu perfil, apelido e telefone foram removidos e o login não funciona mais. Por obrigação legal (fiscal e antifraude), alguns dados de identificação e o histórico de pedidos são mantidos pelo prazo exigido em lei.",
+      footnote: "Se você não pediu isso, entre em contato com o suporte imediatamente.",
+    }),
+    "confirmação de exclusão de conta",
+  )
+}

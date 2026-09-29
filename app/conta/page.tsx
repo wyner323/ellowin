@@ -7,12 +7,14 @@ import { SiteFooter } from "@/components/site-footer"
 import { AccentColorPicker } from "@/components/account/accent-color-picker"
 import { AvatarUpload } from "@/components/account/avatar-upload"
 import { BioForm } from "@/components/account/bio-form"
+import { DeleteAccountSection } from "@/components/account/delete-account-section"
 import { DisplayNameForm } from "@/components/account/display-name-form"
 import { VerificationPanel } from "@/components/account/verification-panel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { getDeletionBlockers } from "@/lib/account-deletion"
 import type { AccentColorId } from "@/lib/accent-colors"
 import { getAccountState, verificationProgress } from "@/lib/session"
 import { formatCpf } from "@/lib/validation"
@@ -30,6 +32,7 @@ export default async function ContaPage() {
   if (!state.cpf || !state.phone) redirect("/completar-cadastro?next=/conta")
 
   const progress = verificationProgress(state)
+  const deletionBlockers = await getDeletionBlockers(state.id)
 
   return (
     <>
@@ -164,6 +167,15 @@ export default async function ContaPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="mt-6 border-destructive/30">
+          <CardHeader>
+            <CardTitle className="text-base text-destructive">Excluir conta</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DeleteAccountSection blockers={deletionBlockers} />
+          </CardContent>
+        </Card>
       </main>
       <SiteFooter />
     </>

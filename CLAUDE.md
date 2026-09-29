@@ -126,6 +126,15 @@ cold starts otherwise open a fresh TCP connection per invocation).
   throw if the buyer's `heldCents` doesn't cover the amount, and the DB has `CHECK` constraints
   against negative wallet balances.
 
+### Account deletion (LGPD)
+
+`lib/account-deletion.ts`: `getDeletionBlockers()` (wallet balance, active orders, active listings, staff role) must return empty
+before `anonymizeAccount()` runs. Anonymization is NOT a row delete — orders/reviews from other people point at this user id, and
+CPF/legal name/document are kept for the legal retention period (comment in `lib/db/schema.ts` on `user.deletedAt`). It clears
+name/displayName/image/bio/banner/phone, sets a unique `excluido+<id>@ellowin.invalid` placeholder email, and deletes the
+`session`/`account` rows so login becomes impossible. Wired into `requestAccountDeletion` (`app/actions/account.ts`, confirmation
+phrase + rate limit) and the danger-zone section on `/conta`.
+
 ### Wallet reconciliation
 
 `lib/reconcile.ts` (read-only, 10 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =
