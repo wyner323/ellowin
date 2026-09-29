@@ -50,6 +50,13 @@
       "when": 1790686770008,
       "tag": "0006_daily_hammerhead",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790687738499,
+      "tag": "0007_petite_blue_blade",
+      "breakpoints": true
     }
   ]
 }

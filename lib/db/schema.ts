@@ -472,3 +472,42 @@ export const authAttempt = pgTable(
   },
   (t) => [index("auth_attempt_key_created_idx").on(t.key, t.createdAt)],
 )
+
+/**
+ * Denúncia de anúncio ou de usuário — canal para golpe, conta invadida
+ * revendida, assédio ou anúncio enganoso. Sempre aponta para EXATAMENTE um
+ * alvo (produto OU usuário, nunca os dois nem nenhum — garantido pelo CHECK).
+ * Fila de moderação em app/admin/denuncias; ver lib/reports.ts pros motivos
+ * (puro) e lib/report-queries.ts pras consultas.
+ */
+export const report = pgTable(
+  "report",
+  {
+    id: serial("id").primaryKey(),
+    reporterId: text("reporterId")
+      .notNull()
+      .references(() => user.id),
+    /** anuncio | usuario */
+    targetType: text("targetType").notNull(),
+    targetProductId: integer("targetProductId").references(() => product.id),
+    targetUserId: text("targetUserId").references(() => user.id),
+    reason: text("reason").notNull(),
+    description: text("description").notNull(),
+    /** aberta | em_analise | resolvida | arquivada */
+    status: text("status").notNull().default("aberta"),
+    moderatorId: text("moderatorId").references(() => user.id),
+    resolutionNote: text("resolutionNote"),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    resolvedAt: timestamp("resolvedAt"),
+  },
+  (t) => [
+    index("report_status_idx").on(t.status),
+    index("report_target_product_idx").on(t.targetProductId),
+    index("report_target_user_idx").on(t.targetUserId),
+    check(
+      "report_target_matches_type",
+      sql`(${t.targetType} = 'anuncio' AND ${t.targetProductId} IS NOT NULL AND ${t.targetUserId} IS NULL)
+          OR (${t.targetType} = 'usuario' AND ${t.targetUserId} IS NOT NULL AND ${t.targetProductId} IS NULL)`,
+    ),
+  ],
+)

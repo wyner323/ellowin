@@ -8,9 +8,11 @@ import { ProductCard } from "@/components/marketplace/product-card"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ReportButton } from "@/components/report-button"
 import { BADGE_META } from "@/lib/badges"
 import { accentColorHex } from "@/lib/accent-colors"
 import { getSellerStorefront } from "@/lib/marketplace"
+import { getSession } from "@/lib/session"
 import { formatDurationHours, formatLastActive, isOnline } from "@/lib/time"
 import { cn, initialsOf } from "@/lib/utils"
 
@@ -35,8 +37,9 @@ export default async function LojaPage({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const store = await getSellerStorefront(slug)
+  const [store, session] = await Promise.all([getSellerStorefront(slug), getSession()])
   if (!store) notFound()
+  const viewerId = session?.user?.id ?? null
 
   const accent = accentColorHex(store.accentColor)
   const memberSince = store.memberSince.toLocaleDateString("pt-BR", {
@@ -123,6 +126,12 @@ export default async function LojaPage({
               <ShieldCheck className="size-3.5 shrink-0" aria-hidden="true" />
               Selo de Certificação — sem registros de conta recuperada
             </p>
+          ) : null}
+
+          {viewerId && viewerId !== store.sellerId ? (
+            <div className="mt-4">
+              <ReportButton target={{ type: "usuario", targetUserId: store.sellerId }} label="Denunciar vendedor" />
+            </div>
           ) : null}
 
           {store.badges.length > 0 ? (

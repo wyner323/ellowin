@@ -21,10 +21,9 @@ const unbounded = Unbounded({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: {
-    default: 'Ellowin — Marketplace de produtos digitais para games',
-    template: '%s — Ellowin',
-  },
+  // Sem `template`: várias páginas (produto, loja, jogo, catálogo) já montam
+  // o próprio "— Ellowin" no título — um template aqui duplicaria o sufixo.
+  title: 'Ellowin — Marketplace de produtos digitais para games',
   openGraph: {
     type: 'website',
     locale: 'pt_BR',

@@ -19,6 +19,7 @@ import { StarRating } from "@/components/marketplace/star-rating"
 import { VariantPicker } from "@/components/product/variant-picker"
 import { ProductGallery } from "@/components/product/product-gallery"
 import { ProductQuestions } from "@/components/product/product-questions"
+import { ReportButton } from "@/components/report-button"
 import { Badge } from "@/components/ui/badge"
 import { accountOriginLabel, accountOriginRetainsRecoveryData } from "@/lib/account-origin"
 import { getCategory } from "@/lib/catalog"
@@ -165,6 +166,10 @@ export default async function ProductPage({
                   </Badge>
                   <Badge variant="outline">{item.deliveryTime}</Badge>
                 </div>
+
+                {viewerId && viewerId !== item.seller.id ? (
+                  <ReportButton target={{ type: "anuncio", productId: item.id }} label="Denunciar anúncio" />
+                ) : null}
 
                 {originLabel ? (
                   <div

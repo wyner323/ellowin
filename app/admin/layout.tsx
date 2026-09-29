@@ -43,6 +43,12 @@ export default async function AdminLayout({
             >
               Disputas
             </Link>
+            <Link
+              href="/admin/denuncias"
+              className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Denúncias
+            </Link>
             {staff.role === "admin" ? (
               <Link
                 href="/admin/conferencia"

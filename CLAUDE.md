@@ -126,6 +126,16 @@ cold starts otherwise open a fresh TCP connection per invocation).
   throw if the buyer's `heldCents` doesn't cover the amount, and the DB has `CHECK` constraints
   against negative wallet balances.
 
+### Reports (denúncias)
+
+Separate from disputes on purpose: a dispute is about ONE order's money and only its two parties + staff can open
+one; a report (`report` table, `lib/reports.ts` pure reasons, `lib/report-queries.ts` DB queries, `app/actions/reports.ts`) is any
+logged-in user flagging a listing or another user (scam, hijacked account, harassment) and never moves money — resolving one only
+logs a moderation record. A CHECK constraint enforces exactly one target (product XOR user). `ReportButton`
+(`components/report-button.tsx`) is the one client component for both target types; wire it wherever a listing or a public profile
+is shown for a viewer who isn't its owner. Queue at `/admin/denuncias` mirrors the dispute queue (open list + paginated closed
+history).
+
 ### Account deletion (LGPD)
 
 `lib/account-deletion.ts`: `getDeletionBlockers()` (wallet balance, active orders, active listings, staff role) must return empty
