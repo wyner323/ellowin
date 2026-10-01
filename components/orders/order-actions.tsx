@@ -89,14 +89,35 @@ export function OrderActions({
             Confira os dados recebidos antes de confirmar. A confirmação libera o
             pagamento ao vendedor e não pode ser desfeita.
           </p>
-          <Button onClick={() => run(() => confirmReceipt(orderId))} disabled={pending}>
-            {pending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="size-4" />
-            )}
-            Confirmar recebimento
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger
+              render={
+                <Button disabled={pending}>
+                  {pending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="size-4" />
+                  )}
+                  Confirmar recebimento
+                </Button>
+              }
+            />
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar recebimento?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  O pagamento é liberado para o vendedor imediatamente e essa ação não
+                  pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Voltar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => run(() => confirmReceipt(orderId))}>
+                  Confirmar recebimento
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       ) : null}
 

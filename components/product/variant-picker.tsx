@@ -5,6 +5,17 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Check, Loader2, Lock, ShieldCheck, Wallet } from "lucide-react"
 import { purchase } from "@/app/actions/orders"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { formatCents } from "@/lib/money"
 import { cn } from "@/lib/utils"
@@ -161,10 +172,32 @@ export function VariantPicker({
             </Button>
           </div>
         ) : (
-          <Button onClick={buy} disabled={pending || !selected} className="w-full">
-            {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-            Comprar agora
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger
+              render={
+                <Button disabled={pending || !selected} className="w-full">
+                  {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+                  Comprar agora
+                </Button>
+              }
+            />
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar compra?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {selected
+                    ? `${selected.label} por ${formatCents(selected.priceCents)}. `
+                    : ""}
+                  O valor sai do seu saldo agora e fica em custódia até você confirmar
+                  o recebimento.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Voltar</AlertDialogCancel>
+                <AlertDialogAction onClick={buy}>Confirmar compra</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
 
         {isAuthenticated && !isOwnProduct ? (
