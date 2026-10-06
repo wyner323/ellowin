@@ -114,7 +114,7 @@ export default async function ProductPage({
 
           {/* Abaixo de lg a ordem é galeria → resumo → compra → detalhes, para o botão de
               comprar não ficar depois de descrição, perguntas e avaliações. */}
-          <div className="grid gap-8 lg:grid-cols-[1fr_22rem]">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_22rem]">
             <div className="flex flex-col gap-8 lg:col-start-1 lg:row-start-1">
               {item.images.length > 0 ? (
                 <ProductGallery images={item.images} title={item.title} />

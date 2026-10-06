@@ -45,7 +45,7 @@ export function ForgotPasswordForm() {
         </div>
         <Link
           href="/entrar"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
+          className="inline-flex items-center gap-1.5 py-2 -my-2 text-sm font-medium text-primary underline-offset-4 hover:underline"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           Voltar para entrar
@@ -101,7 +101,7 @@ export function ForgotPasswordForm() {
 
       <p className="text-center text-sm text-muted-foreground">
         Lembrou?{" "}
-        <Link href="/entrar" className="font-medium text-primary underline-offset-4 hover:underline">
+        <Link href="/entrar" className="inline-block py-2 -my-2 font-medium text-primary underline-offset-4 hover:underline">
           Voltar para entrar
         </Link>
       </p>

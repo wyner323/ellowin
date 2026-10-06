@@ -332,7 +332,7 @@ export function RegisterWizard({ googleEnabled = false }: { googleEnabled?: bool
 
         <p className="text-center text-sm text-muted-foreground">
           Já tem conta?{" "}
-          <Link href="/entrar" className="font-medium text-primary underline-offset-4 hover:underline">
+          <Link href="/entrar" className="inline-block py-2 -my-2 font-medium text-primary underline-offset-4 hover:underline">
             Entrar
           </Link>
         </p>

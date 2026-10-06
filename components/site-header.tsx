@@ -74,6 +74,7 @@ export async function SiteHeader() {
         <nav className="ml-auto flex items-center gap-1.5">
           <MobileNav
             categories={categories.map(({ slug, name }) => ({ slug, name }))}
+            canSignUp={!session?.user}
           />
           {session?.user ? (
             <>
@@ -105,10 +106,14 @@ export async function SiteHeader() {
             </>
           ) : (
             <>
-              <Button render={<Link href="/entrar" />} variant="ghost" size="sm">
+              <Button render={<Link href="/entrar" />} variant="ghost" size="sm" className="relative before:absolute before:inset-x-0 before:-inset-y-1.5">
                 Entrar
               </Button>
-              <Button render={<Link href="/cadastro" />} size="sm">
+              <Button
+                render={<Link href="/cadastro" />}
+                size="sm"
+                className="relative hidden before:absolute before:inset-x-0 before:-inset-y-1.5 sm:inline-flex"
+              >
                 Criar conta
               </Button>
             </>

@@ -239,7 +239,11 @@ Page-level conventions: every page's `<main>` needs `id="conteudo"` (target of t
 `app/layout.tsx`); slow routes get a `loading.tsx` using `PageSkeleton`; `app/error.tsx` is the
 in-layout error boundary (it deliberately avoids `SiteHeader`, which queries the DB). The header hides
 search below `md` and the category bar below `lg`, so `components/mobile-nav.tsx` supplies both on small
-screens — keep the two in sync if you add a nav entry. On the product page the buy box sits right
+screens — keep the two in sync if you add a nav entry. Below `sm` the header's "Criar conta" button is
+hidden and lives in that menu: the two icons plus both buttons do not fit a 320–375px header, so check
+header changes at 320px (the nav's right edge must keep its 16px margin). Grid/flex children holding long
+text need `min-w-0` (a `<fieldset>` needs it explicitly), or an implicit grid track outgrows the viewport
+and the page scrolls sideways on phones. On the product page the buy box sits right
 after the title block on mobile (grid order), not after description/reviews. Product pages emit
 Open Graph + JSON-LD (`lib/product-jsonld.ts`, `<` escaped, CSP nonce); the site-wide share image is
 `app/opengraph-image.tsx`. Irreversible money actions (buy, confirm receipt, cancel) go through an

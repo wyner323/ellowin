@@ -42,12 +42,12 @@ export async function SiteFooter() {
           <div className="flex flex-wrap gap-10">
             <div className="flex flex-col gap-3">
               <h3 className="text-sm font-semibold">Catálogos</h3>
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-3">
                 {categories.map((category) => (
                   <li key={category.slug}>
                     <Link
                       href={`/catalogo/${category.slug}`}
-                      className="text-sm text-muted-foreground hover:text-primary"
+                      className="inline-block py-1 -my-1 text-sm text-muted-foreground hover:text-primary"
                     >
                       {category.name}
                     </Link>
@@ -58,12 +58,12 @@ export async function SiteFooter() {
 
             <div className="flex flex-col gap-3">
               <h3 className="text-sm font-semibold">Institucional</h3>
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-3">
                 {institucional.map((item) => (
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="text-sm text-muted-foreground hover:text-primary"
+                      className="inline-block py-1 -my-1 text-sm text-muted-foreground hover:text-primary"
                     >
                       {item.label}
                     </Link>
@@ -74,12 +74,12 @@ export async function SiteFooter() {
 
             <div className="flex flex-col gap-3">
               <h3 className="text-sm font-semibold">Sua conta</h3>
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-3">
                 {conta.map((item) => (
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="text-sm text-muted-foreground hover:text-primary"
+                      className="inline-block py-1 -my-1 text-sm text-muted-foreground hover:text-primary"
                     >
                       {item.label}
                     </Link>

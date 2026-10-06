@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Gamepad2, Menu, Search, Store, Tag, X } from 'lucide-react'
+import { Gamepad2, Menu, Search, Store, Tag, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,8 +21,11 @@ import {
  */
 export function MobileNav({
   categories,
+  canSignUp,
 }: {
   categories: { slug: string; name: string }[]
+  /** Visitante sem sessão: abaixo de `sm` o "Criar conta" do header some e vem para o menu. */
+  canSignUp: boolean
 }) {
   const pathname = usePathname()
   // Guardar o caminho em que a busca foi aberta fecha o painel sozinho ao navegar.
@@ -34,7 +37,7 @@ export function MobileNav({
       <Button
         variant="ghost"
         size="icon-sm"
-        className="md:hidden"
+        className="relative before:absolute before:-inset-1 md:hidden"
         aria-label={searchOpen ? 'Fechar busca' : 'Buscar anúncios'}
         aria-expanded={searchOpen}
         onClick={() => setOpenOn(searchOpen ? null : pathname)}
@@ -48,7 +51,7 @@ export function MobileNav({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="lg:hidden"
+              className="relative before:absolute before:-inset-1 lg:hidden"
               aria-label="Abrir menu de categorias"
             />
           }
@@ -56,6 +59,15 @@ export function MobileNav({
           <Menu className="size-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
+          {canSignUp ? (
+            <>
+              <DropdownMenuItem className="sm:hidden" render={<Link href="/cadastro" />}>
+                <UserPlus className="size-4" />
+                Criar conta
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="sm:hidden" />
+            </>
+          ) : null}
           <DropdownMenuItem render={<Link href="/jogos" />}>
             <Gamepad2 className="size-4" />
             Jogos

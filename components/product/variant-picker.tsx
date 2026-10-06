@@ -79,7 +79,7 @@ export function VariantPicker({
 
   return (
     <div className="flex flex-col gap-4">
-      <fieldset className="flex flex-col gap-2">
+      <fieldset className="flex min-w-0 flex-col gap-2">
         <legend className="pb-2 text-sm font-semibold">Escolha o item</legend>
 
         {variants.map((variant) => {
@@ -117,7 +117,7 @@ export function VariantPicker({
               </span>
 
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium">{variant.label}</span>
+                <span className="text-sm font-medium break-words">{variant.label}</span>
                 <span className="text-xs text-muted-foreground">
                   {disabled
                     ? "Esgotado"

@@ -51,7 +51,7 @@ export function GamesIndex({
           Nenhum jogo encontrado para &quot;{query}&quot;.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
           {filtered.map((game) => {
             const count = counts[game.slug] ?? 0
             return (
@@ -65,7 +65,7 @@ export function GamesIndex({
                     className="size-4 shrink-0 text-muted-foreground group-hover:text-primary"
                     aria-hidden="true"
                   />
-                  <span className="truncate font-medium">{game.name}</span>
+                  <span className="line-clamp-3 leading-snug font-medium break-words">{game.name}</span>
                 </span>
                 {count > 0 ? (
                   <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">

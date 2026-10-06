@@ -80,7 +80,7 @@ export function LoginForm({
           <Label htmlFor="password">Senha</Label>
           <Link
             href="/esqueci-senha"
-            className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+            className="inline-block py-2 -my-2 text-xs font-medium text-primary underline-offset-4 hover:underline"
           >
             Esqueci minha senha
           </Link>
@@ -121,7 +121,7 @@ export function LoginForm({
 
       <p className="text-center text-sm text-muted-foreground">
         Ainda não tem conta?{" "}
-        <Link href="/cadastro" className="font-medium text-primary underline-offset-4 hover:underline">
+        <Link href="/cadastro" className="inline-block py-2 -my-2 font-medium text-primary underline-offset-4 hover:underline">
           Criar conta
         </Link>
       </p>
