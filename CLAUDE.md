@@ -235,6 +235,16 @@ serving the old file after a re-upload.
 Styling is Tailwind v4 (`app/globals.css`, oklch tokens under `@theme inline`), theme-aware via
 `.dark` class with a `prefers-color-scheme` fallback for users with no explicit preference.
 
+Page-level conventions: every page's `<main>` needs `id="conteudo"` (target of the skip link in
+`app/layout.tsx`); slow routes get a `loading.tsx` using `PageSkeleton`; `app/error.tsx` is the
+in-layout error boundary (it deliberately avoids `SiteHeader`, which queries the DB). The header hides
+search below `md` and the category bar below `lg`, so `components/mobile-nav.tsx` supplies both on small
+screens — keep the two in sync if you add a nav entry. On the product page the buy box sits right
+after the title block on mobile (grid order), not after description/reviews. Product pages emit
+Open Graph + JSON-LD (`lib/product-jsonld.ts`, `<` escaped, CSP nonce); the site-wide share image is
+`app/opengraph-image.tsx`. Irreversible money actions (buy, confirm receipt, cancel) go through an
+`AlertDialog`; action results surface through `sonner` toasts.
+
 ### Security headers
 
 `proxy.ts` (Next 16's renamed `middleware.ts`) sets a per-request CSP nonce and applies it to all
