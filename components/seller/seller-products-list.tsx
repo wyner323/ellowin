@@ -158,7 +158,7 @@ export function SellerProductsList({
                 </div>
                 <div>
                   <dt className="text-[0.7rem] text-muted-foreground">Em estoque</dt>
-                  <dd className={cn("text-sm font-semibold tabular-nums", noStock && "text-gold")}>
+                  <dd className={cn("text-sm font-semibold tabular-nums", noStock && "text-gold-text")}>
                     {stock}
                   </dd>
                 </div>

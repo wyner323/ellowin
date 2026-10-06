@@ -50,14 +50,14 @@ export function AuthShell({ children }: { children: ReactNode }) {
                 </span>
                 <div>
                   <p className="font-medium">{title}</p>
-                  <p className="text-sm leading-relaxed text-primary-foreground/70">{text}</p>
+                  <p className="text-sm leading-relaxed text-primary-foreground/85">{text}</p>
                 </div>
               </li>
             ))}
           </ul>
         </div>
 
-        <p className="relative text-sm text-primary-foreground/60">
+        <p className="relative text-sm text-primary-foreground/80">
           Mais de 29 mil anúncios ativos em 4 catálogos.
         </p>
       </aside>

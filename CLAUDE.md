@@ -233,7 +233,11 @@ the returned URL — that cache-buster is required, or the browser/Next image op
 serving the old file after a re-upload.
 
 Styling is Tailwind v4 (`app/globals.css`, oklch tokens under `@theme inline`), theme-aware via
-`.dark` class with a `prefers-color-scheme` fallback for users with no explicit preference.
+`.dark` class with a `prefers-color-scheme` fallback for users with no explicit preference. Gold has two
+tokens on purpose: `gold` is a bright amber for fills/borders (with `gold-foreground` on top), but as
+**text** on the light theme it is only ~2:1 — use `text-gold-text` for gold text (same amber in dark,
+darker in light). Contrast was audited on both themes (computed WCAG ratio for every visible text node);
+keep body text ≥ 4.5:1 and translucent `text-*-foreground/NN` on `bg-primary` at /80 or more.
 
 Page-level conventions: every page's `<main>` needs `id="conteudo"` (target of the skip link in
 `app/layout.tsx`); slow routes get a `loading.tsx` using `PageSkeleton`; `app/error.tsx` is the

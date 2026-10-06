@@ -42,7 +42,7 @@ export function DeleteAccountSection({ blockers }: { blockers: DeletionBlocker[]
         <ul className="flex flex-col gap-2">
           {blockers.map((b) => (
             <li key={b.code} className="flex items-start gap-2 text-sm text-muted-foreground">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-gold" aria-hidden="true" />
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-gold-text" aria-hidden="true" />
               {b.message}
             </li>
           ))}

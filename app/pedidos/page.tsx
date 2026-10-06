@@ -143,7 +143,7 @@ export default async function PedidosPage({
                       amountCents={o.amountCents}
                       badge={
                         o.status === "concluido" && !o.reviewed ? (
-                          <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[0.7rem] font-medium text-gold">
+                          <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[0.7rem] font-medium text-gold-text">
                             Avaliação pendente
                           </span>
                         ) : null

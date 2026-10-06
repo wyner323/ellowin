@@ -41,7 +41,7 @@ export function SellerActionItems({ items }: { items: SellerActionItem[] }) {
     >
       <span className="flex items-center gap-2 text-sm font-semibold">
         <AlertTriangle
-          className={cn("size-4", hasUrgent ? "text-destructive" : "text-gold")}
+          className={cn("size-4", hasUrgent ? "text-destructive" : "text-gold-text")}
           aria-hidden="true"
         />
         Ações pendentes

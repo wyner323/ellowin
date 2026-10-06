@@ -60,7 +60,7 @@ export function Hero() {
               { value: '11 min', label: 'entrega média' },
             ].map((stat) => (
               <div key={stat.label} className="flex flex-col">
-                <dt className="font-display text-2xl font-bold text-gold">
+                <dt className="font-display text-2xl font-bold text-gold-text">
                   {stat.value}
                 </dt>
                 <dd className="text-xs text-muted-foreground">{stat.label}</dd>
@@ -90,7 +90,7 @@ export function Hero() {
                     {listing.seller.name} · Nível {listing.seller.level}
                   </span>
                 </div>
-                <span className="shrink-0 font-display text-sm font-bold text-gold">
+                <span className="shrink-0 font-display text-sm font-bold text-gold-text">
                   {formatBRL(listing.price)}
                 </span>
               </CardContent>
@@ -138,7 +138,7 @@ export function CategoryGrid() {
                 <span className="text-xs text-muted-foreground">
                   {category.listings.toLocaleString('pt-BR')} anúncios
                 </span>
-                <span className="text-xs font-semibold text-gold">
+                <span className="text-xs font-semibold text-gold-text">
                   a partir de {formatBRL(category.startingAt)}
                 </span>
               </div>

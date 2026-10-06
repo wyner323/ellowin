@@ -30,8 +30,8 @@ export function statusMeta(status: string) {
 export const TONE = {
   gold: {
     pill: "bg-gold text-gold-foreground",
-    tile: "bg-gold/15 text-gold",
-    text: "text-gold",
+    tile: "bg-gold/15 text-gold-text",
+    text: "text-gold-text",
     border: "border-gold/40",
   },
   primary: {

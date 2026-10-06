@@ -47,7 +47,7 @@ export function ProductCard({ card }: { card: StorefrontCard }) {
         <BadgeCheck className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
         <span className="truncate">
           {card.seller.name} ·{" "}
-          <span className="font-medium text-gold">
+          <span className="font-medium text-gold-text">
             Nível {card.seller.level}
           </span>{" "}
           · {card.seller.sales.toLocaleString("pt-BR")} vendas
@@ -57,7 +57,7 @@ export function ProductCard({ card }: { card: StorefrontCard }) {
       <div className="mt-auto flex items-end justify-between gap-2 border-t border-border pt-3">
         <div className="flex flex-col">
           <span className="text-xs text-muted-foreground">a partir de</span>
-          <span className="font-display text-lg font-bold text-gold drop-shadow-[0_0_10px_oklch(from_var(--gold)_l_c_h_/_35%)]">
+          <span className="font-display text-lg font-bold text-gold-text drop-shadow-[0_0_10px_oklch(from_var(--gold)_l_c_h_/_35%)]">
             {formatCents(card.priceCents)}
           </span>
         </div>
