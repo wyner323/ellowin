@@ -10,6 +10,7 @@ import { getStaff } from '@/lib/roles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EllowinLogo } from '@/components/ellowin-logo'
+import { MobileNav } from '@/components/mobile-nav'
 import { UserMenu } from '@/components/user-menu'
 
 export async function SiteHeader() {
@@ -71,6 +72,9 @@ export async function SiteHeader() {
         </form>
 
         <nav className="ml-auto flex items-center gap-1.5">
+          <MobileNav
+            categories={categories.map(({ slug, name }) => ({ slug, name }))}
+          />
           {session?.user ? (
             <>
               <Button
