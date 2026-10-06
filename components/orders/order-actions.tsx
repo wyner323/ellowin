@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { CheckCircle2, Loader2, PackageCheck, XCircle } from "lucide-react"
 import { cancelOrder, confirmReceipt, markDelivered } from "@/app/actions/orders"
 import { Button } from "@/components/ui/button"
@@ -40,14 +41,17 @@ export function OrderActions({
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
-  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+  function run(action: () => Promise<{ ok: boolean; error?: string; message?: string }>) {
     setError(null)
     start(async () => {
       const result = await action()
       if (!result.ok) {
-        setError(result.error ?? "Não foi possível concluir a ação.")
+        const message = result.error ?? "Não foi possível concluir a ação."
+        setError(message)
+        toast.error(message)
         return
       }
+      if (result.message) toast.success(result.message)
       router.refresh()
     })
   }

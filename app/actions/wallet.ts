@@ -120,5 +120,8 @@ export async function requestWithdrawal(amount: string): Promise<ActionResult> {
   }
 
   revalidatePath("/carteira")
-  return { ok: true, message: `Saque de ${formatCents(cents)} solicitado.` }
+  return {
+    ok: true,
+    message: `Saque de ${formatCents(cents)} registrado (simulado — nenhum Pix real foi enviado).`,
+  }
 }

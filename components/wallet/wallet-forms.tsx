@@ -26,7 +26,7 @@ export function WalletForms({ availableCents }: { availableCents: number }) {
       />
       <MoneyForm
         title="Solicitar saque"
-        description="Retira do saldo disponível — valores em custódia não entram."
+        description="Saque simulado: debita do saldo disponível, mas nenhum Pix real é enviado até o gateway entrar. Valores em custódia não entram."
         submitLabel="Sacar"
         icon="out"
         action={requestWithdrawal}

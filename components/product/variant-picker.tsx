@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Check, Loader2, Lock, ShieldCheck, Wallet } from "lucide-react"
 import { purchase } from "@/app/actions/orders"
 import {
@@ -68,8 +69,10 @@ export function VariantPicker({
         setNeeds(result.field === "email" || result.field === "profile" ? result.field : null)
         // O vendedor mudou o preço: recarrega a página pra mostrar o valor atual.
         if (result.field === "price") router.refresh()
+        toast.error(result.error ?? "Não foi possível concluir a compra.")
         return
       }
+      toast.success(result.message ?? "Compra realizada.")
       router.push(`/pedidos/${result.orderId}`)
     })
   }
