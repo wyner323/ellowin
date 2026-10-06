@@ -88,8 +88,10 @@ export default async function ProductPage({
             <span className="truncate text-foreground">{item.title}</span>
           </nav>
 
+          {/* Abaixo de lg a ordem é galeria → resumo → compra → detalhes, para o botão de
+              comprar não ficar depois de descrição, perguntas e avaliações. */}
           <div className="grid gap-8 lg:grid-cols-[1fr_22rem]">
-            <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-8 lg:col-start-1 lg:row-start-1">
               {item.images.length > 0 ? (
                 <ProductGallery images={item.images} title={item.title} />
               ) : null}
@@ -190,7 +192,25 @@ export default async function ProductPage({
                   </div>
                 ) : null}
               </header>
+            </div>
 
+            <aside className="lg:sticky lg:top-28 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
+              {item.status === "ativo" ? (
+                <VariantPicker
+                  variants={item.variants}
+                  isAuthenticated={Boolean(viewerId)}
+                  isOwnProduct={viewerId === item.seller.id}
+                  availableCents={walletSummary.availableCents}
+                />
+              ) : (
+                <p className="rounded-xl border border-border bg-muted/40 p-5 text-sm text-muted-foreground">
+                  Este anúncio está pausado pelo vendedor e não aceita compras
+                  neste momento.
+                </p>
+              )}
+            </aside>
+
+            <div className="flex flex-col gap-8 lg:col-start-1 lg:row-start-2">
               <section className="flex flex-col gap-3" aria-labelledby="descricao">
                 <h2 id="descricao" className="text-lg font-semibold">
                   Sobre este anúncio
@@ -249,22 +269,6 @@ export default async function ProductPage({
                 )}
               </section>
             </div>
-
-            <aside className="lg:sticky lg:top-28 lg:self-start">
-              {item.status === "ativo" ? (
-                <VariantPicker
-                  variants={item.variants}
-                  isAuthenticated={Boolean(viewerId)}
-                  isOwnProduct={viewerId === item.seller.id}
-                  availableCents={walletSummary.availableCents}
-                />
-              ) : (
-                <p className="rounded-xl border border-border bg-muted/40 p-5 text-sm text-muted-foreground">
-                  Este anúncio está pausado pelo vendedor e não aceita compras
-                  neste momento.
-                </p>
-              )}
-            </aside>
           </div>
         </div>
       </main>

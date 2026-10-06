@@ -81,7 +81,7 @@ export function Hero() {
                   {listing.game.slice(0, 2).toUpperCase()}
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <p className="truncate text-sm font-medium">{listing.title}</p>
+                  <p className="line-clamp-2 text-sm font-medium">{listing.title}</p>
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <BadgeCheck
                       className="size-3.5 text-primary"
