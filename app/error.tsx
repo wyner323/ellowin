@@ -35,7 +35,7 @@ export default function Error({
         </div>
       </header>
 
-      <main className="flex flex-1 items-center justify-center px-4 py-16">
+      <main id="conteudo" className="flex flex-1 items-center justify-center px-4 py-16">
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="relative h-40 w-40">
             <Image

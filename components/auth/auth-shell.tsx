@@ -62,7 +62,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
         </p>
       </aside>
 
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-12 sm:px-10">
+      <main id="conteudo" className="flex flex-1 flex-col items-center justify-center px-6 py-12 sm:px-10">
         <div className="mb-10 lg:hidden">
           <Link href="/">
             <EllowinLogo />

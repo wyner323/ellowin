@@ -92,7 +92,7 @@ export default async function ProductPage({
       <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <SiteHeader />
 
-      <main className="flex-1">
+      <main id="conteudo" className="flex-1">
         <div className="mx-auto w-full max-w-6xl px-4 py-8">
           <nav
             aria-label="Você está aqui"

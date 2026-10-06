@@ -39,7 +39,7 @@ export default async function PerguntasPage({
       <SiteHeader />
       <SellerTabs pendingQuestions={counts.pending} />
 
-      <main className="flex-1">
+      <main id="conteudo" className="flex-1">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
           <header className="flex flex-col gap-1">
             <h1 className="font-display text-2xl font-bold tracking-tight">Perguntas recebidas</h1>

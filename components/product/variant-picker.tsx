@@ -90,7 +90,7 @@ export function VariantPicker({
             <label
               key={variant.id}
               className={cn(
-                "flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors",
+                "flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
                 active
                   ? "border-primary bg-primary/5"
                   : "border-border bg-card hover:border-primary/60",

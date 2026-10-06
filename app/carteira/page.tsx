@@ -49,7 +49,7 @@ export default async function CarteiraPage({
       <LiveRefresh />
       <SiteHeader />
 
-      <main className="flex-1">
+      <main id="conteudo" className="flex-1">
         <div className="mx-auto w-full max-w-4xl px-4 py-10">
           <header className="flex flex-col gap-1">
             <h1 className="text-2xl font-semibold tracking-tight">Carteira</h1>

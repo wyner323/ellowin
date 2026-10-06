@@ -72,7 +72,7 @@ export default async function AdminLayout({
         </div>
       </div>
 
-      <main className="flex-1">{children}</main>
+      <main id="conteudo" className="flex-1">{children}</main>
 
       <SiteFooter />
     </div>

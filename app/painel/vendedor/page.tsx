@@ -270,7 +270,7 @@ export default async function PainelVendedorPage() {
       <SiteHeader />
       <SellerTabs pendingQuestions={pendingQuestions} />
 
-      <main className="flex-1">
+      <main id="conteudo" className="flex-1">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10">
           <SellerIdentityCard
             storeName={application.storeName ?? "Sua loja"}

@@ -48,7 +48,7 @@ export default async function MeusProdutosPage({
       <SiteHeader />
       <SellerTabs pendingQuestions={pendingQuestions} />
 
-      <main className="flex-1">
+      <main id="conteudo" className="flex-1">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
           <header className="flex flex-wrap items-end justify-between gap-4">
             <div className="flex flex-col gap-1">

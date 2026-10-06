@@ -53,7 +53,7 @@ export default async function LojaPage({
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
 
-      <main className="flex-1">
+      <main id="conteudo" className="flex-1">
         <div className="relative h-40 w-full overflow-hidden bg-gradient-to-br from-accent to-muted sm:h-56">
           {store.bannerUrl ? (
             <Image
