@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  centsToInput,
   feeForCents,
   formatCents,
   formatRating,
@@ -49,6 +50,15 @@ describe("parseToCents", () => {
     expect(parseToCents("10,005")).toBe(1001)
   })
 })
+
+describe("centsToInput", () => {
+  it("formata para o campo de valor e volta a ser lido igual", () => {
+    expect(centsToInput(123456)).toBe("1234,56");
+    expect(centsToInput(1000)).toBe("10,00");
+    expect(centsToInput(5)).toBe("0,05");
+    expect(parseToCents(centsToInput(98765))).toBe(98765);
+  });
+});
 
 describe("feeForCents", () => {
   it("aplica 8% (800 bps)", () => {

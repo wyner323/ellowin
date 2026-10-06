@@ -10,6 +10,7 @@ import { formatCents } from "@/lib/money"
 import { getSession } from "@/lib/session"
 import { Pagination } from "@/components/pagination"
 import { parsePage } from "@/lib/pagination"
+import { getPayoutState } from "@/lib/payout"
 import { getWalletEntriesPage, getWalletSummary } from "@/lib/wallet"
 
 export const metadata: Metadata = {
@@ -38,9 +39,10 @@ export default async function CarteiraPage({
   if (!session?.user) redirect("/entrar")
 
   const userId = session.user.id
-  const [summary, statement] = await Promise.all([
+  const [summary, statement, payout] = await Promise.all([
     getWalletSummary(userId),
     getWalletEntriesPage(userId, parsePage(sp.pagina)),
+    getPayoutState(userId),
   ])
   const { entries } = statement
 
@@ -91,7 +93,7 @@ export default async function CarteiraPage({
             <h2 id="movimentar" className="sr-only">
               Movimentar saldo
             </h2>
-            <WalletForms availableCents={summary.availableCents} />
+            <WalletForms availableCents={summary.availableCents} payout={payout} />
           </section>
 
           <section className="mt-8 flex flex-col gap-3" aria-labelledby="extrato">

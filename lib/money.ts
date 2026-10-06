@@ -19,6 +19,11 @@ export function formatCents(cents: number) {
   })
 }
 
+/** Centavos no formato de um campo de valor: 123456 → "1234,56". */
+export function centsToInput(cents: number) {
+  return (cents / 100).toFixed(2).replace(".", ",")
+}
+
 /** Converte "1.234,56", "1234.56" ou "1234" para centavos. */
 export function parseToCents(input: string): number | null {
   const raw = input.trim()
