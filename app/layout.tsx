@@ -31,7 +31,6 @@ export const metadata: Metadata = {
   },
   description:
     'Compre e venda contas de jogos, moedas, gift cards e boosting com pagamento intermediado. Cadastro verificado por CPF e email.',
-  generator: 'v0.app',
   icons: {
     icon: '/icon-32x32.png',
     apple: '/apple-icon.png',

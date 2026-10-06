@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import {
@@ -24,7 +25,9 @@ import { Badge } from "@/components/ui/badge"
 import { accountOriginLabel, accountOriginRetainsRecoveryData } from "@/lib/account-origin"
 import { getCategory } from "@/lib/catalog"
 import { getProductBySlug, getProductQuestions } from "@/lib/marketplace"
+import { buildProductJsonLd, serializeJsonLd } from "@/lib/product-jsonld"
 import { getSession } from "@/lib/session"
+import { SITE_URL } from "@/lib/site"
 import { getWalletSummary } from "@/lib/wallet"
 
 export async function generateMetadata({
@@ -36,9 +39,24 @@ export async function generateMetadata({
   const item = await getProductBySlug(slug)
   if (!item) return { title: "Anúncio não encontrado — Ellowin" }
 
+  const title = `${item.title} — Ellowin`
+  const description = item.description.slice(0, 155)
+  const image = item.images[0] ?? getCategory(item.categorySlug)?.image
+
   return {
-    title: `${item.title} — Ellowin`,
-    description: item.description.slice(0, 155),
+    title,
+    description,
+    alternates: { canonical: `/produtos/${item.slug}` },
+    openGraph: {
+      type: "website",
+      locale: "pt_BR",
+      siteName: "Ellowin",
+      title,
+      description,
+      url: `/produtos/${item.slug}`,
+      ...(image ? { images: [{ url: image }] } : {}),
+    },
+    twitter: { card: "summary_large_image", title, description },
   }
 }
 
@@ -64,8 +82,14 @@ export default async function ProductPage({
   const { positivas, neutras, negativas } = item.seller.reputation
   const totalSellerReviews = positivas + neutras + negativas
 
+  const nonce = (await headers()).get("x-nonce") ?? undefined
+  const productUrl = `${SITE_URL}/produtos/${item.slug}`
+  const fallbackImage = `${SITE_URL}${category?.image ?? "/icon-32x32.png"}`
+  const jsonLd = serializeJsonLd(buildProductJsonLd(item, productUrl, fallbackImage))
+
   return (
     <div className="flex min-h-screen flex-col">
+      <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <SiteHeader />
 
       <main className="flex-1">
