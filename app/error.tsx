@@ -3,7 +3,6 @@
 import { useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import * as Sentry from "@sentry/nextjs"
 import { RotateCw } from "lucide-react"
 import { EllowinLogo } from "@/components/ellowin-logo"
 import { Button } from "@/components/ui/button"
@@ -22,7 +21,9 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    Sentry.captureException(error)
+    // Import dinâmico e condicional: sem DSN o SDK não entra no bundle.
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN)
+      void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error))
   }, [error])
 
   return (

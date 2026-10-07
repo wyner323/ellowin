@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect } from "react"
-import * as Sentry from "@sentry/nextjs"
 
 /**
  * Erro não tratado dentro do próprio layout raiz (fora do alcance de um
@@ -16,7 +15,9 @@ export default function GlobalError({
   error: Error & { digest?: string }
 }) {
   useEffect(() => {
-    Sentry.captureException(error)
+    // Import dinâmico e condicional: sem DSN o SDK não entra no bundle.
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN)
+      void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error))
   }, [error])
 
   return (

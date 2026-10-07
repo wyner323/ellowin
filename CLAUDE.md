@@ -265,7 +265,13 @@ routes except static assets. If you add an inline `<script>`, it needs that nonc
 subpath — the main package export doesn't have it in this version) but is **inert by default**:
 `lib/sentry-shared.ts` reads `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` and sets `enabled: false` when
 neither is set, so nothing is sent and the build/deploy can't break for lack of a Sentry account.
-To activate it: create a Sentry project and set the DSN env var in Vercel; optionally
+The browser SDK is ~460 KB raw (~150 KB gzip), so it is **not in the bundle unless
+`NEXT_PUBLIC_SENTRY_DSN` is set at build time** (`instrumentation-client.ts`, `app/error.tsx` and
+`app/global-error.tsx` import it dynamically behind that check; never add a static
+`import "@sentry/nextjs"` to client code — it puts the SDK on every page). With the DSN it loads after
+hydration. A server-only `SENTRY_DSN` leaves the browser SDK off.
+To activate it: create a Sentry project, set `NEXT_PUBLIC_SENTRY_DSN` in Vercel and **redeploy** (it is
+inlined at build, a plain env change is not enough); optionally
 `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN` for source-map upload (readable stack traces)
 and `SENTRY_TRACES_SAMPLE_RATE` for performance tracing (0 by default). Runtime init lives in
 `instrumentation.ts` (server/edge, picks the config by `NEXT_RUNTIME`) and
