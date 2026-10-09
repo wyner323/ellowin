@@ -2,6 +2,8 @@ import { withSentryConfig } from "@sentry/nextjs/config"
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Não anuncia o framework/versão em cada resposta (x-powered-by: Next.js).
+  poweredByHeader: false,
   images: {
     // Otimização ligada: o Next serve AVIF/WebP no tamanho certo para cada tela,
     // reduzindo o peso das fotos dos anúncios sem esforço do vendedor.
