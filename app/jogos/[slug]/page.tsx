@@ -5,12 +5,15 @@ import { eq } from "drizzle-orm"
 import { ChevronRight, Sparkles } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
-import { ProductCard } from "@/components/marketplace/product-card"
+import { ListingFilterBar } from "@/components/marketplace/listing-filter-bar"
+import { ListingResults } from "@/components/marketplace/listing-results"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { db } from "@/lib/db"
 import { sellerApplication } from "@/lib/db/schema"
-import { getListingsByGame } from "@/lib/marketplace"
+import { activeFilterCount, parseListingFilters } from "@/lib/listing-filters"
+import { searchListings } from "@/lib/marketplace"
+import { parsePage } from "@/lib/pagination"
 import { findGameBySlug } from "@/lib/product-catalog"
 import { getSession } from "@/lib/session"
 
@@ -25,19 +28,28 @@ export async function generateMetadata({
   return {
     title: `${game.name} — Ellowin`,
     description: `Contas, moedas, itens e serviços de ${game.name} na Ellowin.`,
+    alternates: { canonical: `/jogos/${slug}` },
   }
 }
 
 export default async function JogoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const { slug } = await params
   const game = findGameBySlug(slug)
   if (!game) notFound()
 
-  const [items, session] = await Promise.all([getListingsByGame(slug), getSession()])
+  const sp = await searchParams
+  const filters = parseListingFilters(sp)
+  const [result, session] = await Promise.all([
+    searchListings({ gameSlug: slug }, filters, parsePage(sp.pagina)),
+    getSession(),
+  ])
+  const isEmpty = result.realTotal === 0 && activeFilterCount(filters) === 0
 
   let sellHref = "/vender"
   if (session?.user) {
@@ -73,18 +85,21 @@ export default async function JogoPage({
               <span className="text-foreground">{game.name}</span>
             </nav>
             <h1 className="text-3xl font-bold text-balance">{game.name}</h1>
-            <Badge variant="secondary" className="w-fit">
-              {items.length} {items.length === 1 ? "anúncio ativo" : "anúncios ativos"}
-            </Badge>
+            {/* Com filtro, o total da lista não é o total de anúncios do jogo. */}
+            {activeFilterCount(filters) === 0 ? (
+              <Badge variant="secondary" className="w-fit">
+                {result.realTotal}{" "}
+                {result.realTotal === 1 ? "anúncio ativo" : "anúncios ativos"}
+              </Badge>
+            ) : null}
           </div>
         </section>
 
         <section className="mx-auto w-full max-w-6xl px-4 py-10">
-          {items.length > 0 ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {items.map((card) => (
-                <ProductCard key={card.key} card={card} />
-              ))}
+          {!isEmpty ? (
+            <div className="flex flex-col gap-5">
+              <ListingFilterBar basePath={`/jogos/${slug}`} filters={filters} />
+              <ListingResults result={result} filters={filters} basePath={`/jogos/${slug}`} />
             </div>
           ) : (
             <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border p-10 text-center">

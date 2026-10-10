@@ -170,6 +170,16 @@ Orders (buyer and seller), the seller's listings, the wallet statement and close
 don't filter only the loaded page in a client component. The seller dashboard must not load every order: use the SQL
 aggregates in `getSellerOrderAggregates()`, and the balance chart uses `getDailyBalanceHistory()` (one point per day).
 
+### Buyer-facing listing pages (`/catalogo/[slug]`, `/jogos/[slug]`, `/busca`)
+
+Filters, sort and pagination live in the URL and run in SQL: `parseListingFilters()` (pure, `lib/listing-filters.ts`,
+params `ordem`, `min`, `max`, `entrega`, `nivel`, `avaliados`, `pagina`) → `searchListings()` in `lib/marketplace.ts`
+(24 per page) → `ListingFilterBar` (a plain GET `<form>`, no JS) + `ListingResults`. "For sale" = active product with an
+active in-stock variant (`FOR_SALE_SQL`/`MIN_PRICE_SQL`). Static demo cards are appended only in the clean view (no filter,
+default sort) and only on `/catalogo` and `/busca`; the count line counts real listings only. `entrega=imediata` reads
+`product.deliveryType`, not the free-text `deliveryTime` (legacy seed rows have values like `imediata`/`ate 24h`).
+Filtered/paged URLs canonicalize to the base path; `/busca` is `noindex`.
+
 ### SLA / auto-refund pattern
 
 `lib/sla.ts` is **pure only** (business-hour deadline math, `slaState()`, `formatDeadline()`) —

@@ -5,13 +5,16 @@ import type { Metadata } from 'next'
 import { ChevronRight } from 'lucide-react'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
-import { ProductCard } from '@/components/marketplace/product-card'
+import { ListingFilterBar } from '@/components/marketplace/listing-filter-bar'
+import { ListingResults } from '@/components/marketplace/listing-results'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { categories, getCategory } from '@/lib/catalog'
 import { categoryCardInfo } from '@/lib/home-stats'
+import { activeFilterCount, parseListingFilters } from '@/lib/listing-filters'
 import { getCategoryStats } from '@/lib/market-stats'
-import { getStorefrontCards } from '@/lib/marketplace'
+import { searchListings } from '@/lib/marketplace'
+import { parsePage } from '@/lib/pagination'
 import { formatCents } from '@/lib/money'
 
 export async function generateMetadata({
@@ -25,25 +28,34 @@ export async function generateMetadata({
   return {
     title: `${category.name} — Ellowin`,
     description: category.description,
+    // Filtros e ?pagina= não geram páginas novas para indexar.
+    alternates: { canonical: `/catalogo/${slug}` },
   }
 }
 
 export default async function CatalogPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const { slug } = await params
   const category = getCategory(slug)
   if (!category) notFound()
 
-  // Produtos cadastrados no banco vêm primeiro; os anúncios fixos completam a
-  // vitrine e ficam marcados como demonstração.
-  const [items, categoryStats] = await Promise.all([
-    getStorefrontCards({ categorySlug: slug }),
+  const sp = await searchParams
+  const filters = parseListingFilters(sp)
+
+  // Filtros, ordem e paginação rodam no banco. Os anúncios fixos só completam a
+  // vitrine sem filtro e ficam marcados como demonstração.
+  const [result, categoryStats] = await Promise.all([
+    searchListings({ categorySlug: slug }, filters, parsePage(sp.pagina)),
     getCategoryStats(),
   ])
   const info = categoryCardInfo(categoryStats[slug])
+  const isEmpty =
+    result.realTotal === 0 && result.demoTotal === 0 && activeFilterCount(filters) === 0
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -99,16 +111,15 @@ export default async function CatalogPage({
             ))}
           </div>
 
-          {items.length > 0 ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {items.map((card) => (
-                <ProductCard key={card.key} card={card} />
-              ))}
-            </div>
-          ) : (
+          {isEmpty ? (
             <p className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
               Nenhum anúncio nesta categoria ainda.
             </p>
+          ) : (
+            <div className="flex flex-col gap-5">
+              <ListingFilterBar basePath={`/catalogo/${slug}`} filters={filters} />
+              <ListingResults result={result} filters={filters} basePath={`/catalogo/${slug}`} />
+            </div>
           )}
 
           <div className="mt-10 flex flex-col items-start gap-3 rounded-xl border border-border bg-muted/40 p-6">

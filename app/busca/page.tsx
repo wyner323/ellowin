@@ -1,60 +1,51 @@
 import type { Metadata } from "next"
-import Link from "next/link"
-import { SearchX } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
-import { ProductCard } from "@/components/marketplace/product-card"
-import { Button } from "@/components/ui/button"
-import { getStorefrontCards } from "@/lib/marketplace"
+import { ListingFilterBar } from "@/components/marketplace/listing-filter-bar"
+import { ListingResults } from "@/components/marketplace/listing-results"
+import { parseListingFilters } from "@/lib/listing-filters"
+import { searchListings } from "@/lib/marketplace"
+import { parsePage } from "@/lib/pagination"
 
 export const metadata: Metadata = {
   title: "Busca",
   description: "Encontre contas, moedas, gift cards e serviços na Ellowin.",
+  // Resultados de busca mudam a cada filtro; não há o que indexar aqui.
+  robots: { index: false, follow: true },
 }
 
 export default async function BuscaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const { q = "" } = await searchParams
-  const term = q.trim()
+  const sp = await searchParams
+  const rawQuery = Array.isArray(sp.q) ? sp.q[0] : sp.q
+  const term = (rawQuery ?? "").trim().slice(0, 80)
+  const filters = parseListingFilters(sp)
 
-  const results = await getStorefrontCards(term ? { query: term } : {})
+  const result = await searchListings(
+    term ? { query: term } : {},
+    filters,
+    parsePage(sp.pagina),
+  )
 
   return (
     <>
       <SiteHeader />
-      <main id="conteudo" className="mx-auto w-full max-w-6xl px-4 py-10">
+      <main id="conteudo" className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-10">
         <h1 className="text-2xl font-semibold tracking-tight text-balance">
-          {term ? `Resultados para "${q}"` : "Todos os anúncios"}
+          {term ? `Resultados para "${term}"` : "Todos os anúncios"}
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {results.length} anúncio{results.length === 1 ? "" : "s"} encontrado
-          {results.length === 1 ? "" : "s"}
-        </p>
 
-        {results.length === 0 ? (
-          <div className="mt-12 flex flex-col items-center gap-4 rounded-xl border border-border bg-card px-6 py-16 text-center">
-            <SearchX className="size-8 text-muted-foreground" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">
-              Nenhum anúncio corresponde à sua busca.
-            </p>
-            <Button
-              render={<Link href="/busca" />}
-              variant="outline"
-              size="sm"
-            >
-              Ver todos os anúncios
-            </Button>
-          </div>
-        ) : (
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {results.map((card) => (
-              <ProductCard key={card.key} card={card} />
-            ))}
-          </div>
-        )}
+        <ListingFilterBar basePath="/busca" query={term || undefined} filters={filters} />
+        <ListingResults
+          result={result}
+          filters={filters}
+          basePath="/busca"
+          query={term || undefined}
+          gridClass="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        />
       </main>
       <SiteFooter />
     </>

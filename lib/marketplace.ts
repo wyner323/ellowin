@@ -16,6 +16,13 @@ import {
 import { getCategory, listings as demoListings } from "@/lib/catalog"
 import { computeSellerBadges } from "@/lib/badges"
 import { slugifyGame } from "@/lib/product-catalog"
+import {
+  LISTING_PAGE_SIZE,
+  deliveryRuleFor,
+  isDefaultView,
+  listingWindow,
+  type ListingFilters,
+} from "@/lib/listing-filters"
 
 /**
  * Leitura da vitrine.
@@ -70,9 +77,27 @@ function demoToCard(l: (typeof demoListings)[number]): StorefrontCard {
   }
 }
 
+/**
+ * Correlaciona com `"product"."id"` por texto (ver o comentário em `minPrice`
+ * abaixo): menor preço entre as variantes ativas e com estoque.
+ */
+const MIN_PRICE_SQL = sql`(
+  select min(v."priceCents") from "product_variant" v
+  where v."productId" = "product"."id" and v."active" = true and v."stock" > 0
+)`
+
+/** Anúncio "à venda" = pelo menos uma variante ativa com estoque (mesma regra de `lib/market-stats.ts`). */
+const FOR_SALE_SQL = sql`exists (
+  select 1 from "product_variant" v
+  where v."productId" = "product"."id" and v."active" = true and v."stock" > 0
+)`
+
 /** Query base dos anúncios reais ativos — preço mínimo, capa e loja do vendedor. */
-function activeRealProductsQuery(extraConditions: SQL[] = []) {
-  return db
+function activeRealProductsQuery(
+  extraConditions: SQL[] = [],
+  opts: { order?: SQL[]; limit?: number; offset?: number } = {},
+) {
+  const query = db
     .select({
       id: product.id,
       slug: product.slug,
@@ -106,7 +131,11 @@ function activeRealProductsQuery(extraConditions: SQL[] = []) {
     .leftJoin(user, eq(user.id, product.sellerId))
     .leftJoin(sellerApplication, eq(sellerApplication.userId, product.sellerId))
     .where(and(eq(product.status, "ativo"), ...extraConditions))
-    .orderBy(desc(product.createdAt))
+    .orderBy(...(opts.order ?? [desc(product.createdAt)]))
+    .$dynamic()
+
+  const limited = opts.limit !== undefined ? query.limit(opts.limit) : query
+  return opts.offset !== undefined ? limited.offset(opts.offset) : limited
 }
 
 type ActiveRealProductRow = Awaited<ReturnType<typeof activeRealProductsQuery>>[number]
@@ -136,21 +165,28 @@ async function getRealCards(filters: {
   categorySlug?: string
   query?: string
 }): Promise<StorefrontCard[]> {
+  const conditions = scopeConditions(filters)
+  const rows = await activeRealProductsQuery(conditions)
+  return rows.filter((r) => r.minPrice !== null).map(realRowToCard)
+}
+
+/** Recorte da lista: categoria e/ou busca por texto (título ou jogo). */
+function scopeConditions(scope: { categorySlug?: string; query?: string }): SQL[] {
   const conditions: SQL[] = []
 
-  if (filters.categorySlug) {
-    conditions.push(eq(product.categorySlug, filters.categorySlug))
+  if (scope.categorySlug) {
+    conditions.push(eq(product.categorySlug, scope.categorySlug))
   }
 
-  if (filters.query) {
-    const term = `%${filters.query.toLowerCase()}%`
+  if (scope.query) {
+    // `%` e `_` digitados pelo usuário valem como texto, não como curinga.
+    const term = `%${escapeLike(scope.query)}%`
     conditions.push(
-      sql`(lower(${product.title}) like ${term} or lower(coalesce(${product.game}, '')) like ${term})`,
+      sql`(${product.title} ilike ${term} or coalesce(${product.game}, '') ilike ${term})`,
     )
   }
 
-  const rows = await activeRealProductsQuery(conditions)
-  return rows.filter((r) => r.minPrice !== null).map(realRowToCard)
+  return conditions
 }
 
 /** Só anúncios reais (os mais recentes), para áreas que não podem exibir demonstração. */
@@ -812,10 +848,132 @@ export async function getGameListingCounts(): Promise<Record<string, number>> {
   return counts
 }
 
-/** Anúncios ativos de um jogo específico, para `/jogos/[slug]`. */
-export async function getListingsByGame(gameSlug: string): Promise<StorefrontCard[]> {
-  const rows = await activeRealProductsQuery()
-  return rows
-    .filter((r) => r.minPrice !== null && r.game && slugifyGame(r.game) === gameSlug)
-    .map(realRowToCard)
+/* ---------------------------------------------------------------------------
+ * Listas filtradas e paginadas (/catalogo, /jogos, /busca)
+ * ------------------------------------------------------------------------ */
+
+export type ListingScope = { categorySlug?: string; gameSlug?: string; query?: string }
+
+export type ListingPage = {
+  cards: StorefrontCard[]
+  /** Anúncios reais que atendem ao recorte e aos filtros (todas as páginas). */
+  realTotal: number
+  /** Cards de demonstração anexados ao fim (só na vitrine sem filtro). */
+  demoTotal: number
+  page: number
+  pages: number
+}
+
+function listingOrder(sort: ListingFilters["sort"]): SQL[] {
+  // `product.id` desempata, para a paginação não repetir nem pular itens.
+  const tiebreak = [desc(product.createdAt), desc(product.id)]
+  switch (sort) {
+    case "menor-preco":
+      return [asc(MIN_PRICE_SQL), ...tiebreak]
+    case "maior-preco":
+      return [desc(MIN_PRICE_SQL), ...tiebreak]
+    case "vendidos":
+      return [desc(product.salesCount), ...tiebreak]
+    case "avaliados":
+      // Sem avaliação vai para o fim. Entre os avaliados, a média é suavizada
+      // (3 votos "fantasma" de nota 4) para que 1 avaliação 5★ não passe à frente
+      // de 40 avaliações 4,9★.
+      return [
+        sql`(case when ${product.ratingCount} = 0 then 1 else 0 end) asc`,
+        sql`((${product.ratingSum} + 12.0) / (${product.ratingCount} + 3)) desc`,
+        desc(product.ratingCount),
+        ...tiebreak,
+      ]
+    default:
+      return tiebreak
+  }
+}
+
+function demoCardsFor(scope: ListingScope): StorefrontCard[] {
+  // Demonstração não tem recorte por jogo.
+  if (scope.gameSlug) return []
+  let demo = demoListings.map(demoToCard)
+  if (scope.categorySlug) demo = demo.filter((d) => d.categorySlug === scope.categorySlug)
+  if (scope.query) {
+    const term = scope.query.toLowerCase()
+    demo = demo.filter(
+      (d) => d.title.toLowerCase().includes(term) || (d.game ?? "").toLowerCase().includes(term),
+    )
+  }
+  return demo
+}
+
+/**
+ * Anúncios reais filtrados, ordenados e paginados no banco. Os cards de
+ * demonstração só entram na vitrine "limpa" (sem filtro, ordem padrão) e vão
+ * depois dos reais, atravessando as páginas como uma lista só.
+ */
+export async function searchListings(
+  scope: ListingScope,
+  filters: ListingFilters,
+  requestedPage: number,
+  pageSize = LISTING_PAGE_SIZE,
+): Promise<ListingPage> {
+  const conditions: SQL[] = [...scopeConditions(scope), FOR_SALE_SQL]
+
+  if (scope.gameSlug) {
+    // O jogo é texto livre em `product.game`; casa pelo slug em JS (anúncios
+    // antigos continuam certos sem migração) e filtra por nome no SQL.
+    const games = await db
+      .selectDistinct({ game: product.game })
+      .from(product)
+      .where(and(eq(product.status, "ativo"), isNotNull(product.game)))
+    const names = games
+      .map((g) => g.game)
+      .filter((g): g is string => !!g && slugifyGame(g) === scope.gameSlug)
+    if (names.length === 0) return { cards: [], realTotal: 0, demoTotal: 0, page: 1, pages: 1 }
+    conditions.push(inArray(product.game, names))
+  }
+
+  if (filters.minPriceCents !== null) conditions.push(sql`${MIN_PRICE_SQL} >= ${filters.minPriceCents}`)
+  if (filters.maxPriceCents !== null) conditions.push(sql`${MIN_PRICE_SQL} <= ${filters.maxPriceCents}`)
+  const deliveryRule = deliveryRuleFor(filters.delivery)
+  if (deliveryRule) {
+    const automatic = eq(product.deliveryType, "automatica")
+    conditions.push(
+      deliveryRule.labels.length > 0
+        ? sql`(${automatic} or ${inArray(product.deliveryTime, deliveryRule.labels)})`
+        : automatic,
+    )
+  }
+  if (filters.minLevel > 1) {
+    conditions.push(sql`coalesce(${sellerApplication.level}, 1) >= ${filters.minLevel}`)
+  }
+  if (filters.onlyReviewed) conditions.push(sql`${product.ratingCount} > 0`)
+
+  const [countRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(product)
+    .leftJoin(sellerApplication, eq(sellerApplication.userId, product.sellerId))
+    .where(and(eq(product.status, "ativo"), ...conditions))
+  const realTotal = countRow?.n ?? 0
+
+  const demo = isDefaultView(filters) ? demoCardsFor(scope) : []
+  const { page, pages, offset, limit } = resolvePage(requestedPage, realTotal + demo.length, pageSize)
+
+  // A janela [offset, offset+limit) da lista "reais + demonstração".
+  const { realOffset, realLimit, demoStart } = listingWindow(realTotal, offset, limit)
+  const rows =
+    realLimit > 0
+      ? await activeRealProductsQuery(conditions, {
+          order: listingOrder(filters.sort),
+          limit: realLimit,
+          offset: realOffset,
+        })
+      : []
+
+  const demoSlice = demo.slice(demoStart, demoStart + (limit - rows.length))
+
+  return {
+    cards: [...rows.map(realRowToCard), ...demoSlice],
+    realTotal,
+    demoTotal: demo.length,
+    page,
+    pages,
+  }
 }
