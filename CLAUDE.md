@@ -194,6 +194,13 @@ fields. To add a game, add an entry to `GAME_ATTRIBUTES` (only append options â€
 the test file checks the game exists in the catalog. Listings created before this have `{}`, so a filter excludes them until
 the seller edits the listing.
 
+### Per-game SEO text
+
+`lib/game-seo.ts` holds, for 10 games, the meta description, intro, "o que conferir" tips and FAQ shown at the end of
+`/jogos/[slug]` (`components/games/game-seo-section.tsx`; the "how buying works" steps use `AUTO_RELEASE_DAYS`). Each game must
+have its own text (a test fails on copied paragraphs), only claim what the system does, and never type a number of days (the
+test bans `N dias`). Every game that has structured attributes must also have an entry.
+
 ### SLA / auto-refund pattern
 
 `lib/sla.ts` is **pure only** (business-hour deadline math, `slaState()`, `formatDeadline()`) â€”

@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm"
 import { ChevronRight, Sparkles } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { GameSeoSection } from "@/components/games/game-seo-section"
 import { ListingFilterBar } from "@/components/marketplace/listing-filter-bar"
 import { ListingResults } from "@/components/marketplace/listing-results"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +16,7 @@ import { attributeFieldsForSlug } from "@/lib/game-attributes"
 import { activeFilterCount, parseListingFilters } from "@/lib/listing-filters"
 import { searchListings } from "@/lib/marketplace"
 import { parsePage } from "@/lib/pagination"
+import { getGameSeo } from "@/lib/game-seo"
 import { findGameBySlug } from "@/lib/product-catalog"
 import { getSession } from "@/lib/session"
 
@@ -28,7 +30,9 @@ export async function generateMetadata({
   if (!game) return { title: "Jogo não encontrado — Ellowin" }
   return {
     title: `${game.name} — Ellowin`,
-    description: `Contas, moedas, itens e serviços de ${game.name} na Ellowin.`,
+    description:
+      getGameSeo(slug)?.metaDescription ??
+      `Contas, moedas, itens e serviços de ${game.name} na Ellowin.`,
     alternates: { canonical: `/jogos/${slug}` },
   }
 }
@@ -52,6 +56,7 @@ export default async function JogoPage({
     getSession(),
   ])
   const isEmpty = result.realTotal === 0 && activeFilterCount(filters) === 0
+  const seo = getGameSeo(slug)
 
   let sellHref = "/vender"
   if (session?.user) {
@@ -125,6 +130,8 @@ export default async function JogoPage({
             </div>
           )}
         </section>
+
+        {seo ? <GameSeoSection game={game.name} seo={seo} /> : null}
       </main>
       <SiteFooter />
     </div>
