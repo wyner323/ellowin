@@ -35,7 +35,7 @@ export async function SiteFooter() {
             <EllowinLogo />
             <p className="text-sm leading-relaxed text-muted-foreground">
               Marketplace de produtos digitais para games com pagamento
-              intermediado, vendedores verificados e suporte na disputa.
+              intermediado, nível do vendedor visível e suporte na disputa.
             </p>
           </div>
 

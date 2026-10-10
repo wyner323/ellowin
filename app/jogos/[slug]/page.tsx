@@ -96,7 +96,7 @@ export default async function JogoPage({
                   Ninguém vende {game.name} na Ellowin ainda
                 </h2>
                 <p className="max-w-sm text-sm text-muted-foreground">
-                  Seja o primeiro vendedor verificado a anunciar aqui e apareça
+                  Seja o primeiro vendedor a anunciar aqui e apareça
                   para quem está procurando por {game.name}.
                 </p>
               </div>

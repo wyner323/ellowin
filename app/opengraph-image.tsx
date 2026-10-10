@@ -49,7 +49,7 @@ export default function OpengraphImage() {
         </div>
 
         <div style={{ display: "flex", gap: 16, fontSize: 26, color: "#f2b53a" }}>
-          <span>Vendedores verificados</span>
+          <span>Nível do vendedor visível</span>
           <span>·</span>
           <span>Custódia até você confirmar</span>
         </div>

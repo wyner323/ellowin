@@ -23,8 +23,8 @@ export default async function VenderPage() {
           Cadastro de vendedor
         </h1>
         <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted-foreground">
-          A Ellowin libera recursos por nível. Cada etapa concluída aumenta seu limite de vendas e
-          a confiança da sua loja na vitrine.
+          O nível do seu cadastro aparece em todos os seus anúncios, e cada etapa concluída aumenta a
+          confiança da sua loja na vitrine.
         </p>
 
         <div className="mt-8">

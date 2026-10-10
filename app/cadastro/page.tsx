@@ -8,7 +8,7 @@ import { getSession } from "@/lib/session"
 export const metadata: Metadata = {
   title: "Criar conta",
   description:
-    "Crie sua conta Ellowin com CPF validado e email confirmado para comprar e vender produtos digitais com segurança.",
+    "Crie sua conta Ellowin com CPF válido e e-mail confirmado para comprar e vender produtos digitais com segurança.",
 }
 
 export default async function CadastroPage() {

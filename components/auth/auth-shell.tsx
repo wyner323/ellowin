@@ -11,13 +11,13 @@ const HIGHLIGHTS = [
   },
   {
     icon: Lock,
-    title: "Conta verificada",
-    text: "CPF validado e email confirmado antes da primeira negociação.",
+    title: "Cadastro confirmado",
+    text: "CPF válido e e-mail confirmado antes da primeira negociação.",
   },
   {
     icon: Wallet,
     title: "Saque em PIX",
-    text: "Vendedores aprovados recebem em minutos, sem burocracia.",
+    text: "Vendedores aprovados sacam o saldo disponível para a chave Pix cadastrada.",
   },
 ]
 

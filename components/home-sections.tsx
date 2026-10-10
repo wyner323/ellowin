@@ -31,7 +31,7 @@ export async function Hero() {
             className="animate-in fade-in slide-in-from-bottom-2 gap-1.5 fill-mode-both duration-500"
           >
             <Fingerprint className="size-3.5" aria-hidden="true" />
-            Cadastro verificado por CPF e email
+            CPF válido e e-mail confirmado
           </Badge>
           <h1 className="animate-in fade-in slide-in-from-bottom-3 text-4xl leading-tight font-bold text-balance fill-mode-both delay-75 duration-700 sm:text-5xl">
             O marketplace de produtos digitais onde o dinheiro só sai depois da
@@ -39,7 +39,7 @@ export async function Hero() {
           </h1>
           <p className="animate-in fade-in slide-in-from-bottom-3 max-w-xl text-base leading-relaxed text-muted-foreground text-pretty fill-mode-both delay-150 duration-700">
             Contas de jogos, moedas, gift cards e boosting de vendedores
-            verificados. A Ellowin retém o pagamento até você confirmar que
+            com nível visível no anúncio. A Ellowin retém o pagamento até você confirmar que
             recebeu o que comprou.
           </p>
           <div className="animate-in fade-in slide-in-from-bottom-3 flex flex-wrap items-center gap-3 fill-mode-both delay-200 duration-700">
@@ -282,12 +282,12 @@ export function TrustSection() {
       <div className="flex flex-col gap-8 rounded-2xl border border-border bg-card p-8 lg:flex-row lg:items-center">
         <div className="flex flex-1 flex-col gap-4">
           <h2 className="text-2xl font-bold text-balance">
-            Cada vendedor passa por níveis de verificação
+            Cada vendedor tem um nível de cadastro
           </h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            O nível aparece em todo anúncio. Quanto maior o nível, maior o limite
-            de venda e menor a taxa — e nada é liberado sem CPF válido e email
-            confirmado.
+            O nível aparece em todo anúncio e mostra quantas etapas do cadastro o
+            vendedor concluiu. Para comprar ou vender, é preciso ter CPF válido e
+            e-mail confirmado.
           </p>
           <Button
             render={<Link href="/vender" />}
@@ -299,10 +299,10 @@ export function TrustSection() {
 
         <ul className="flex flex-1 flex-col gap-3">
           {[
-            { level: 1, label: 'Email confirmado', limit: 'até R$ 500/mês' },
-            { level: 2, label: 'Telefone confirmado', limit: 'até R$ 2.500/mês' },
-            { level: 3, label: 'CPF e documento validados', limit: 'até R$ 15.000/mês' },
-            { level: 4, label: 'Dados de saque confirmados', limit: 'sem limite mensal' },
+            { level: 1, label: 'E-mail confirmado' },
+            { level: 2, label: 'Telefone informado' },
+            { level: 3, label: 'CPF e documento enviados' },
+            { level: 4, label: 'Dados de saque cadastrados' },
           ].map((item) => (
             <li
               key={item.level}
@@ -312,7 +312,6 @@ export function TrustSection() {
                 N{item.level}
               </span>
               <span className="flex-1 text-sm font-medium">{item.label}</span>
-              <span className="text-xs text-muted-foreground">{item.limit}</span>
             </li>
           ))}
         </ul>
