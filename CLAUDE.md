@@ -196,6 +196,15 @@ merged in `getStorefrontCards()` so the vitrine never looks empty while the mark
 Demo cards are visually marked and non-clickable (`source: "demo"`, `href: null`). Don't assume
 every card rendered by `ProductCard` corresponds to a database row.
 
+**Public numbers must come from the database, never from constants.** The home hero stats, category
+counts/"a partir de" prices and the "Jogos com anúncios" strip read `lib/market-stats.ts` (raw SQL; "for
+sale" = active product with an active variant in stock, the same rule as the cards) and are formatted by
+the pure `lib/home-stats.ts`, which hides the average rating until ≥ 20 reviews and the average delivery
+time until ≥ 20 deliveries (and `Novo na Ellowin` for an empty category) instead of printing a fragile or
+invented figure. Legacy demo orders 1–5 are excluded from delivery averages. The static `lib/catalog.ts`
+no longer carries `listings`/`startingAt` for categories — don't re-add them. Hero cards are real listings
+only (`getRealStorefrontCards`); demo cards stay confined to the labeled "demonstração" fallback.
+
 ### Seller listing flow: catalog-driven suggestions
 
 `lib/product-catalog.ts` holds a static list of ~190 games/categories plus a small set of generic
