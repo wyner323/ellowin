@@ -17,6 +17,7 @@ import {
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { StarRating } from "@/components/marketplace/star-rating"
+import { BuyerProtection } from "@/components/product/buyer-protection"
 import { VariantPicker } from "@/components/product/variant-picker"
 import { ProductGallery } from "@/components/product/product-gallery"
 import { ProductQuestions } from "@/components/product/product-questions"
@@ -218,14 +219,18 @@ export default async function ProductPage({
               </header>
             </div>
 
-            <aside className="lg:sticky lg:top-28 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
+            {/* Sticky só quando a coluna inteira cabe na altura da janela; senão o fim do bloco ficaria cortado. */}
+            <aside className="lg:top-28 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start [@media(min-width:1024px)_and_(min-height:780px)]:sticky">
               {item.status === "ativo" ? (
-                <VariantPicker
-                  variants={item.variants}
-                  isAuthenticated={Boolean(viewerId)}
-                  isOwnProduct={viewerId === item.seller.id}
-                  availableCents={walletSummary.availableCents}
-                />
+                <>
+                  <VariantPicker
+                    variants={item.variants}
+                    isAuthenticated={Boolean(viewerId)}
+                    isOwnProduct={viewerId === item.seller.id}
+                    availableCents={walletSummary.availableCents}
+                  />
+                  <BuyerProtection />
+                </>
               ) : (
                 <p className="rounded-xl border border-border bg-muted/40 p-5 text-sm text-muted-foreground">
                   Este anúncio está pausado pelo vendedor e não aceita compras
