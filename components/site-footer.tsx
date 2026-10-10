@@ -6,6 +6,7 @@ import { EllowinLogo } from '@/components/ellowin-logo'
 
 const institucional = [
   { label: 'Como funciona', href: '/#como-funciona' },
+  { label: 'Central de ajuda', href: '/ajuda' },
   { label: 'Seja vendedor', href: '/vender' },
   { label: 'Central de segurança', href: '/#seguranca' },
   { label: 'Verificador de contas', href: '/verificador' },
