@@ -15,6 +15,7 @@ import {
 } from "@/lib/db/schema"
 import { getCategory, listings as demoListings } from "@/lib/catalog"
 import { computeSellerBadges } from "@/lib/badges"
+import { positivePercent } from "@/lib/card-info"
 import { slugifyGame } from "@/lib/product-catalog"
 import {
   LISTING_PAGE_SIZE,
@@ -50,6 +51,13 @@ export type StorefrontCard = {
     rating: number | null
     sales: number
   }
+  /** Entrega automática (lido de `product.deliveryType`). Demonstração: false. */
+  instant: boolean
+  ratingCount: number
+  /** % de avaliações 4★ ou 5★; null enquanto houver poucas avaliações para o número fazer sentido. */
+  positivePct: number | null
+  /** Unidades em estoque somando as variantes ativas; null na demonstração. */
+  stock: number | null
 }
 
 /** Imagem da categoria, usada como fallback quando o anúncio não tem foto. */
@@ -74,6 +82,10 @@ function demoToCard(l: (typeof demoListings)[number]): StorefrontCard {
       rating: l.seller.rating,
       sales: l.seller.sales,
     },
+    instant: false,
+    ratingCount: 0,
+    positivePct: null,
+    stock: null,
   }
 }
 
@@ -105,6 +117,7 @@ function activeRealProductsQuery(
       categorySlug: product.categorySlug,
       game: product.game,
       deliveryTime: product.deliveryTime,
+      deliveryType: product.deliveryType,
       ratingSum: product.ratingSum,
       ratingCount: product.ratingCount,
       salesCount: product.salesCount,
@@ -120,6 +133,14 @@ function activeRealProductsQuery(
       minPrice: sql<number>`(
         select min(v."priceCents") from "product_variant" v
         where v."productId" = "product"."id" and v."active" = true and v."stock" > 0
+      )`,
+      stockTotal: sql<number>`(
+        select coalesce(sum(v."stock"), 0)::int from "product_variant" v
+        where v."productId" = "product"."id" and v."active" = true
+      )`,
+      positiveCount: sql<number>`(
+        select count(*)::int from "review" rv
+        where rv."productId" = "product"."id" and rv."rating" >= 4
       )`,
       coverUrl: sql<string | null>`(
         select img."url" from "product_image" img
@@ -157,6 +178,10 @@ function realRowToCard(r: ActiveRealProductRow): StorefrontCard {
       rating: r.ratingCount > 0 ? Math.round((r.ratingSum / r.ratingCount) * 10) / 10 : null,
       sales: r.salesCount,
     },
+    instant: r.deliveryType === "automatica",
+    ratingCount: r.ratingCount,
+    positivePct: positivePercent(r.positiveCount, r.ratingCount),
+    stock: Number(r.stockTotal),
   }
 }
 
@@ -764,31 +789,10 @@ export async function getSellerStorefront(slug: string) {
     getSellerAccountFlagSummary(row.sellerId),
   ])
 
-  const activeProducts = await db
-    .select({
-      id: product.id,
-      slug: product.slug,
-      title: product.title,
-      categorySlug: product.categorySlug,
-      game: product.game,
-      deliveryTime: product.deliveryTime,
-      ratingSum: product.ratingSum,
-      ratingCount: product.ratingCount,
-      // Ver o comentário equivalente em activeRealProductsQuery: correlaciona
-      // por texto ("product"."id"), não interpolando o Column do Drizzle.
-      minPrice: sql<number>`(
-        select min(v."priceCents") from "product_variant" v
-        where v."productId" = "product"."id" and v."active" = true and v."stock" > 0
-      )`,
-      coverUrl: sql<string | null>`(
-        select img."url" from "product_image" img
-        where img."productId" = "product"."id"
-        order by img."sortOrder" asc, img."id" asc limit 1
-      )`,
-    })
-    .from(product)
-    .where(and(eq(product.sellerId, row.sellerId), eq(product.status, "ativo")))
-    .orderBy(desc(product.createdAt))
+  const activeProducts = await activeRealProductsQuery([
+    eq(product.sellerId, row.sellerId),
+    FOR_SALE_SQL,
+  ])
 
   const disputesCount = Number(disputeRow[0]?.count ?? 0)
 
@@ -808,20 +812,16 @@ export async function getSellerStorefront(slug: string) {
     delivery,
     accountFlags,
     badges: computeSellerBadges({ ...stats, disputesCount }),
-    products: activeProducts
-      .filter((p) => p.minPrice !== null)
-      .map((p) => ({
-        key: `real-${p.id}`,
-        source: "real" as const,
-        title: p.title,
-        categorySlug: p.categorySlug,
-        game: p.game,
-        priceCents: Number(p.minPrice),
-        delivery: p.deliveryTime,
-        imageUrl: p.coverUrl ?? categoryImage(p.categorySlug),
-        href: `/produtos/${p.slug}`,
-        seller: { name: row.storeName ?? row.displayName ?? row.name, level: row.level, rating: stats.rating, sales: stats.salesCount },
-      })),
+    // Na loja, o selo de reputação do card é o da loja (não o da nota isolada do anúncio).
+    products: activeProducts.map((p) => ({
+      ...realRowToCard(p),
+      seller: {
+        name: row.storeName ?? row.displayName ?? row.name,
+        level: row.level,
+        rating: stats.rating,
+        sales: stats.salesCount,
+      },
+    })),
   }
 }
 

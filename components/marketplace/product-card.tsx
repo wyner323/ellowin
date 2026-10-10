@@ -1,8 +1,9 @@
 import Link from "next/link"
 import Image from "next/image"
-import { BadgeCheck } from "lucide-react"
+import { BadgeCheck, ThumbsUp, Zap } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { StarRating } from "@/components/marketplace/star-rating"
+import { stockHint } from "@/lib/card-info"
 import type { StorefrontCard } from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
 
@@ -14,6 +15,7 @@ import { formatCents } from "@/lib/money"
  * não existe no banco. A capa é otimizada pelo Next (AVIF/WebP responsivo).
  */
 export function ProductCard({ card }: { card: StorefrontCard }) {
+  const lowStock = stockHint(card.stock)
   const cover = (
     <div className="relative aspect-[4/3] overflow-hidden bg-muted">
       <Image
@@ -35,7 +37,7 @@ export function ProductCard({ card }: { card: StorefrontCard }) {
         {card.source === "demo" ? (
           <span className="text-xs text-muted-foreground">demonstração</span>
         ) : (
-          <StarRating rating={card.seller.rating} />
+          <StarRating rating={card.seller.rating} count={card.ratingCount} />
         )}
       </div>
 
@@ -54,6 +56,28 @@ export function ProductCard({ card }: { card: StorefrontCard }) {
         </span>
       </p>
 
+      {card.instant || card.positivePct !== null || lowStock ? (
+        <ul className="mt-2.5 flex flex-wrap gap-1.5 text-[0.7rem] font-medium">
+          {card.instant ? (
+            <li className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-success">
+              <Zap className="size-3" aria-hidden="true" />
+              Entrega imediata
+            </li>
+          ) : null}
+          {card.positivePct !== null ? (
+            <li className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-foreground">
+              <ThumbsUp className="size-3 text-muted-foreground" aria-hidden="true" />
+              {card.positivePct}% positivas
+            </li>
+          ) : null}
+          {lowStock ? (
+            <li className="inline-flex items-center rounded-full bg-gold/15 px-2 py-0.5 text-gold-text">
+              {lowStock}
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+
       <div className="mt-auto flex items-end justify-between gap-2 border-t border-border pt-3">
         <div className="flex flex-col">
           <span className="text-xs text-muted-foreground">a partir de</span>
@@ -61,9 +85,11 @@ export function ProductCard({ card }: { card: StorefrontCard }) {
             {formatCents(card.priceCents)}
           </span>
         </div>
-        <span className="pb-1 text-right text-xs text-muted-foreground">
-          {card.delivery}
-        </span>
+        {card.instant ? null : (
+          <span className="pb-1 text-right text-xs text-muted-foreground">
+            {card.delivery}
+          </span>
+        )}
       </div>
     </div>
   )
