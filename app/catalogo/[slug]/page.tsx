@@ -8,8 +8,11 @@ import { SiteFooter } from '@/components/site-footer'
 import { ProductCard } from '@/components/marketplace/product-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { categories, formatBRL, getCategory } from '@/lib/catalog'
+import { categories, getCategory } from '@/lib/catalog'
+import { categoryCardInfo } from '@/lib/home-stats'
+import { getCategoryStats } from '@/lib/market-stats'
 import { getStorefrontCards } from '@/lib/marketplace'
+import { formatCents } from '@/lib/money'
 
 export async function generateMetadata({
   params,
@@ -36,7 +39,11 @@ export default async function CatalogPage({
 
   // Produtos cadastrados no banco vêm primeiro; os anúncios fixos completam a
   // vitrine e ficam marcados como demonstração.
-  const items = await getStorefrontCards({ categorySlug: slug })
+  const [items, categoryStats] = await Promise.all([
+    getStorefrontCards({ categorySlug: slug }),
+    getCategoryStats(),
+  ])
+  const info = categoryCardInfo(categoryStats[slug])
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -60,12 +67,10 @@ export default async function CatalogPage({
                 {category.description}
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <Badge variant="secondary">
-                  {category.listings.toLocaleString('pt-BR')} anúncios
-                </Badge>
-                <Badge variant="outline">
-                  a partir de {formatBRL(category.startingAt)}
-                </Badge>
+                <Badge variant="secondary">{info.countLabel}</Badge>
+                {info.fromCents !== null ? (
+                  <Badge variant="outline">a partir de {formatCents(info.fromCents)}</Badge>
+                ) : null}
               </div>
             </div>
             <div className="relative aspect-[4/3] w-full max-w-64 shrink-0 overflow-hidden rounded-xl border border-border">

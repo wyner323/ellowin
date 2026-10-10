@@ -153,6 +153,11 @@ async function getRealCards(filters: {
   return rows.filter((r) => r.minPrice !== null).map(realRowToCard)
 }
 
+/** Só anúncios reais (os mais recentes), para áreas que não podem exibir demonstração. */
+export async function getRealStorefrontCards(limit: number): Promise<StorefrontCard[]> {
+  return (await getRealCards({})).slice(0, limit)
+}
+
 /** Produtos reais primeiro, anúncios de demonstração depois. */
 export async function getStorefrontCards(filters: {
   categorySlug?: string

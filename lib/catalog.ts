@@ -4,8 +4,6 @@ export type Category = {
   tagline: string
   description: string
   image: string
-  listings: number
-  startingAt: number
 }
 
 export type Listing = {
@@ -32,8 +30,6 @@ export const categories: Category[] = [
     description:
       'Contas completas de Valorant, League of Legends, CS2, Free Fire e mais, com transferência acompanhada pela Ellowin.',
     image: '/images/cat-contas.png',
-    listings: 12480,
-    startingAt: 19.9,
   },
   {
     slug: 'moedas',
@@ -42,8 +38,6 @@ export const categories: Category[] = [
     description:
       'Robux, V-Bucks, Diamantes, FIFA Coins e gold de MMO entregues por vendedores verificados.',
     image: '/images/cat-moedas.png',
-    listings: 8320,
-    startingAt: 4.5,
   },
   {
     slug: 'gift-cards',
@@ -52,8 +46,6 @@ export const categories: Category[] = [
     description:
       'Créditos de Steam, PlayStation, Xbox, Nintendo e recargas de jogos com código validado antes da liberação.',
     image: '/images/cat-giftcards.png',
-    listings: 5610,
-    startingAt: 9.9,
   },
   {
     slug: 'boosting',
@@ -62,8 +54,6 @@ export const categories: Category[] = [
     description:
       'Subida de elo, farm de missões, conquistas e coaching com prestadores avaliados pela comunidade.',
     image: '/images/cat-boosting.png',
-    listings: 3140,
-    startingAt: 29.9,
   },
 ]
 

@@ -12,10 +12,16 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { ProductCard } from '@/components/marketplace/product-card'
-import { categories, formatBRL, games, listings } from '@/lib/catalog'
-import { getStorefrontCards } from '@/lib/marketplace'
+import { categories } from '@/lib/catalog'
+import { buildHeroStats, categoryCardInfo } from '@/lib/home-stats'
+import { getCategoryStats, getListedGames, getMarketStats } from '@/lib/market-stats'
+import { getRealStorefrontCards, getStorefrontCards } from '@/lib/marketplace'
+import { formatCents } from '@/lib/money'
 
-export function Hero() {
+export async function Hero() {
+  const [stats, heroCards] = await Promise.all([getMarketStats(), getRealStorefrontCards(3)])
+  const heroStats = buildHeroStats(stats)
+
   return (
     <section className="border-b border-border bg-gradient-to-b from-accent/60 to-background">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-14 lg:flex-row lg:items-center lg:py-20">
@@ -53,56 +59,60 @@ export function Hero() {
               Quero vender
             </Button>
           </div>
-          <dl className="animate-in fade-in slide-in-from-bottom-3 flex flex-wrap gap-x-8 gap-y-3 pt-2 fill-mode-both delay-300 duration-700">
-            {[
-              { value: '29.5k', label: 'anúncios ativos' },
-              { value: '4.9/5', label: 'avaliação média' },
-              { value: '11 min', label: 'entrega média' },
-            ].map((stat) => (
-              <div key={stat.label} className="flex flex-col">
-                <dt className="font-display text-2xl font-bold text-gold-text">
-                  {stat.value}
-                </dt>
-                <dd className="text-xs text-muted-foreground">{stat.label}</dd>
-              </div>
-            ))}
-          </dl>
+          {heroStats.length > 0 ? (
+            <dl className="animate-in fade-in slide-in-from-bottom-3 flex flex-wrap gap-x-8 gap-y-3 pt-2 fill-mode-both delay-300 duration-700">
+              {heroStats.map((stat) => (
+                <div key={stat.label} className="flex flex-col">
+                  <dt className="font-display text-2xl font-bold text-gold-text">
+                    {stat.value}
+                  </dt>
+                  <dd className="text-xs text-muted-foreground">{stat.label}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
         </div>
 
-        <div className="flex flex-1 flex-col gap-3">
-          {listings.slice(0, 3).map((listing, index) => (
-            <Card
-              key={listing.id}
-              style={{ animationDelay: `${150 + index * 100}ms` }}
-              className="animate-in fade-in slide-in-from-right-4 border-border/70 fill-mode-both duration-700 transition-all hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <CardContent className="flex items-center gap-4 p-4">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent font-display text-sm font-bold text-accent-foreground">
-                  {listing.game.slice(0, 2).toUpperCase()}
-                </span>
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <p className="line-clamp-2 text-sm font-medium">{listing.title}</p>
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <BadgeCheck
-                      className="size-3.5 text-primary"
-                      aria-hidden="true"
-                    />
-                    {listing.seller.name} · Nível {listing.seller.level}
-                  </span>
-                </div>
-                <span className="shrink-0 font-display text-sm font-bold text-gold-text">
-                  {formatBRL(listing.price)}
-                </span>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {heroCards.length > 0 ? (
+          <div className="flex flex-1 flex-col gap-3">
+            {heroCards.map((card, index) => (
+              <Link key={card.key} href={card.href ?? '/'} className="block">
+                <Card
+                  style={{ animationDelay: `${150 + index * 100}ms` }}
+                  className="animate-in fade-in slide-in-from-right-4 border-border/70 fill-mode-both duration-700 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <CardContent className="flex items-center gap-4 p-4">
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent font-display text-sm font-bold text-accent-foreground">
+                      {(card.game ?? 'Digital').slice(0, 2).toUpperCase()}
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <p className="line-clamp-2 text-sm font-medium">{card.title}</p>
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <BadgeCheck
+                          className="size-3.5 shrink-0 text-primary"
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">{card.seller.name}</span>
+                        <span className="shrink-0">· Nível {card.seller.level}</span>
+                      </span>
+                    </div>
+                    <span className="shrink-0 font-display text-sm font-bold text-gold-text">
+                      {formatCents(card.priceCents)}
+                    </span>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   )
 }
 
-export function CategoryGrid() {
+export async function CategoryGrid() {
+  const categoryStats = await getCategoryStats()
+
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-14" id="catalogos">
       <div className="flex flex-col gap-2">
@@ -114,7 +124,9 @@ export function CategoryGrid() {
       </div>
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {categories.map((category) => (
+        {categories.map((category) => {
+          const info = categoryCardInfo(categoryStats[category.slug])
+          return (
           <Link
             key={category.slug}
             href={`/catalogo/${category.slug}`}
@@ -135,33 +147,37 @@ export function CategoryGrid() {
                 {category.tagline}
               </p>
               <div className="mt-auto flex items-center justify-between pt-3">
-                <span className="text-xs text-muted-foreground">
-                  {category.listings.toLocaleString('pt-BR')} anúncios
-                </span>
-                <span className="text-xs font-semibold text-gold-text">
-                  a partir de {formatBRL(category.startingAt)}
-                </span>
+                <span className="text-xs text-muted-foreground">{info.countLabel}</span>
+                {info.fromCents !== null ? (
+                  <span className="text-xs font-semibold text-gold-text">
+                    a partir de {formatCents(info.fromCents)}
+                  </span>
+                ) : null}
               </div>
             </div>
           </Link>
-        ))}
+          )
+        })}
       </div>
     </section>
   )
 }
 
-export function GameStrip() {
+export async function GameStrip() {
+  const listedGames = await getListedGames(10)
+  if (listedGames.length === 0) return null
+
   return (
     <section className="border-y border-border bg-muted/40">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-2 px-4 py-6">
-        <span className="mr-2 text-sm font-semibold">Jogos em alta</span>
-        {games.map((game) => (
+        <span className="mr-2 text-sm font-semibold">Jogos com anúncios</span>
+        {listedGames.map((game) => (
           <Link
-            key={game}
-            href="/catalogo/contas"
+            key={game.slug}
+            href={`/jogos/${game.slug}`}
             className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:text-primary hover:shadow-sm"
           >
-            {game}
+            {game.name}
           </Link>
         ))}
       </div>
@@ -179,7 +195,7 @@ export async function FeaturedListings() {
         <div className="flex flex-col gap-2">
           <h2 className="text-2xl font-bold sm:text-3xl">Anúncios em destaque</h2>
           <p className="text-sm text-muted-foreground">
-            Selecionados entre vendedores de nível 3 ou superior.
+            Os anúncios mais recentes da Ellowin.
           </p>
         </div>
         <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
