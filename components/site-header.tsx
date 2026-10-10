@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EllowinLogo } from '@/components/ellowin-logo'
 import { MobileNav } from '@/components/mobile-nav'
+import { SearchShortcut } from '@/components/search-shortcut'
 import { UserMenu } from '@/components/user-menu'
 
 export async function SiteHeader() {
@@ -68,7 +69,10 @@ export async function SiteHeader() {
             placeholder="Busque por jogo, conta, moedas ou gift card"
             className="h-10 pl-9"
             aria-label="Buscar anúncios"
+            aria-keyshortcuts="/"
+            title="Atalho: tecla /"
           />
+          <SearchShortcut />
         </form>
 
         <nav className="ml-auto flex items-center gap-1.5">

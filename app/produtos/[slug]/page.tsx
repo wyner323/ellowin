@@ -18,6 +18,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { BuyerProtection } from "@/components/product/buyer-protection"
+import { RelatedListings } from "@/components/product/related-listings"
 import { VariantPicker } from "@/components/product/variant-picker"
 import { ProductGallery } from "@/components/product/product-gallery"
 import { ProductQuestions } from "@/components/product/product-questions"
@@ -25,7 +26,8 @@ import { ReportButton } from "@/components/report-button"
 import { Badge } from "@/components/ui/badge"
 import { accountOriginLabel, accountOriginRetainsRecoveryData } from "@/lib/account-origin"
 import { getCategory } from "@/lib/catalog"
-import { getProductBySlug, getProductQuestions } from "@/lib/marketplace"
+import { getProductBySlug, getProductQuestions, getRelatedListings } from "@/lib/marketplace"
+import { findGameBySlug, slugifyGame } from "@/lib/product-catalog"
 import { buildProductJsonLd, serializeJsonLd } from "@/lib/product-jsonld"
 import { getSession } from "@/lib/session"
 import { SITE_URL } from "@/lib/site"
@@ -72,12 +74,27 @@ export default async function ProductPage({
 
   const session = await getSession()
   const viewerId = session?.user?.id ?? null
-  const [walletSummary, questions] = await Promise.all([
+  const [walletSummary, questions, related] = await Promise.all([
     viewerId ? getWalletSummary(viewerId) : Promise.resolve({ availableCents: 0, heldCents: 0 }),
     getProductQuestions(item.id),
+    getRelatedListings({
+      id: item.id,
+      game: item.game,
+      categorySlug: item.categorySlug,
+      sellerId: item.seller.id,
+    }),
   ])
 
   const category = getCategory(item.categorySlug)
+  // Mesmo jogo → página do jogo (se existir no catálogo); sem jogo → a categoria.
+  const gameSlug = item.game ? slugifyGame(item.game) : null
+  const relatedTitle = item.game ? `Mais de ${item.game}` : `Mais em ${category?.name ?? "esta categoria"}`
+  const relatedHref =
+    gameSlug && findGameBySlug(gameSlug)
+      ? `/jogos/${gameSlug}`
+      : item.game
+        ? `/busca?q=${encodeURIComponent(item.game)}`
+        : `/catalogo/${item.categorySlug}`
   const originLabel = accountOriginLabel(item.accountOrigin)
   const originRetainsRecovery = accountOriginRetainsRecoveryData(item.accountOrigin)
   const { positivas, neutras, negativas } = item.seller.reputation
@@ -299,6 +316,15 @@ export default async function ProductPage({
               </section>
             </div>
           </div>
+
+          <RelatedListings
+            sameGame={related.sameGame}
+            sameGameTitle={relatedTitle}
+            sameGameHref={relatedHref}
+            sameSeller={related.sameSeller}
+            sellerName={item.seller.name}
+            sellerHref={item.seller.storeSlug ? `/loja/${item.seller.storeSlug}` : null}
+          />
         </div>
       </main>
 

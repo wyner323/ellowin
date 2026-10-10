@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, sql, type SQL } from "drizzle-orm"
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, sql, type SQL } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { escapeLike, resolvePage } from "@/lib/pagination"
 import {
@@ -846,6 +846,39 @@ export async function getGameListingCounts(): Promise<Record<string, number>> {
     counts[slug] = (counts[slug] ?? 0) + 1
   }
   return counts
+}
+
+/**
+ * Outros anúncios para o fim da página de um anúncio: do mesmo jogo (ou, sem
+ * jogo, da mesma categoria) e da mesma loja, sem repetir o anúncio atual nem
+ * repetir um card entre as duas listas.
+ */
+export async function getRelatedListings(
+  base: { id: number; game: string | null; categorySlug: string; sellerId: string },
+  limit = 4,
+): Promise<{ sameGame: StorefrontCard[]; sameSeller: StorefrontCard[] }> {
+  const notSelf = ne(product.id, base.id)
+  const sameGameRows = await activeRealProductsQuery(
+    [
+      notSelf,
+      FOR_SALE_SQL,
+      base.game ? eq(product.game, base.game) : eq(product.categorySlug, base.categorySlug),
+    ],
+    { limit },
+  )
+  const taken = new Set(sameGameRows.map((r) => r.id))
+  const sellerRows = await activeRealProductsQuery(
+    [notSelf, FOR_SALE_SQL, eq(product.sellerId, base.sellerId)],
+    { limit: limit + taken.size },
+  )
+
+  return {
+    sameGame: sameGameRows.map(realRowToCard),
+    sameSeller: sellerRows
+      .filter((r) => !taken.has(r.id))
+      .slice(0, limit)
+      .map(realRowToCard),
+  }
 }
 
 /* ---------------------------------------------------------------------------

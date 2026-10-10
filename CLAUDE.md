@@ -178,7 +178,10 @@ params `ordem`, `min`, `max`, `entrega`, `nivel`, `avaliados`, `pagina`) → `se
 active in-stock variant (`FOR_SALE_SQL`/`MIN_PRICE_SQL`). Static demo cards are appended only in the clean view (no filter,
 default sort) and only on `/catalogo` and `/busca`; the count line counts real listings only. `entrega=imediata` reads
 `product.deliveryType`, not the free-text `deliveryTime` (legacy seed rows have values like `imediata`/`ate 24h`).
-Filtered/paged URLs canonicalize to the base path; `/busca` is `noindex`.
+Filtered/paged URLs canonicalize to the base path; `/busca` is `noindex`. Card extras (`instant`, `positivePct` from
+≥ 5 reviews, "últimas N unidades" at ≤ 5 in stock) come from the same query and the pure `lib/card-info.ts`. The product
+page ends with `getRelatedListings()` (same game/category + same store); the header search has a `/` shortcut
+(`components/search-shortcut.tsx`).
 
 ### SLA / auto-refund pattern
 
