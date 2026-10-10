@@ -262,6 +262,20 @@ Open Graph + JSON-LD (`lib/product-jsonld.ts`, `<` escaped, CSP nonce); the site
 `app/opengraph-image.tsx`. Irreversible money actions (buy, confirm receipt, cancel) go through an
 `AlertDialog`; action results surface through `sonner` toasts.
 
+### Help center (`/ajuda`)
+
+Content lives in `lib/help-content.ts` (typed topics → questions with stable `id`s that are also URL
+anchors: `/ajuda#tempo-para-conferir` opens that answer through `components/help/open-on-hash.tsx`).
+Numbers inside answers are built from the code's own constants (`AUTO_RELEASE_DAYS`,
+`PLATFORM_FEE_BPS`, the SLA hours), so change the rule and the help follows; when a rule has no
+constant, update the answer by hand. `lib/help-content.test.ts` fails on duplicate ids and on phrases the
+system doesn't back ("em minutos", "24/7", "verificado por CPF"…). Never rename a published question id
+(links point at it). The contact channel is **not hard-coded**: `lib/support.ts` reads
+`ELLOWIN_SUPPORT_EMAIL` / `ELLOWIN_SUPPORT_HOURS` per request (no redeploy); unset → the page says there is
+no direct channel yet and points to opening a dispute. Don't add copy that promises support hours or a
+guarantee window the operation or the order rules don't have (`autoReleaseAt` counts 7 days from the
+**purchase**, not the delivery).
+
 ### Security headers
 
 `proxy.ts` (Next 16's renamed `middleware.ts`) sets a per-request CSP nonce and applies it to all
