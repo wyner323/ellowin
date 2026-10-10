@@ -16,6 +16,7 @@ import {
 import { getCategory, listings as demoListings } from "@/lib/catalog"
 import { computeSellerBadges } from "@/lib/badges"
 import { positivePercent } from "@/lib/card-info"
+import { attributeFieldsForSlug, describeAttributes } from "@/lib/game-attributes"
 import { slugifyGame } from "@/lib/product-catalog"
 import {
   LISTING_PAGE_SIZE,
@@ -58,6 +59,8 @@ export type StorefrontCard = {
   positivePct: number | null
   /** Unidades em estoque somando as variantes ativas; null na demonstração. */
   stock: number | null
+  /** Atributos de destaque do jogo (ex.: "Imortal", "Brasil"), no máximo 2. */
+  highlights: string[]
 }
 
 /** Imagem da categoria, usada como fallback quando o anúncio não tem foto. */
@@ -86,6 +89,7 @@ function demoToCard(l: (typeof demoListings)[number]): StorefrontCard {
     ratingCount: 0,
     positivePct: null,
     stock: null,
+    highlights: [],
   }
 }
 
@@ -118,6 +122,7 @@ function activeRealProductsQuery(
       game: product.game,
       deliveryTime: product.deliveryTime,
       deliveryType: product.deliveryType,
+      attributes: product.attributes,
       ratingSum: product.ratingSum,
       ratingCount: product.ratingCount,
       salesCount: product.salesCount,
@@ -182,6 +187,10 @@ function realRowToCard(r: ActiveRealProductRow): StorefrontCard {
     ratingCount: r.ratingCount,
     positivePct: positivePercent(r.positiveCount, r.ratingCount),
     stock: Number(r.stockTotal),
+    highlights: describeAttributes(r.game, r.categorySlug, r.attributes)
+      .filter((a) => a.highlight)
+      .slice(0, 2)
+      .map((a) => a.value),
   }
 }
 
@@ -255,6 +264,8 @@ export type ProductDetail = {
   deliveryTime: string
   /** Só preenchido quando categorySlug = "contas" — ver lib/account-origin.ts. */
   accountOrigin: string | null
+  /** Atributos estruturados do jogo, já como rótulos (ver lib/game-attributes.ts). */
+  attributes: { key: string; label: string; value: string; highlight: boolean }[]
   status: string
   salesCount: number
   rating: number | null
@@ -297,6 +308,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       deliveryType: product.deliveryType,
       deliveryTime: product.deliveryTime,
       accountOrigin: product.accountOrigin,
+      attributesRaw: product.attributes,
       status: product.status,
       salesCount: product.salesCount,
       ratingSum: product.ratingSum,
@@ -357,6 +369,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     deliveryType: row.deliveryType,
     deliveryTime: row.deliveryTime,
     accountOrigin: row.accountOrigin,
+    attributes: describeAttributes(row.game, row.categorySlug, row.attributesRaw),
     status: row.status,
     salesCount: row.salesCount,
     rating:
@@ -978,6 +991,13 @@ export async function searchListings(
     conditions.push(sql`coalesce(${sellerApplication.level}, 1) >= ${filters.minLevel}`)
   }
   if (filters.onlyReviewed) conditions.push(sql`${product.ratingCount} > 0`)
+  if (scope.gameSlug) {
+    // Só chaves da definição do jogo; o valor vai como parâmetro.
+    for (const field of attributeFieldsForSlug(scope.gameSlug)) {
+      const value = filters.attrs[field.key]
+      if (value) conditions.push(sql`${product.attributes} ->> ${field.key} = ${value}`)
+    }
+  }
 
   const [countRow] = await db
     .select({ n: sql<number>`count(*)::int` })

@@ -4,6 +4,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgTable,
   serial,
   text,
@@ -220,6 +221,11 @@ export const product = pgTable("product", {
   deliveryTime: text("deliveryTime").notNull().default("ate 24h"),
   /** Só preenchido quando categorySlug = "contas" — ver lib/account-origin.ts. */
   accountOrigin: text("accountOrigin"),
+  /**
+   * Atributos estruturados do jogo (região, rank...): chave → valor, ambos de um
+   * conjunto fechado definido em lib/game-attributes.ts e revalidado no servidor.
+   */
+  attributes: jsonb("attributes").$type<Record<string, string>>().notNull().default({}),
   /** ativo | pausado */
   status: text("status").notNull().default("ativo"),
   ratingSum: integer("ratingSum").notNull().default(0),

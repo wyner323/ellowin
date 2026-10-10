@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { INSTANT_DELIVERY_TIME } from "@/lib/delivery"
+import { attributeFieldsForSlug } from "@/lib/game-attributes"
 import {
   DEFAULT_LISTING_FILTERS,
   activeFilterCount,
@@ -31,6 +32,7 @@ describe("parseListingFilters", () => {
       delivery: "24h",
       minLevel: 3,
       onlyReviewed: true,
+      attrs: {},
     })
   })
 
@@ -65,6 +67,25 @@ describe("parseListingFilters", () => {
 
   it("usa o primeiro valor quando o parâmetro se repete", () => {
     expect(parseListingFilters({ ordem: ["maior-preco", "menor-preco"] }).sort).toBe("maior-preco")
+  })
+})
+
+describe("atributos do jogo", () => {
+  const fields = attributeFieldsForSlug("valorant")
+
+  it("lê a_<chave> só para campos e opções da definição", () => {
+    const f = parseListingFilters({ a_rank: "imortal", a_regiao: "br", a_skins: "999", a_hack: "x" }, fields)
+    expect(f.attrs).toEqual({ rank: "imortal", regiao: "br" })
+  })
+
+  it("sem definição do jogo, ignora os atributos da URL", () => {
+    expect(parseListingFilters({ a_rank: "imortal" }).attrs).toEqual({})
+  })
+
+  it("cada atributo conta como um filtro e volta para a URL", () => {
+    const f = parseListingFilters({ a_rank: "ouro", a_regiao: "eu" }, fields)
+    expect(activeFilterCount(f)).toBe(2)
+    expect(filtersToParams(f)).toMatchObject({ a_rank: "ouro", a_regiao: "eu" })
   })
 })
 

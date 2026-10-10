@@ -215,6 +215,20 @@ export default async function ProductPage({
                   <ReportButton target={{ type: "anuncio", productId: item.id }} label="Denunciar anúncio" />
                 ) : null}
 
+                {item.attributes.length > 0 ? (
+                  <ul aria-label="Detalhes do anúncio" className="flex flex-wrap gap-2">
+                    {item.attributes.map((a) => (
+                      <li
+                        key={a.key}
+                        className="min-w-0 rounded-lg border border-border bg-card px-3 py-1.5 text-xs"
+                      >
+                        <span className="text-muted-foreground">{a.label}: </span>
+                        <span className="font-medium">{a.value}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
                 {originLabel ? (
                   <div
                     className={

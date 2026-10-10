@@ -56,8 +56,16 @@ export function ProductCard({ card }: { card: StorefrontCard }) {
         </span>
       </p>
 
-      {card.instant || card.positivePct !== null || lowStock ? (
+      {card.instant || card.positivePct !== null || lowStock || card.highlights.length > 0 ? (
         <ul className="mt-2.5 flex flex-wrap gap-1.5 text-[0.7rem] font-medium">
+          {card.highlights.map((value) => (
+            <li
+              key={value}
+              className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-foreground"
+            >
+              {value}
+            </li>
+          ))}
           {card.instant ? (
             <li className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-success">
               <Zap className="size-3" aria-hidden="true" />

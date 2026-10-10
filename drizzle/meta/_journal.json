@@ -57,6 +57,13 @@
       "when": 1790687738499,
       "tag": "0007_petite_blue_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791666756081,
+      "tag": "0008_strong_thing",
+      "breakpoints": true
     }
   ]
 }

@@ -183,6 +183,17 @@ Filtered/paged URLs canonicalize to the base path; `/busca` is `noindex`. Card e
 page ends with `getRelatedListings()` (same game/category + same store); the header search has a `/` shortcut
 (`components/search-shortcut.tsx`).
 
+### Per-game attributes (rank, region…)
+
+`lib/game-attributes.ts` (pure) defines, per game slug, closed-set fields (`valorant`, `counter-strike-2`, `steam` so far)
+stored in `product.attributes` (jsonb, key → option value; migration 0008). Same pattern as delivery time: the seller form
+(`components/seller/product-form.tsx`) renders selects from the definition, `createProduct`/`updateProduct` re-validate with
+`sanitizeAttributes()` (unknown keys/values dropped, required fields enforced) and `/jogos/[slug]` adds `a_<key>` filters
+(`parseListingFilters(sp, fields)` → `product.attributes ->> key`). The product page lists them and cards show up to 2 `highlight`
+fields. To add a game, add an entry to `GAME_ATTRIBUTES` (only append options — changing a `value` orphans saved listings);
+the test file checks the game exists in the catalog. Listings created before this have `{}`, so a filter excludes them until
+the seller edits the listing.
+
 ### SLA / auto-refund pattern
 
 `lib/sla.ts` is **pure only** (business-hour deadline math, `slaState()`, `formatDeadline()`) —

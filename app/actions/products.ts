@@ -12,6 +12,7 @@ import {
   hoursForDeliveryTime,
 } from "@/lib/delivery"
 import { isValidAccountOrigin } from "@/lib/account-origin"
+import { sanitizeAttributes } from "@/lib/game-attributes"
 import { MAX_DESCRIPTION, MAX_TITLE } from "@/lib/listing-checks"
 import { parseToCents } from "@/lib/money"
 import { slugifyGame } from "@/lib/product-catalog"
@@ -213,6 +214,7 @@ export async function createProduct(input: {
   deliveryType: string
   deliveryTime: string
   accountOrigin?: string
+  attributes?: Record<string, string>
   images?: string[]
   variants: VariantInput[]
 }): Promise<ActionResult & { slug?: string }> {
@@ -254,6 +256,10 @@ export async function createProduct(input: {
       error: "Informe a procedência da conta.",
     }
 
+  const attrs = sanitizeAttributes(input.game, input.categorySlug, input.attributes)
+  if (attrs.missing)
+    return { ok: false, field: "attributes", error: `Informe: ${attrs.missing.label}.` }
+
   if (!isAcceptableDeliveryTime(input.deliveryType, input.deliveryTime))
     return { ok: false, field: "deliveryTime", error: "Escolha um prazo de entrega da lista." }
 
@@ -276,6 +282,7 @@ export async function createProduct(input: {
       deliveryType: delivery.deliveryType,
       deliveryTime: delivery.deliveryTime,
       accountOrigin,
+      attributes: attrs.attributes,
     })
     .returning({ id: product.id })
 
@@ -311,6 +318,7 @@ export async function updateProduct(input: {
   deliveryType: string
   deliveryTime: string
   accountOrigin?: string
+  attributes?: Record<string, string>
   images?: string[]
   variants: (VariantInput & { id?: number })[]
 }): Promise<ActionResult> {
@@ -358,6 +366,10 @@ export async function updateProduct(input: {
       error: "Informe a procedência da conta.",
     }
 
+  const attrs = sanitizeAttributes(input.game, input.categorySlug, input.attributes)
+  if (attrs.missing)
+    return { ok: false, field: "attributes", error: `Informe: ${attrs.missing.label}.` }
+
   const { error, parsed } = validateVariants(input.variants)
   if (error || !parsed) return { ok: false, field: "variants", error: error ?? undefined }
 
@@ -374,6 +386,7 @@ export async function updateProduct(input: {
       deliveryType: delivery.deliveryType,
       deliveryTime: delivery.deliveryTime,
       accountOrigin,
+      attributes: attrs.attributes,
       updatedAt: new Date(),
     })
     .where(eq(product.id, owned.id))

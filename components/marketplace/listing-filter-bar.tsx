@@ -2,6 +2,7 @@ import Link from "next/link"
 import { SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import type { AttributeField } from "@/lib/game-attributes"
 import {
   DELIVERY_FILTER_OPTIONS,
   MAX_SELLER_LEVEL,
@@ -28,11 +29,14 @@ export function ListingFilterBar({
   basePath,
   query,
   filters,
+  attributeFields = [],
 }: {
   basePath: string
   /** Busca por texto (/busca): preservada ao aplicar os filtros. */
   query?: string
   filters: ListingFilters
+  /** Filtros próprios do jogo (rank, região...), só em /jogos/[slug]. */
+  attributeFields?: AttributeField[]
 }) {
   const active = activeFilterCount(filters)
   const clearHref = query ? `${basePath}?q=${encodeURIComponent(query)}` : basePath
@@ -99,6 +103,27 @@ export function ListingFilterBar({
             ))}
           </select>
         </div>
+
+        {attributeFields.map((field) => (
+          <div key={field.key} className="flex min-w-0 flex-col gap-1.5">
+            <label htmlFor={`f-a-${field.key}`} className={labelClass}>
+              {field.label}
+            </label>
+            <select
+              id={`f-a-${field.key}`}
+              name={`a_${field.key}`}
+              defaultValue={filters.attrs[field.key] ?? ""}
+              className={fieldClass}
+            >
+              <option value="">Qualquer</option>
+              {field.options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
 
         <fieldset className="flex min-w-0 flex-col gap-1.5">
           <legend className={labelClass}>Preço (R$)</legend>

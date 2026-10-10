@@ -32,6 +32,7 @@ import {
   INSTANT_DELIVERY_TIME,
 } from "@/lib/delivery"
 import { ACCOUNT_ORIGIN_OPTIONS } from "@/lib/account-origin"
+import { attributeFieldsFor } from "@/lib/game-attributes"
 import {
   MAX_DESCRIPTION,
   MAX_TITLE,
@@ -74,6 +75,7 @@ export function ProductForm({
     deliveryType: string
     deliveryTime: string
     accountOrigin?: string | null
+    attributes?: Record<string, string>
     images?: string[]
     variants: {
       id: number
@@ -99,6 +101,7 @@ export function ProductForm({
       : (product?.deliveryTime ?? DEFAULT_MANUAL_DELIVERY_TIME),
   )
   const [accountOrigin, setAccountOrigin] = useState(product?.accountOrigin ?? "")
+  const [attributes, setAttributes] = useState<Record<string, string>>(product?.attributes ?? {})
   const [images, setImages] = useState<string[]>(product?.images ?? [])
 
   const [rows, setRows] = useState<Row[]>(
@@ -144,7 +147,20 @@ export function ProductForm({
     setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)))
   }
 
-  const checks = listingChecks({ title, categorySlug, description, accountOrigin, rows }, images.length)
+  // Campos próprios do jogo escolhido (rank, região...), quando o jogo tem definição.
+  const attributeFields = attributeFieldsFor(game, categorySlug)
+  const checks = listingChecks(
+    {
+      title,
+      categorySlug,
+      description,
+      accountOrigin,
+      requiredAttributes: attributeFields.filter((f) => f.required),
+      attributes,
+      rows,
+    },
+    images.length,
+  )
   const ready = isListingReady(checks)
   const done = (key: string) => checks.find((c) => c.key === key)?.ok ?? false
 
@@ -160,6 +176,9 @@ export function ProductForm({
         deliveryType,
         deliveryTime,
         accountOrigin,
+        attributes: Object.fromEntries(
+          attributeFields.flatMap((f) => (attributes[f.key] ? [[f.key, attributes[f.key]]] : [])),
+        ),
         images,
         variants: rows,
       }
@@ -230,7 +249,13 @@ export function ProductForm({
           icon={AlignLeft}
           title="Sobre o anúncio"
           description="O título e a descrição são o que convence o comprador — seja específico."
-          complete={done("title") && done("category") && done("description") && (categorySlug !== "contas" || done("origin"))}
+          complete={
+            done("title") &&
+            done("category") &&
+            done("description") &&
+            (categorySlug !== "contas" || done("origin")) &&
+            (attributeFields.every((f) => !f.required) || done("attributes"))
+          }
           action={
             !editing ? (
               <Button type="button" variant="ghost" size="sm" onClick={() => setPickerResolved(false)}>
@@ -282,6 +307,43 @@ export function ProductForm({
               disabled={pending}
             />
           </Field>
+
+          {attributeFields.length > 0 ? (
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm leading-none font-medium">Detalhes de {game.trim()}</span>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  O comprador filtra por esses campos. Escolha com exatidão: eles aparecem no anúncio.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {attributeFields.map((field) => (
+                  <div key={field.key} className="flex min-w-0 flex-col gap-1.5">
+                    <label htmlFor={`attr-${field.key}`} className="text-sm leading-none font-medium">
+                      {field.label}
+                      {field.required ? <span className="text-destructive"> *</span> : null}
+                    </label>
+                    <select
+                      id={`attr-${field.key}`}
+                      value={attributes[field.key] ?? ""}
+                      onChange={(e) =>
+                        setAttributes((current) => ({ ...current, [field.key]: e.target.value }))
+                      }
+                      disabled={pending}
+                      className="h-9 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+                    >
+                      <option value="">{field.required ? "Escolha uma opção" : "Não informar"}</option>
+                      {field.options.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {categorySlug === "contas" ? (
             <div className="flex flex-col gap-2 rounded-xl border border-gold/30 bg-gold/5 p-4">

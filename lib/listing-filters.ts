@@ -1,4 +1,5 @@
 import { DELIVERY_TIME_OPTIONS, INSTANT_DELIVERY_TIME } from "@/lib/delivery"
+import type { AttributeField } from "@/lib/game-attributes"
 import { parseToCents } from "@/lib/money"
 
 /**
@@ -43,6 +44,8 @@ export type ListingFilters = {
   /** 1 = sem filtro. */
   minLevel: number
   onlyReviewed: boolean
+  /** Atributos do jogo (só em /jogos/[slug]): chave → valor da opção. */
+  attrs: Record<string, string>
 }
 
 export const DEFAULT_LISTING_FILTERS: ListingFilters = {
@@ -52,6 +55,7 @@ export const DEFAULT_LISTING_FILTERS: ListingFilters = {
   delivery: "qualquer",
   minLevel: 1,
   onlyReviewed: false,
+  attrs: {},
 }
 
 type RawParams = Record<string, string | string[] | undefined>
@@ -68,7 +72,11 @@ function parsePrice(raw: string | string[] | undefined): number | null {
   return cents
 }
 
-export function parseListingFilters(params: RawParams): ListingFilters {
+export function parseListingFilters(
+  params: RawParams,
+  /** Campos do jogo da página; sem eles, `a_*` na URL é ignorado. */
+  attributeFields: AttributeField[] = [],
+): ListingFilters {
   const sortRaw = first(params.ordem)
   const sort =
     SORT_OPTIONS.find((o) => o.value === sortRaw)?.value ?? DEFAULT_LISTING_FILTERS.sort
@@ -89,6 +97,12 @@ export function parseListingFilters(params: RawParams): ListingFilters {
     ;[minPriceCents, maxPriceCents] = [maxPriceCents, minPriceCents]
   }
 
+  const attrs: Record<string, string> = {}
+  for (const field of attributeFields) {
+    const value = first(params[`a_${field.key}`])
+    if (value && field.options.some((o) => o.value === value)) attrs[field.key] = value
+  }
+
   return {
     sort,
     minPriceCents,
@@ -96,6 +110,7 @@ export function parseListingFilters(params: RawParams): ListingFilters {
     delivery,
     minLevel,
     onlyReviewed: first(params.avaliados) === "1",
+    attrs,
   }
 }
 
@@ -105,7 +120,8 @@ export function activeFilterCount(f: ListingFilters): number {
     (f.minPriceCents !== null || f.maxPriceCents !== null ? 1 : 0) +
     (f.delivery !== "qualquer" ? 1 : 0) +
     (f.minLevel > 1 ? 1 : 0) +
-    (f.onlyReviewed ? 1 : 0)
+    (f.onlyReviewed ? 1 : 0) +
+    Object.keys(f.attrs).length
   )
 }
 
@@ -127,6 +143,7 @@ export function filtersToParams(f: ListingFilters): Record<string, string | unde
     entrega: f.delivery !== "qualquer" ? f.delivery : undefined,
     nivel: f.minLevel > 1 ? String(f.minLevel) : undefined,
     avaliados: f.onlyReviewed ? "1" : undefined,
+    ...Object.fromEntries(Object.entries(f.attrs).map(([key, value]) => [`a_${key}`, value])),
   }
 }
 

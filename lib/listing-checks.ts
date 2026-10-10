@@ -17,6 +17,9 @@ export type ListingDraft = {
   categorySlug: string
   description: string
   accountOrigin: string
+  /** Campos obrigatórios do jogo (lib/game-attributes.ts) e os valores já escolhidos. */
+  requiredAttributes?: { key: string; label: string }[]
+  attributes?: Record<string, string>
   rows: { label: string; price: string; stock: string }[]
 }
 
@@ -48,6 +51,16 @@ export function listingChecks(draft: ListingDraft, imageCount: number): ListingC
       key: "origin",
       label: "Procedência da conta informada",
       ok: Boolean(draft.accountOrigin),
+      required: true,
+    })
+  }
+
+  const required = draft.requiredAttributes ?? []
+  if (required.length > 0) {
+    checks.push({
+      key: "attributes",
+      label: `Informar ${required.map((f) => f.label.toLowerCase()).join(" e ")}`,
+      ok: required.every((f) => Boolean(draft.attributes?.[f.key])),
       required: true,
     })
   }

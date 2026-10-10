@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { db } from "@/lib/db"
 import { sellerApplication } from "@/lib/db/schema"
+import { attributeFieldsForSlug } from "@/lib/game-attributes"
 import { activeFilterCount, parseListingFilters } from "@/lib/listing-filters"
 import { searchListings } from "@/lib/marketplace"
 import { parsePage } from "@/lib/pagination"
@@ -44,7 +45,8 @@ export default async function JogoPage({
   if (!game) notFound()
 
   const sp = await searchParams
-  const filters = parseListingFilters(sp)
+  const attributeFields = attributeFieldsForSlug(slug)
+  const filters = parseListingFilters(sp, attributeFields)
   const [result, session] = await Promise.all([
     searchListings({ gameSlug: slug }, filters, parsePage(sp.pagina)),
     getSession(),
@@ -98,7 +100,11 @@ export default async function JogoPage({
         <section className="mx-auto w-full max-w-6xl px-4 py-10">
           {!isEmpty ? (
             <div className="flex flex-col gap-5">
-              <ListingFilterBar basePath={`/jogos/${slug}`} filters={filters} />
+              <ListingFilterBar
+                basePath={`/jogos/${slug}`}
+                filters={filters}
+                attributeFields={attributeFields}
+              />
               <ListingResults result={result} filters={filters} basePath={`/jogos/${slug}`} />
             </div>
           ) : (
