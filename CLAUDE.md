@@ -57,6 +57,12 @@ hand-applied before `drizzle-kit` existed (baselined into `drizzle/0000_wooden_s
 single migration, marked already-applied rather than re-run). Don't add new schema changes as a
 loose `scripts/*.sql` file anymore; always go through `db:generate`/`db:migrate`.
 
+## Pending items that need the owner
+
+`PENDENCIAS.md` (pt-BR, repo root) is the single list of things Claude cannot do alone (secrets in Vercel/GitHub, production data fixes,
+legal/business decisions, test logins). When one of those comes up or gets done, update that file (and the matching memory note)
+instead of leaving it only in chat.
+
 ## Architecture
 
 ### Server actions, not a REST API
