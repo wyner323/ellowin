@@ -293,6 +293,16 @@ Open Graph + JSON-LD (`lib/product-jsonld.ts`, `<` escaped, CSP nonce); the site
 `app/opengraph-image.tsx`. Irreversible money actions (buy, confirm receipt, cancel) go through an
 `AlertDialog`; action results surface through `sonner` toasts.
 
+### Theme toggle (light / dark / automatic)
+
+The choice lives in the `ellowin-theme` cookie (`lib/theme.ts`, pure): `app/layout.tsx` reads it and puts `dark`/`light` on `<html>`
+server-side, so there is no pre-hydration script (it would need the CSP nonce) and no flash. No cookie = no class = the CSS follows
+`prefers-color-scheme` (`:root:not(.light)` block in `app/globals.css`). The Tailwind `dark:` variant is defined to match all three
+states. Client side, `useThemePreference()` (`components/theme-preference.ts`) reads the `<html>` class and writes class + cookie;
+`ThemeToggle` (header, `sm`+) and `ThemeMenuItems` (inside the mobile menu, below `sm`) use it, and so does the sonner `Toaster`.
+`next-themes` was removed — don't re-add it. The dev-only `DesignLab` restores the chosen theme when its panel closes.
+Because the root layout calls `cookies()`, every page renders dynamically (they already did, via the header session).
+
 ### Help center (`/ajuda`)
 
 Content lives in `lib/help-content.ts` (typed topics → questions with stable `id`s that are also URL

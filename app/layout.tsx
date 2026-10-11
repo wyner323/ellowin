@@ -1,9 +1,11 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
+import { cookies } from 'next/headers'
 import { Inter, Unbounded } from 'next/font/google'
 import { DesignLab } from '@/components/dev/design-lab'
 import { Toaster } from '@/components/ui/sonner'
 import { SITE_URL } from '@/lib/site'
+import { THEME_COOKIE, parseTheme, themeClass } from '@/lib/theme'
 
 import './globals.css'
 
@@ -45,15 +47,19 @@ export const viewport: Viewport = {
   ],
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // O tema escolhido fica num cookie para o servidor já mandar a classe certa (sem piscar).
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value)
+
   return (
     <html
       lang="pt-BR"
-      className={`bg-background ${inter.variable} ${unbounded.variable}`}
+      className={`bg-background ${inter.variable} ${unbounded.variable} ${themeClass(theme)}`.trim()}
+      suppressHydrationWarning
     >
       <body className="font-sans antialiased">
         <a

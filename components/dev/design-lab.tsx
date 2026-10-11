@@ -211,6 +211,8 @@ export function DesignLab() {
   const [mode, setMode] = useState<Mode>("light")
   const [overrides, setOverrides] = useState<Overrides>(() => loadJSON(COLORS_KEY, { light: {}, dark: {} }))
   const baselineRef = useRef<Record<string, { hex: string; alpha: string }>>({})
+  // Tema do site antes do painel forçar claro/escuro (null = o painel não mexeu).
+  const themeBeforeRef = useRef<"light" | "dark" | "" | null>(null)
   const [, forceRender] = useState(0)
 
   const [selecting, setSelecting] = useState(false)
@@ -305,11 +307,24 @@ export function DesignLab() {
   // Forçar o tema claro/escuro só vale com o painel aberto — é só a lupa pra
   // conferir cada modo enquanto edita, não uma mudança salva.
   useEffect(() => {
+    const root = document.documentElement
     if (!open) {
-      document.documentElement.classList.remove("light", "dark")
+      // Devolve o tema que a pessoa tinha escolhido no botão do site (classe do <html>).
+      if (themeBeforeRef.current !== null) {
+        root.classList.remove("light", "dark")
+        if (themeBeforeRef.current) root.classList.add(themeBeforeRef.current)
+        themeBeforeRef.current = null
+      }
       return
     }
 
+    if (themeBeforeRef.current === null) {
+      themeBeforeRef.current = root.classList.contains("dark")
+        ? "dark"
+        : root.classList.contains("light")
+          ? "light"
+          : ""
+    }
     document.documentElement.classList.toggle("dark", mode === "dark")
     document.documentElement.classList.toggle("light", mode === "light")
 
@@ -356,7 +371,10 @@ export function DesignLab() {
 
   useEffect(() => {
     return () => {
-      document.documentElement.classList.remove("light", "dark")
+      if (themeBeforeRef.current !== null) {
+        document.documentElement.classList.remove("light", "dark")
+        if (themeBeforeRef.current) document.documentElement.classList.add(themeBeforeRef.current)
+      }
       document.body.style.removeProperty("zoom")
       document.getElementById("design-lab-page-style")?.remove()
     }

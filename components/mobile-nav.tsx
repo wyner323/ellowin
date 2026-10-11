@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { Gamepad2, Menu, Search, Store, Tag, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ThemeMenuItems } from '@/components/theme-toggle'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,6 +87,11 @@ export function MobileNav({
             <Store className="size-4" />
             Quero vender na Ellowin
           </DropdownMenuItem>
+          {/* A partir de `sm` o tema tem botão próprio no cabeçalho. */}
+          <div className="sm:hidden">
+            <DropdownMenuSeparator />
+            <ThemeMenuItems />
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
 
