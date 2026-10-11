@@ -25,11 +25,11 @@ the platform and only released to the seller after delivery is confirmed.
   `drizzle/*.sql` migrations (UTC time zone, like Neon), no network. A test file swaps the app's
   `@/lib/db` for it with `vi.mock` (see `lib/wallet.test.ts` / `lib/sla-sweeps.test.ts`). These cover
   the escrow primitives, double-settlement guards, the 10 reconciliation checks, the three SLA sweeps
-  and the server actions for orders and disputes (`app/actions/orders.test.ts`, `disputes.test.ts`:
+  and the server actions for orders, disputes and the wallet (`app/actions/orders.test.ts`, `disputes.test.ts`, `wallet.test.ts`:
   real `lib/session.ts`/`lib/roles.ts` over a faked `@/lib/auth` session, `next/cache`, `next/headers`,
   `next/server` and `@/lib/notify` mocked). Limits: PGlite is a single connection, so two truly
   concurrent transactions (the `FOR UPDATE` race, or the SQL-level status guards that only matter in a
-  race) are not exercised; `app/actions/wallet.ts` (deposit/withdraw), `products.ts`, `seller.ts`,
+  race) are not exercised; `app/actions/products.ts`, `seller.ts`,
   `account.ts`, `auth.ts`, `reports.ts`, `admin.ts` and the API routes have no tests. If you change
   money code, add a case there and confirm it fails when you break the guard (the suites were
   mutation-checked that way).
