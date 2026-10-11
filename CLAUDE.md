@@ -15,7 +15,8 @@ the platform and only released to the seller after delivery is confirmed.
 - `npx tsc --noEmit` — type-check. This is the main correctness gate in this repo.
 - `pnpm lint` — runs ESLint (`eslint.config.mjs`); currently passes clean. Run it alongside
   `tsc --noEmit` before committing. GitHub Actions (`.github/workflows/ci.yml`) runs `tsc --noEmit`,
-  `pnpm lint` and `pnpm test` on every push to `main` and on pull requests.
+  `pnpm lint`, `pnpm test`, `pnpm build` (with dummy env vars, no database) and
+  `pnpm audit --prod --audit-level=high` on every push to `main` and on pull requests.
 - `pnpm test` — runs Vitest (`vitest run`) over pure-function unit tests in `lib/*.test.ts`
   (money math, SLA business-hour deadlines, delivery time lookup, account-origin lookup, seller
   badge thresholds, Sentry event scrubbing). `pnpm test:watch` for interactive mode.
@@ -352,9 +353,11 @@ etc.) before it leaves the process. `lib/notify.ts` and `lib/reconcile-alert.ts`
 to it; add `Sentry.captureException`/`captureMessage` calls to new server-side failure paths the
 same way.
 
-**Note: CI does not run `next build`** (`.github/workflows/ci.yml` only runs `tsc --noEmit`,
-`pnpm lint`, `pnpm test`) — none of those catch Next's client/server module-boundary errors (e.g.
-a client component transitively importing server-only code like `next/server`'s `after()`). That
-class of bug only surfaces in an actual `next build`/`pnpm build`, which is why `lib/sla.ts` had to
-be split from `lib/sla-sweeps.ts` (see above). Run `pnpm build` locally before pushing anything
-that touches imports shared between client and server code, since CI won't catch it.
+**CI runs `next build` too** (since 2026-10-11), because `tsc`/`lint`/`vitest` don't catch Next's client/server
+module-boundary errors (e.g. a client component transitively importing server-only code like `next/server`'s
+`after()`) — which is why `lib/sla.ts` had to be split from `lib/sla-sweeps.ts` (see above). The CI build has no database
+and fake `DATABASE_URL`/`BETTER_AUTH_SECRET`, so **no page or route may query the database while building**: anything that
+is statically prerendered and reads Neon (like the old `app/sitemap.ts`) fails that build — mark it
+`export const dynamic = "force-dynamic"`. The audit step fails on high/critical advisories in production dependencies; fix
+by bumping the transitive package (`pnpm up <pkg> --depth Infinity`; a parent that pins an exact version needs its own
+bump, as happened with `minimatch` → `brace-expansion`). Still run `pnpm build` locally before pushing.

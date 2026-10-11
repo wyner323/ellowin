@@ -7,10 +7,16 @@ import { GAMES } from "@/lib/product-catalog"
 import { SITE_URL } from "@/lib/site"
 
 /**
- * Gerado no build/deploy (não por requisição): páginas fixas, cada categoria do
- * catálogo, cada jogo do catálogo estático e os anúncios REAIS ativos (nunca os
- * de demonstração, que não têm página própria — ver lib/catalog.ts).
+ * Gerado a cada requisição: páginas fixas, cada categoria do catálogo, cada jogo
+ * do catálogo estático e os anúncios REAIS ativos (nunca os de demonstração, que
+ * não têm página própria — ver lib/catalog.ts).
+ *
+ * Dinâmico de propósito: gerado no build, o sitemap só mostrava os anúncios que
+ * existiam no último deploy, e o build (inclusive o da CI, sem banco) não
+ * dependeria de uma consulta ao Neon.
  */
+export const dynamic = "force-dynamic"
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const activeProducts = await db
     .select({ slug: product.slug, updatedAt: product.updatedAt })

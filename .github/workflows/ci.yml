@@ -35,3 +35,20 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      # Pega o que tsc/lint/vitest não pegam: erro de fronteira cliente/servidor entre módulos.
+      # Sem banco nem segredos reais: nenhuma página consulta o Neon durante o build, e os
+      # valores abaixo só existem para o build não parar na checagem de segredo do Better Auth.
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          BETTER_AUTH_SECRET: ci-build-only-secret-0123456789abcdefghijklmnop
+          BETTER_AUTH_URL: http://localhost:3000
+
+      # Só dependências de produção; falha com vulnerabilidade alta ou crítica (teria pego a
+      # falha de execução remota do Next). Se uma nova advisory sem correção disponível
+      # travar a CI, avalie o caso e, se não for explorável aqui, suba o nível temporariamente.
+      - name: Audit
+        run: pnpm audit --prod --audit-level=high
