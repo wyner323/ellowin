@@ -2,6 +2,7 @@ import Link from "next/link"
 import { SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { scopeHref } from "@/lib/listing-filters"
 import type { AttributeField } from "@/lib/game-attributes"
 import {
   DELIVERY_FILTER_OPTIONS,
@@ -28,18 +29,21 @@ function centsToField(cents: number | null): string {
 export function ListingFilterBar({
   basePath,
   query,
+  category,
   filters,
   attributeFields = [],
 }: {
   basePath: string
   /** Busca por texto (/busca): preservada ao aplicar os filtros. */
   query?: string
+  /** Categoria escolhida em /busca (`?categoria=`): preservada ao aplicar os filtros. */
+  category?: string
   filters: ListingFilters
   /** Filtros próprios do jogo (rank, região...), só em /jogos/[slug]. */
   attributeFields?: AttributeField[]
 }) {
   const active = activeFilterCount(filters)
-  const clearHref = query ? `${basePath}?q=${encodeURIComponent(query)}` : basePath
+  const clearHref = scopeHref(basePath, { q: query, categoria: category })
   const hasAnything = active > 0 || filters.sort !== "recentes"
 
   return (
@@ -63,6 +67,7 @@ export function ListingFilterBar({
         className="grid grid-cols-1 gap-4 border-t border-border p-4 sm:grid-cols-2 lg:grid-cols-4"
       >
         {query ? <input type="hidden" name="q" value={query} /> : null}
+        {category ? <input type="hidden" name="categoria" value={category} /> : null}
 
         <div className="flex min-w-0 flex-col gap-1.5">
           <label htmlFor="f-ordem" className={labelClass}>

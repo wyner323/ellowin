@@ -4,7 +4,8 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { ListingFilterBar } from "@/components/marketplace/listing-filter-bar"
 import { ListingResults } from "@/components/marketplace/listing-results"
-import { parseListingFilters } from "@/lib/listing-filters"
+import { categories, getCategory } from "@/lib/catalog"
+import { parseListingFilters, scopeHref } from "@/lib/listing-filters"
 import { getGameListingCounts, searchListings } from "@/lib/marketplace"
 import { parsePage } from "@/lib/pagination"
 import { findGameBySlug } from "@/lib/product-catalog"
@@ -25,9 +26,16 @@ export default async function BuscaPage({
   const rawQuery = Array.isArray(sp.q) ? sp.q[0] : sp.q
   const term = (rawQuery ?? "").trim().slice(0, 80)
   const filters = parseListingFilters(sp)
+  // Só categorias que existem; qualquer outro valor na URL é ignorado.
+  const rawCategory = Array.isArray(sp.categoria) ? sp.categoria[0] : sp.categoria
+  const category = rawCategory && getCategory(rawCategory) ? rawCategory : undefined
 
   const [result, gameCounts] = await Promise.all([
-    searchListings(term ? { query: term } : {}, filters, parsePage(sp.pagina)),
+    searchListings(
+      { ...(term ? { query: term } : {}), ...(category ? { categorySlug: category } : {}) },
+      filters,
+      parsePage(sp.pagina),
+    ),
     // Atalhos para os jogos que têm anúncio — só quando ainda não há um termo digitado.
     term ? Promise.resolve({} as Record<string, number>) : getGameListingCounts(),
   ])
@@ -62,12 +70,38 @@ export default async function BuscaPage({
           </nav>
         ) : null}
 
-        <ListingFilterBar basePath="/busca" query={term || undefined} filters={filters} />
+        <nav aria-label="Categorias" className="flex flex-wrap items-center gap-2">
+          {[{ slug: undefined, name: "Todas" }, ...categories].map((item) => {
+            const active = item.slug === category
+            return (
+              <Link
+                key={item.slug ?? "todas"}
+                href={scopeHref("/busca", { q: term || undefined, categoria: item.slug })}
+                aria-current={active ? "true" : undefined}
+                className={
+                  active
+                    ? "rounded-full border border-primary bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                    : "rounded-full border border-border bg-card px-3.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                }
+              >
+                {item.name}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <ListingFilterBar
+          basePath="/busca"
+          query={term || undefined}
+          category={category}
+          filters={filters}
+        />
         <ListingResults
           result={result}
           filters={filters}
           basePath="/busca"
           query={term || undefined}
+          category={category}
           gridClass="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         />
       </main>

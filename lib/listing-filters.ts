@@ -147,6 +147,14 @@ export function filtersToParams(f: ListingFilters): Record<string, string | unde
   }
 }
 
+/** Link para a mesma lista sem filtros, mantendo o recorte (busca e categoria). */
+export function scopeHref(basePath: string, scope: Record<string, string | undefined>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(scope)) if (value) search.set(key, value)
+  const qs = search.toString()
+  return qs ? `${basePath}?${qs}` : basePath
+}
+
 /**
  * A janela de uma página sobre a lista "reais, depois demonstração": quantos
  * reais buscar no banco (e a partir de onde) e onde começa a fatia de demonstração.

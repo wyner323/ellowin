@@ -10,7 +10,7 @@ import { ListingResults } from '@/components/marketplace/listing-results'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { categories, getCategory } from '@/lib/catalog'
-import { categoryCardInfo } from '@/lib/home-stats'
+import { categoryCardInfo, sellerCountLabel } from '@/lib/home-stats'
 import { activeFilterCount, parseListingFilters } from '@/lib/listing-filters'
 import { getCategoryStats } from '@/lib/market-stats'
 import { searchListings } from '@/lib/marketplace'
@@ -54,6 +54,7 @@ export default async function CatalogPage({
     getCategoryStats(),
   ])
   const info = categoryCardInfo(categoryStats[slug])
+  const sellers = sellerCountLabel(categoryStats[slug]?.sellerCount)
   const isEmpty =
     result.realTotal === 0 && result.demoTotal === 0 && activeFilterCount(filters) === 0
 
@@ -80,6 +81,7 @@ export default async function CatalogPage({
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <Badge variant="secondary">{info.countLabel}</Badge>
+                {sellers ? <Badge variant="secondary">{sellers}</Badge> : null}
                 {info.fromCents !== null ? (
                   <Badge variant="outline">a partir de {formatCents(info.fromCents)}</Badge>
                 ) : null}

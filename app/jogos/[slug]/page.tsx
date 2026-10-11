@@ -14,7 +14,10 @@ import { db } from "@/lib/db"
 import { sellerApplication } from "@/lib/db/schema"
 import { attributeFieldsForSlug } from "@/lib/game-attributes"
 import { activeFilterCount, parseListingFilters } from "@/lib/listing-filters"
+import { categoryCardInfo, sellerCountLabel } from "@/lib/home-stats"
+import { getGameStats } from "@/lib/market-stats"
 import { searchListings } from "@/lib/marketplace"
+import { formatCents } from "@/lib/money"
 import { parsePage } from "@/lib/pagination"
 import { getGameSeo } from "@/lib/game-seo"
 import { findGameBySlug } from "@/lib/product-catalog"
@@ -51,10 +54,13 @@ export default async function JogoPage({
   const sp = await searchParams
   const attributeFields = attributeFieldsForSlug(slug)
   const filters = parseListingFilters(sp, attributeFields)
-  const [result, session] = await Promise.all([
+  const [result, session, gameStats] = await Promise.all([
     searchListings({ gameSlug: slug }, filters, parsePage(sp.pagina)),
     getSession(),
+    getGameStats(slug),
   ])
+  const gameInfo = categoryCardInfo(gameStats ?? undefined)
+  const sellers = sellerCountLabel(gameStats?.sellerCount)
   const isEmpty = result.realTotal === 0 && activeFilterCount(filters) === 0
   const seo = getGameSeo(slug)
 
@@ -92,13 +98,14 @@ export default async function JogoPage({
               <span className="text-foreground">{game.name}</span>
             </nav>
             <h1 className="text-3xl font-bold text-balance">{game.name}</h1>
-            {/* Com filtro, o total da lista não é o total de anúncios do jogo. */}
-            {activeFilterCount(filters) === 0 ? (
-              <Badge variant="secondary" className="w-fit">
-                {result.realTotal}{" "}
-                {result.realTotal === 1 ? "anúncio ativo" : "anúncios ativos"}
-              </Badge>
-            ) : null}
+            {/* Números do jogo todo (não da lista filtrada), direto do banco. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">{gameInfo.countLabel}</Badge>
+              {sellers ? <Badge variant="secondary">{sellers}</Badge> : null}
+              {gameInfo.fromCents !== null ? (
+                <Badge variant="outline">a partir de {formatCents(gameInfo.fromCents)}</Badge>
+              ) : null}
+            </div>
           </div>
         </section>
 

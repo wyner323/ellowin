@@ -3,7 +3,7 @@ import { SearchX } from "lucide-react"
 import { Pagination } from "@/components/pagination"
 import { ProductCard } from "@/components/marketplace/product-card"
 import { Button } from "@/components/ui/button"
-import { activeFilterCount, filtersToParams, type ListingFilters } from "@/lib/listing-filters"
+import { activeFilterCount, filtersToParams, scopeHref, type ListingFilters } from "@/lib/listing-filters"
 import type { ListingPage } from "@/lib/marketplace"
 
 /**
@@ -15,16 +15,18 @@ export function ListingResults({
   filters,
   basePath,
   query,
+  category,
   gridClass = "grid gap-5 sm:grid-cols-2 lg:grid-cols-4",
 }: {
   result: ListingPage
   filters: ListingFilters
   basePath: string
   query?: string
+  category?: string
   gridClass?: string
 }) {
   const { cards, realTotal, demoTotal, page, pages } = result
-  const clearHref = query ? `${basePath}?q=${encodeURIComponent(query)}` : basePath
+  const clearHref = scopeHref(basePath, { q: query, categoria: category })
   const filtered = activeFilterCount(filters) > 0
 
   return (
@@ -65,7 +67,7 @@ export function ListingResults({
         pages={pages}
         total={realTotal + demoTotal}
         basePath={basePath}
-        params={{ q: query, ...filtersToParams(filters) }}
+        params={{ q: query, categoria: category, ...filtersToParams(filters) }}
       />
     </div>
   )

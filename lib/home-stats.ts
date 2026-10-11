@@ -60,7 +60,18 @@ export function buildHeroStats(s: MarketStats): HeroStat[] {
   return stats
 }
 
-export type CategoryStat = { count: number; minPriceCents: number }
+export type CategoryStat = {
+  count: number
+  minPriceCents: number
+  /** Vendedores distintos com anúncio à venda (ausente em quem só precisa da contagem). */
+  sellerCount?: number
+}
+
+/** "1 vendedor" / "3 vendedores"; null quando não há ninguém para contar. */
+export function sellerCountLabel(n: number | undefined): string | null {
+  if (!n || n < 1) return null
+  return `${nf.format(n)} ${n === 1 ? "vendedor" : "vendedores"}`
+}
 
 /** Texto do rodapé do card de categoria: contagem real, ou "Novo" quando ainda não há anúncio. */
 export function categoryCardInfo(stat: CategoryStat | undefined): {

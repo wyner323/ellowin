@@ -181,7 +181,10 @@ default sort) and only on `/catalogo` and `/busca`; the count line counts real l
 Filtered/paged URLs canonicalize to the base path; `/busca` is `noindex`. Card extras (`instant`, `positivePct` from
 ≥ 5 reviews, "últimas N unidades" at ≤ 5 in stock) come from the same query and the pure `lib/card-info.ts`. The product
 page ends with `getRelatedListings()` (same game/category + same store); the header search has a `/` shortcut
-(`components/search-shortcut.tsx`).
+(`components/search-shortcut.tsx`) and game-name suggestions through a native `<datalist>`
+(`components/search-suggestions.tsx` → `/api/busca/sugestoes`, static catalog only, `lib/search-suggest.ts`). `/busca` also
+takes `?categoria=` (chips; `scopeHref()` keeps the scope when clearing filters). Category and game pages show real
+listing/seller counts and "a partir de" (`getCategoryStats()`/`getGameStats()` in `lib/market-stats.ts`), never the filtered total.
 
 ### Per-game attributes (rank, region…)
 

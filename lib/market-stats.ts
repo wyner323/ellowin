@@ -55,8 +55,14 @@ export async function getMarketStats(): Promise<MarketStats> {
 
 /** Contagem e menor preço por categoria, só de anúncios reais à venda. */
 export async function getCategoryStats(): Promise<Record<string, CategoryStat>> {
-  const { rows } = await pool.query<{ slug: string; count: number; min_price: number }>(
+  const { rows } = await pool.query<{
+    slug: string
+    count: number
+    sellers: number
+    min_price: number
+  }>(
     `select p."categorySlug" as slug, count(*)::int as count,
+            count(distinct p."sellerId")::int as sellers,
             min((select min(v."priceCents") from "product_variant" v
                  where v."productId" = p."id" and v."active" = true and v."stock" > 0))::int as min_price
        from "product" p
@@ -64,8 +70,37 @@ export async function getCategoryStats(): Promise<Record<string, CategoryStat>> 
       group by p."categorySlug"`,
   )
   return Object.fromEntries(
-    rows.map((r) => [r.slug, { count: r.count, minPriceCents: r.min_price }]),
+    rows.map((r) => [
+      r.slug,
+      { count: r.count, minPriceCents: r.min_price, sellerCount: r.sellers },
+    ]),
   )
+}
+
+/**
+ * Números de um jogo (por slug) para o topo de /jogos/[slug]: anúncios à venda,
+ * vendedores distintos e menor preço. `product.game` é texto livre, então o
+ * cruzamento com o slug é feito em JS, como no resto de /jogos.
+ */
+export async function getGameStats(gameSlug: string): Promise<CategoryStat | null> {
+  const { rows } = await pool.query<{ game: string; count: number; sellers: string[]; min_price: number }>(
+    `select p."game" as game, count(*)::int as count,
+            array_agg(distinct p."sellerId") as sellers,
+            min((select min(v."priceCents") from "product_variant" v
+                 where v."productId" = p."id" and v."active" = true and v."stock" > 0))::int as min_price
+       from "product" p
+      where ${FOR_SALE} and p."game" is not null
+      group by p."game"`,
+  )
+  const matching = rows.filter((r) => slugifyGame(r.game) === gameSlug)
+  if (matching.length === 0) return null
+
+  return {
+    count: matching.reduce((sum, r) => sum + r.count, 0),
+    minPriceCents: Math.min(...matching.map((r) => r.min_price)),
+    // O mesmo vendedor pode aparecer em duas grafias do jogo: conta uma vez só.
+    sellerCount: new Set(matching.flatMap((r) => r.sellers)).size,
+  }
 }
 
 /** Jogos que têm anúncio real à venda, do mais anunciado para o menos, só os que têm página em /jogos. */

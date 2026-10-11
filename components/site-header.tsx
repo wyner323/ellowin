@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { EllowinLogo } from '@/components/ellowin-logo'
 import { MobileNav } from '@/components/mobile-nav'
 import { SearchShortcut } from '@/components/search-shortcut'
+import { SearchSuggestions } from '@/components/search-suggestions'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { UserMenu } from '@/components/user-menu'
 
@@ -74,6 +75,7 @@ export async function SiteHeader() {
             title="Atalho: tecla /"
           />
           <SearchShortcut />
+          <SearchSuggestions />
         </form>
 
         <nav className="ml-auto flex items-center gap-1.5">
