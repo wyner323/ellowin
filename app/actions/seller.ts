@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { profile, sellerApplication } from "@/lib/db/schema"
+import { PIX_TYPE_LABEL } from "@/lib/pix"
 import { accountBlock, getUserId } from "@/lib/session"
 import { isValidCpf, onlyDigits } from "@/lib/validation"
 import type { ActionResult } from "@/app/actions/auth"
@@ -73,6 +74,8 @@ async function getApplicationProgress(userId: string) {
     phoneVerified: Boolean(p?.phoneVerified),
   }
 }
+
+const DOCUMENT_TYPES = ["cpf", "cnh", "rg"]
 
 const MISSING_STEPS = "Conclua as etapas anteriores do cadastro (loja, telefone e documento) antes deste passo."
 
@@ -146,7 +149,9 @@ export async function saveKycStep(input: {
   const progress = await getApplicationProgress(userId)
   if (!progress.hasStore || !progress.phoneVerified) return { ok: false, error: MISSING_STEPS }
 
-  if (!input.documentType)
+  // Conjunto fechado (o assistente só oferece estes): um tipo desconhecido escaparia de
+  // todas as validações de número abaixo.
+  if (!DOCUMENT_TYPES.includes(input.documentType))
     return { ok: false, field: "documentType", error: "Selecione o tipo de documento." }
 
   const number = onlyDigits(input.documentNumber)
@@ -228,7 +233,8 @@ export async function savePayoutStep(input: {
   if (!progress.hasStore || !progress.phoneVerified || !progress.hasDocument)
     return { ok: false, error: MISSING_STEPS }
 
-  if (!input.pixKeyType)
+  // Mesmo motivo do tipo de documento: só os tipos de chave que existem (lib/pix.ts).
+  if (!Object.hasOwn(PIX_TYPE_LABEL, input.pixKeyType))
     return { ok: false, field: "pixKeyType", error: "Escolha o tipo de chave PIX." }
 
   const key = input.pixKey.trim()
