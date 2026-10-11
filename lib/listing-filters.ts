@@ -13,6 +13,8 @@ import { parseToCents } from "@/lib/money"
 export const LISTING_PAGE_SIZE = 24
 
 export const SORT_OPTIONS = [
+  /** Só existe na busca por texto (em /busca com `q`); nas demais listas não há termo para pontuar. */
+  { value: "relevancia", label: "Mais relevantes" },
   { value: "recentes", label: "Mais recentes" },
   { value: "menor-preco", label: "Menor preço" },
   { value: "maior-preco", label: "Maior preço" },
@@ -38,6 +40,8 @@ const MAX_PRICE_CENTS = 100_000_000
 
 export type ListingFilters = {
   sort: ListingSort
+  /** Ordem usada quando a URL não escolhe uma ("relevancia" na busca por texto, "recentes" no resto). */
+  defaultSort: ListingSort
   minPriceCents: number | null
   maxPriceCents: number | null
   delivery: DeliveryFilter
@@ -50,6 +54,7 @@ export type ListingFilters = {
 
 export const DEFAULT_LISTING_FILTERS: ListingFilters = {
   sort: "recentes",
+  defaultSort: "recentes",
   minPriceCents: null,
   maxPriceCents: null,
   delivery: "qualquer",
@@ -76,10 +81,16 @@ export function parseListingFilters(
   params: RawParams,
   /** Campos do jogo da página; sem eles, `a_*` na URL é ignorado. */
   attributeFields: AttributeField[] = [],
+  /** "relevancia" só na busca por texto: é o que habilita essa ordem (e a torna a padrão). */
+  defaultSort: ListingSort = "recentes",
 ): ListingFilters {
   const sortRaw = first(params.ordem)
+  const requested = SORT_OPTIONS.find((o) => o.value === sortRaw)?.value
+  // Sem termo de busca não há o que pontuar: "relevancia" na URL vira a ordem padrão.
   const sort =
-    SORT_OPTIONS.find((o) => o.value === sortRaw)?.value ?? DEFAULT_LISTING_FILTERS.sort
+    requested && (requested !== "relevancia" || defaultSort === "relevancia")
+      ? requested
+      : defaultSort
 
   const deliveryRaw = first(params.entrega)
   const delivery =
@@ -105,6 +116,7 @@ export function parseListingFilters(
 
   return {
     sort,
+    defaultSort,
     minPriceCents,
     maxPriceCents,
     delivery,
@@ -127,7 +139,7 @@ export function activeFilterCount(f: ListingFilters): number {
 
 /** Vitrine "limpa": sem filtro e na ordem padrão. Só nela os anúncios de demonstração entram. */
 export function isDefaultView(f: ListingFilters): boolean {
-  return activeFilterCount(f) === 0 && f.sort === DEFAULT_LISTING_FILTERS.sort
+  return activeFilterCount(f) === 0 && f.sort === f.defaultSort
 }
 
 function centsToParam(cents: number): string {
@@ -137,7 +149,7 @@ function centsToParam(cents: number): string {
 /** Parâmetros de URL (sem os valores padrão) para links de paginação e "limpar". */
 export function filtersToParams(f: ListingFilters): Record<string, string | undefined> {
   return {
-    ordem: f.sort !== DEFAULT_LISTING_FILTERS.sort ? f.sort : undefined,
+    ordem: f.sort !== f.defaultSort ? f.sort : undefined,
     min: f.minPriceCents !== null ? centsToParam(f.minPriceCents) : undefined,
     max: f.maxPriceCents !== null ? centsToParam(f.maxPriceCents) : undefined,
     entrega: f.delivery !== "qualquer" ? f.delivery : undefined,

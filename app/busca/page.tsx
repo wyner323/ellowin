@@ -25,7 +25,8 @@ export default async function BuscaPage({
   const sp = await searchParams
   const rawQuery = Array.isArray(sp.q) ? sp.q[0] : sp.q
   const term = (rawQuery ?? "").trim().slice(0, 80)
-  const filters = parseListingFilters(sp)
+  // Com texto digitado, a ordem padrão é por relevância; sem ele, a mais recente.
+  const filters = parseListingFilters(sp, [], term ? "relevancia" : "recentes")
   // Só categorias que existem; qualquer outro valor na URL é ignorado.
   const rawCategory = Array.isArray(sp.categoria) ? sp.categoria[0] : sp.categoria
   const category = rawCategory && getCategory(rawCategory) ? rawCategory : undefined
@@ -62,7 +63,7 @@ export default async function BuscaPage({
               <Link
                 key={game.slug}
                 href={`/jogos/${game.slug}`}
-                className="rounded-full border border-border bg-card px-3.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                className="rounded-full border border-border bg-card px-3.5 py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
               >
                 {game.name}
               </Link>
@@ -80,8 +81,8 @@ export default async function BuscaPage({
                 aria-current={active ? "true" : undefined}
                 className={
                   active
-                    ? "rounded-full border border-primary bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-                    : "rounded-full border border-border bg-card px-3.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                    ? "rounded-full border border-primary bg-primary px-3.5 py-2.5 text-xs font-medium text-primary-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                    : "rounded-full border border-border bg-card px-3.5 py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
                 }
               >
                 {item.name}

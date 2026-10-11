@@ -44,7 +44,7 @@ export function ListingFilterBar({
 }) {
   const active = activeFilterCount(filters)
   const clearHref = scopeHref(basePath, { q: query, categoria: category })
-  const hasAnything = active > 0 || filters.sort !== "recentes"
+  const hasAnything = active > 0 || filters.sort !== filters.defaultSort
 
   return (
     <details
@@ -74,7 +74,7 @@ export function ListingFilterBar({
             Ordenar por
           </label>
           <select id="f-ordem" name="ordem" defaultValue={filters.sort} className={fieldClass}>
-            {SORT_OPTIONS.map((o) => (
+            {SORT_OPTIONS.filter((o) => o.value !== "relevancia" || filters.defaultSort === "relevancia").map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>

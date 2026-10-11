@@ -910,10 +910,24 @@ export type ListingPage = {
   pages: number
 }
 
-function listingOrder(sort: ListingFilters["sort"]): SQL[] {
+function listingOrder(sort: ListingFilters["sort"], query?: string): SQL[] {
   // `product.id` desempata, para a paginação não repetir nem pular itens.
   const tiebreak = [desc(product.createdAt), desc(product.id)]
   switch (sort) {
+    case "relevancia": {
+      if (!query) return tiebreak
+      // Título que começa com o termo > título com uma palavra que começa com ele >
+      // jogo que começa com ele > o resto (que só contém o termo). Empate: o mais recente.
+      const term = escapeLike(query)
+      return [
+        sql`(case
+          when ${product.title} ilike ${term + "%"} then 0
+          when ${product.title} ilike ${"% " + term + "%"} then 1
+          when coalesce(${product.game}, '') ilike ${term + "%"} then 2
+          else 3 end) asc`,
+        ...tiebreak,
+      ]
+    }
     case "menor-preco":
       return [asc(MIN_PRICE_SQL), ...tiebreak]
     case "maior-preco":
@@ -1014,7 +1028,7 @@ export async function searchListings(
   const rows =
     realLimit > 0
       ? await activeRealProductsQuery(conditions, {
-          order: listingOrder(filters.sort),
+          order: listingOrder(filters.sort, scope.query),
           limit: realLimit,
           offset: realOffset,
         })

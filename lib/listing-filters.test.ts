@@ -27,6 +27,7 @@ describe("parseListingFilters", () => {
     })
     expect(f).toEqual({
       sort: "menor-preco",
+      defaultSort: "recentes",
       minPriceCents: 1000,
       maxPriceCents: 123450,
       delivery: "24h",
@@ -67,6 +68,30 @@ describe("parseListingFilters", () => {
 
   it("usa o primeiro valor quando o parâmetro se repete", () => {
     expect(parseListingFilters({ ordem: ["maior-preco", "menor-preco"] }).sort).toBe("maior-preco")
+  })
+})
+
+describe("relevância", () => {
+  it("sem termo de busca, 'relevancia' na URL vira a ordem padrão", () => {
+    expect(parseListingFilters({ ordem: "relevancia" }).sort).toBe("recentes")
+  })
+
+  it("com termo, é a ordem padrão e some da URL; outra escolha vai para a URL", () => {
+    const padrao = parseListingFilters({}, [], "relevancia")
+    expect(padrao.sort).toBe("relevancia")
+    expect(isDefaultView(padrao)).toBe(true)
+    expect(filtersToParams(padrao).ordem).toBeUndefined()
+
+    const outra = parseListingFilters({ ordem: "menor-preco" }, [], "relevancia")
+    expect(outra.sort).toBe("menor-preco")
+    expect(isDefaultView(outra)).toBe(false)
+    expect(filtersToParams(outra).ordem).toBe("menor-preco")
+  })
+
+  it("escolher 'mais recentes' explicitamente na busca por texto é guardado na URL", () => {
+    const f = parseListingFilters({ ordem: "recentes" }, [], "relevancia")
+    expect(f.sort).toBe("recentes")
+    expect(filtersToParams(f).ordem).toBe("recentes")
   })
 })
 
