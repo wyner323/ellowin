@@ -13,6 +13,9 @@ import type { PoolClient } from "@neondatabase/serverless"
  *
  * Limite honesto: é UMA conexão. Dá para testar a aritmética, o extrato, os
  * rollbacks e as travas de estado, mas não duas transações realmente simultâneas.
+ * Para o código que abre transações em paralelo (a rotina de prazos roda as três
+ * varreduras juntas), `pool.connect()` entrega a conexão a uma transação por vez:
+ * é o que o `FOR UPDATE` garante no Neon, onde a segunda espera a primeira.
  */
 
 type QueryResult = { rows: Record<string, unknown>[]; rowCount: number }
@@ -51,9 +54,29 @@ export async function createTestDb(): Promise<TestDb> {
   }
   const client = { query, release() {} } as unknown as PoolClient
 
+  // Uma transação por vez: quem pede a conexão espera a anterior liberar.
+  let tail: Promise<void> = Promise.resolve()
+  const connect = async (): Promise<PoolClient> => {
+    const previous = tail
+    let unlock!: () => void
+    tail = new Promise<void>((resolve) => {
+      unlock = resolve
+    })
+    await previous
+    let released = false
+    return {
+      query,
+      release() {
+        if (released) return
+        released = true
+        unlock()
+      },
+    } as unknown as PoolClient
+  }
+
   return {
     client,
-    pool: { query, connect: async () => client },
+    pool: { query, connect },
     query,
     db: drizzle(pg, { schema }),
     close: () => pg.close(),

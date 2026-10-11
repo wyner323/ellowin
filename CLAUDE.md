@@ -31,8 +31,12 @@ the platform and only released to the seller after delivery is confirmed.
   `next/server` and `@/lib/notify` mocked). Limits: PGlite is a single connection, so two truly
   concurrent transactions (the `FOR UPDATE` race, or the SQL-level status guards that only matter in a
   race) are not exercised; `auth.test.ts` fakes Better Auth itself (user creation / password check), so the
-  real hashing, session cookies and Google linking are untested; the API routes (`app/api/*`) and the
-  read-only pages have no tests. If you change money code, add a case there and confirm it fails when you break the
+  real hashing, session cookies and Google linking are untested (so is the Better Auth catch-all route,
+  `app/api/auth/[...all]`); the other API routes are covered (`app/api/cron/sla/route.test.ts`,
+  `app/api/uploads.test.ts`, `app/api/busca/sugestoes/route.test.ts`) and the read-only pages/queries are not.
+  `lib/test-db.ts` hands out its single connection to ONE transaction at a time (like `FOR UPDATE` waits on
+  Neon) — without that, code that opens transactions in parallel (the cron route runs three sweeps at once)
+  interleaves BEGIN/COMMIT on the shared connection and loses updates. If you change money code, add a case there and confirm it fails when you break the
   guard (the suites were
   mutation-checked that way).
 - Package manager is `pnpm` (`pnpm-lock.yaml`). This pnpm version no longer reads workspace-level
