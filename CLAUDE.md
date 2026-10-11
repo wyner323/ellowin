@@ -24,11 +24,15 @@ the platform and only released to the seller after delivery is confirmed.
   need a database use `lib/test-db.ts`: an in-memory Postgres (PGlite, WASM) that applies the real
   `drizzle/*.sql` migrations (UTC time zone, like Neon), no network. A test file swaps the app's
   `@/lib/db` for it with `vi.mock` (see `lib/wallet.test.ts` / `lib/sla-sweeps.test.ts`). These cover
-  the escrow primitives, the purchase/confirm/cancel/dispute sequences, double-settlement guards, the
-  10 reconciliation checks and the three SLA sweeps. Limit: PGlite is a single connection, so two
-  truly concurrent transactions (the `FOR UPDATE` race itself) are not exercised. **Server actions
-  (`app/actions/*`) and routes still have no tests.** If you change money code, add a case there and
-  confirm it fails when you break the guard (the suite was mutation-checked that way).
+  the escrow primitives, double-settlement guards, the 10 reconciliation checks, the three SLA sweeps
+  and the server actions for orders and disputes (`app/actions/orders.test.ts`, `disputes.test.ts`:
+  real `lib/session.ts`/`lib/roles.ts` over a faked `@/lib/auth` session, `next/cache`, `next/headers`,
+  `next/server` and `@/lib/notify` mocked). Limits: PGlite is a single connection, so two truly
+  concurrent transactions (the `FOR UPDATE` race, or the SQL-level status guards that only matter in a
+  race) are not exercised; `app/actions/wallet.ts` (deposit/withdraw), `products.ts`, `seller.ts`,
+  `account.ts`, `auth.ts`, `reports.ts`, `admin.ts` and the API routes have no tests. If you change
+  money code, add a case there and confirm it fails when you break the guard (the suites were
+  mutation-checked that way).
 - Package manager is `pnpm` (`pnpm-lock.yaml`). This pnpm version no longer reads workspace-level
   settings from a `pnpm` key in `package.json` at all (confirmed directly: a `pnpm.overrides`
   block once broke the Vercel build silently, and later a `pnpm.onlyBuiltDependencies` addition
