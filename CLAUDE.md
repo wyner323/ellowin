@@ -20,12 +20,15 @@ the platform and only released to the seller after delivery is confirmed.
 - `pnpm test` — runs Vitest (`vitest run`) over pure-function unit tests in `lib/*.test.ts`
   (money math, SLA business-hour deadlines, delivery time lookup, account-origin lookup, seller
   badge thresholds, Sentry event scrubbing). `pnpm test:watch` for interactive mode.
-  **Coverage is intentionally narrow**:
-  only functions with zero I/O are tested — nothing in `lib/wallet.ts` (escrow) or any server
-  action has a test yet, because there is no separate test database (only one `DATABASE_URL`,
-  pointing at production) and running DB-touching tests against it would be unsafe. Provisioning
-  a dedicated test database (e.g. a Neon branch) is a prerequisite for testing that code, not yet
-  done.
+  **Never run DB-touching tests against the real `DATABASE_URL`** (it is production). Tests that
+  need a database use `lib/test-db.ts`: an in-memory Postgres (PGlite, WASM) that applies the real
+  `drizzle/*.sql` migrations (UTC time zone, like Neon), no network. A test file swaps the app's
+  `@/lib/db` for it with `vi.mock` (see `lib/wallet.test.ts` / `lib/sla-sweeps.test.ts`). These cover
+  the escrow primitives, the purchase/confirm/cancel/dispute sequences, double-settlement guards, the
+  10 reconciliation checks and the three SLA sweeps. Limit: PGlite is a single connection, so two
+  truly concurrent transactions (the `FOR UPDATE` race itself) are not exercised. **Server actions
+  (`app/actions/*`) and routes still have no tests.** If you change money code, add a case there and
+  confirm it fails when you break the guard (the suite was mutation-checked that way).
 - Package manager is `pnpm` (`pnpm-lock.yaml`). This pnpm version no longer reads workspace-level
   settings from a `pnpm` key in `package.json` at all (confirmed directly: a `pnpm.overrides`
   block once broke the Vercel build silently, and later a `pnpm.onlyBuiltDependencies` addition
