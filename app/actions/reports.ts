@@ -1,6 +1,6 @@
 "use server"
 
-import { eq } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { product, report, user } from "@/lib/db/schema"
@@ -9,6 +9,7 @@ import {
   isValidReportReason,
   MAX_REPORT_DESCRIPTION,
   MIN_REPORT_DESCRIPTION,
+  OPEN_REPORT_STATUSES,
 } from "@/lib/reports"
 import { hitRateLimit } from "@/lib/rate-limit"
 import { getStaff } from "@/lib/roles"
@@ -100,15 +101,45 @@ export async function reportUser(input: {
   return { ok: true, message: "Denúncia enviada. Nossa equipe vai analisar." }
 }
 
-/** Moderador assume o caso — mesmo padrão de claimDispute. */
+/**
+ * O membro da moderação é parte do caso? (denunciou, é o denunciado ou é dono do
+ * anúncio denunciado). Mesma regra de conflito de interesse das disputas: quem
+ * é parte não assume nem decide.
+ */
+async function isPartyToReport(
+  staffId: string,
+  row: { reporterId: string; targetUserId: string | null; targetProductId: number | null },
+) {
+  if (row.reporterId === staffId || row.targetUserId === staffId) return true
+  if (row.targetProductId === null) return false
+  const [item] = await db.select({ sellerId: product.sellerId }).from(product).where(eq(product.id, row.targetProductId)).limit(1)
+  return item?.sellerId === staffId
+}
+
+const reportCaseColumns = {
+  status: report.status,
+  reporterId: report.reporterId,
+  targetUserId: report.targetUserId,
+  targetProductId: report.targetProductId,
+}
+
+/** Moderador assume o caso — mesmo padrão de claimDispute: só caso em aberto, e nunca o próprio. */
 export async function claimReport(reportId: number): Promise<ActionResult> {
   const staff = await getStaff()
   if (!staff) return { ok: false, error: "Acesso restrito à moderação." }
 
+  const [row] = await db.select(reportCaseColumns).from(report).where(eq(report.id, reportId)).limit(1)
+  if (!row) return { ok: false, error: "Denúncia não encontrada." }
+  if (!OPEN_REPORT_STATUSES.includes(row.status as (typeof OPEN_REPORT_STATUSES)[number]))
+    return { ok: false, error: "Esta denúncia já foi encerrada." }
+  if (await isPartyToReport(staff.id, row))
+    return { ok: false, error: "Você é parte desta denúncia e não pode assumi-la." }
+
+  // O status no WHERE: se o caso foi encerrado entre a leitura e aqui, nada é reaberto.
   await db
     .update(report)
     .set({ moderatorId: staff.id, status: "em_analise" })
-    .where(eq(report.id, reportId))
+    .where(and(eq(report.id, reportId), inArray(report.status, OPEN_REPORT_STATUSES)))
 
   revalidatePath(`/admin/denuncias/${reportId}`)
   revalidatePath("/admin/denuncias")
@@ -124,16 +155,22 @@ export async function resolveReport(input: {
   const staff = await getStaff()
   if (!staff) return { ok: false, error: "Acesso restrito à moderação." }
 
+  // O tipo do TypeScript não vale em runtime: só os dois desfechos existem.
+  if (input.status !== "resolvida" && input.status !== "arquivada")
+    return { ok: false, field: "status", error: "Escolha o desfecho da denúncia." }
+
   const note = input.note.trim()
   if (note.length < 5)
     return { ok: false, field: "note", error: "Registre uma nota sobre a decisão (mínimo de 5 caracteres)." }
   if (note.length > MAX_REPORT_DESCRIPTION)
     return { ok: false, field: "note", error: `A nota pode ter até ${MAX_REPORT_DESCRIPTION} caracteres.` }
 
-  const [row] = await db.select({ status: report.status }).from(report).where(eq(report.id, input.reportId)).limit(1)
+  const [row] = await db.select(reportCaseColumns).from(report).where(eq(report.id, input.reportId)).limit(1)
   if (!row) return { ok: false, error: "Denúncia não encontrada." }
   if (row.status === "resolvida" || row.status === "arquivada")
     return { ok: false, error: "Esta denúncia já foi encerrada." }
+  if (await isPartyToReport(staff.id, row))
+    return { ok: false, error: "Você é parte desta denúncia e não pode decidi-la." }
 
   await db
     .update(report)
@@ -143,7 +180,7 @@ export async function resolveReport(input: {
       moderatorId: staff.id,
       resolvedAt: new Date(),
     })
-    .where(eq(report.id, input.reportId))
+    .where(and(eq(report.id, input.reportId), inArray(report.status, OPEN_REPORT_STATUSES)))
 
   revalidatePath(`/admin/denuncias/${input.reportId}`)
   revalidatePath("/admin/denuncias")

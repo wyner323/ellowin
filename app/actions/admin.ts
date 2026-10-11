@@ -29,10 +29,12 @@ export async function setUserRole(input: {
   if (input.userId === admin.id && input.role !== "admin")
     return { ok: false, error: "Você não pode remover o seu próprio acesso de administrador." }
 
-  await db
+  const updated = await db
     .update(user)
     .set({ role: input.role })
     .where(eq(user.id, input.userId))
+    .returning({ id: user.id })
+  if (updated.length === 0) return { ok: false, error: "Usuário não encontrado." }
 
   revalidatePath("/admin/usuarios")
   return { ok: true, message: "Cargo atualizado." }

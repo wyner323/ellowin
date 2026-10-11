@@ -26,13 +26,13 @@ the platform and only released to the seller after delivery is confirmed.
   `@/lib/db` for it with `vi.mock` (see `lib/wallet.test.ts` / `lib/sla-sweeps.test.ts`). These cover
   the escrow primitives, double-settlement guards, the 10 reconciliation checks, the three SLA sweeps
   and the server actions for orders, disputes, the wallet, listings, account/login, "Minha conta" + LGPD
-  deletion and seller onboarding (`app/actions/{orders,disputes,wallet,products,auth,account,seller}.test.ts`:
+  deletion, seller onboarding, reports and admin/roles (`app/actions/{orders,disputes,wallet,products,auth,account,seller,reports,admin}.test.ts`:
   real `lib/session.ts`/`lib/roles.ts` over a faked `@/lib/auth` session, with `next/cache`, `next/headers`,
   `next/server` and `@/lib/notify` mocked). Limits: PGlite is a single connection, so two truly
   concurrent transactions (the `FOR UPDATE` race, or the SQL-level status guards that only matter in a
   race) are not exercised; `auth.test.ts` fakes Better Auth itself (user creation / password check), so the
-  real hashing, session cookies and Google linking are untested; `reports.ts`, `admin.ts` and the API
-  routes have no tests. If you change money code, add a case there and confirm it fails when you break the
+  real hashing, session cookies and Google linking are untested; the API routes (`app/api/*`) and the
+  read-only pages have no tests. If you change money code, add a case there and confirm it fails when you break the
   guard (the suites were
   mutation-checked that way).
 - Package manager is `pnpm` (`pnpm-lock.yaml`). This pnpm version no longer reads workspace-level
