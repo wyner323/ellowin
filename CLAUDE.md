@@ -182,7 +182,9 @@ Filtered/paged URLs canonicalize to the base path; `/busca` is `noindex`. Card e
 ≥ 5 reviews, "últimas N unidades" at ≤ 5 in stock) come from the same query and the pure `lib/card-info.ts`. The product
 page ends with `getRelatedListings()` (same game/category + same store); the header search has a `/` shortcut
 (`components/search-shortcut.tsx`) and game-name suggestions through a native `<datalist>`
-(`components/search-suggestions.tsx` → `/api/busca/sugestoes`, static catalog only, `lib/search-suggest.ts`). `/busca` also
+(`components/search-suggestions.tsx` → `/api/busca/sugestoes`, static catalog only, `lib/search-suggest.ts`). `/busca` with
+a text term sorts by relevance by default (`defaultSort` on `ListingFilters`; title starts with the term > a title word starts
+with it > game starts with it > rest, ties by newest) and offers no relevance option without a term. `/busca` also
 takes `?categoria=` (chips; `scopeHref()` keeps the scope when clearing filters). Category and game pages show real
 listing/seller counts and "a partir de" (`getCategoryStats()`/`getGameStats()` in `lib/market-stats.ts`), never the filtered total.
 
