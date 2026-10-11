@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { dispute, order } from "@/lib/db/schema"
+import { isUniqueViolation } from "@/lib/db-errors"
 import { DISPUTE_REASONS } from "@/lib/disputes"
 import { getDisputeMessages } from "@/lib/orders"
 import { formatCents } from "@/lib/money"
@@ -127,10 +128,6 @@ export async function openDispute(input: {
   notifyOrder("dispute_opened", row.id)
 
   return { ok: true, message: "Disputa aberta. O chat com o vendedor está disponível.", disputeId }
-}
-
-function isUniqueViolation(error: unknown) {
-  return Boolean(error && typeof error === "object" && "code" in error && error.code === "23505")
 }
 
 const MAX_MESSAGE_LENGTH = 2000

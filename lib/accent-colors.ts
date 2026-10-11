@@ -15,7 +15,8 @@ export const ACCENT_COLORS = {
 export type AccentColorId = keyof typeof ACCENT_COLORS
 
 export function isValidAccentColor(value: string): value is AccentColorId {
-  return value in ACCENT_COLORS
+  // `in` aceitaria nomes herdados do Object ("constructor", "__proto__", "toString").
+  return Object.hasOwn(ACCENT_COLORS, value)
 }
 
 /** Hex da cor, ou null quando é a cor padrão da marca (usa --primary do tema). */

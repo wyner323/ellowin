@@ -7,15 +7,12 @@ import { user } from "@/lib/db/schema"
 import { getUserId } from "@/lib/session"
 import { anonymizeAccount, getDeletionBlockers } from "@/lib/account-deletion"
 import { isValidAccentColor } from "@/lib/accent-colors"
+import { isUniqueViolation } from "@/lib/db-errors"
 import { isOwnBlobUrl } from "@/lib/blob-urls"
 import { sendAccountDeletedEmail } from "@/lib/email"
 import { hitRateLimit } from "@/lib/rate-limit"
 import { isValidBio, isValidDisplayName } from "@/lib/validation"
 import type { ActionResult } from "@/app/actions/auth"
-
-function isUniqueViolation(error: unknown) {
-  return Boolean(error && typeof error === "object" && "code" in error && error.code === "23505")
-}
 
 /** Atualiza o apelido público exibido no chat, avaliações e anúncios. */
 export async function updateDisplayName(input: { displayName: string }): Promise<ActionResult> {

@@ -25,13 +25,13 @@ the platform and only released to the seller after delivery is confirmed.
   `drizzle/*.sql` migrations (UTC time zone, like Neon), no network. A test file swaps the app's
   `@/lib/db` for it with `vi.mock` (see `lib/wallet.test.ts` / `lib/sla-sweeps.test.ts`). These cover
   the escrow primitives, double-settlement guards, the 10 reconciliation checks, the three SLA sweeps
-  and the server actions for orders, disputes, the wallet, listings and account/login (`app/actions/orders.test.ts`, `disputes.test.ts`, `wallet.test.ts`, `products.test.ts`, `auth.test.ts`:
+  and the server actions for orders, disputes, the wallet, listings, account/login and "Minha conta" + LGPD deletion (`app/actions/orders.test.ts`, `disputes.test.ts`, `wallet.test.ts`, `products.test.ts`, `auth.test.ts`, `account.test.ts`:
   real `lib/session.ts`/`lib/roles.ts` over a faked `@/lib/auth` session, `next/cache`, `next/headers`,
   `next/server` and `@/lib/notify` mocked). Limits: PGlite is a single connection, so two truly
   concurrent transactions (the `FOR UPDATE` race, or the SQL-level status guards that only matter in a
   race) are not exercised; `auth.test.ts` fakes Better Auth itself (user creation / password check), so the real
   hashing, session cookies and Google linking are untested; `app/actions/seller.ts`,
-  `account.ts`, `reports.ts`, `admin.ts` and the API routes have no tests. If you change
+  `reports.ts`, `admin.ts` and the API routes have no tests. If you change
   money code, add a case there and confirm it fails when you break the guard (the suites were
   mutation-checked that way).
 - Package manager is `pnpm` (`pnpm-lock.yaml`). This pnpm version no longer reads workspace-level
@@ -196,6 +196,12 @@ a text term sorts by relevance by default (`defaultSort` on `ListingFilters`; ti
 with it > game starts with it > rest, ties by newest) and offers no relevance option without a term. `/busca` also
 takes `?categoria=` (chips; `scopeHref()` keeps the scope when clearing filters). Category and game pages show real
 listing/seller counts and "a partir de" (`getCategoryStats()`/`getGameStats()` in `lib/market-stats.ts`), never the filtered total.
+
+### Unique-violation errors
+
+Drizzle (0.45) wraps driver errors in a `DrizzleQueryError` with the original in `.cause`, so `error.code === "23505"` is false
+for `db.insert/update` calls (it only works on the raw `pool`/`client`). Use `isUniqueViolation()` from `lib/db-errors.ts`, which
+walks the cause chain; never re-implement the check inline (an inline one made "nickname already in use" a 500 in "Minha conta").
 
 ### Per-game attributes (rank, region…)
 

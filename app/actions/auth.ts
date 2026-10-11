@@ -5,6 +5,7 @@ import { and, desc, eq, isNull, lt, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { isUniqueViolation } from "@/lib/db-errors"
 import { otpCode, profile, user } from "@/lib/db/schema"
 import { sendEmailOtp, sendPhoneOtpByEmail } from "@/lib/email"
 import { clearRateLimit, clientIp, hitRateLimit } from "@/lib/rate-limit"
@@ -530,7 +531,7 @@ export async function completeProfile(input: {
       .where(eq(user.id, userId))
   } catch (error) {
     // Corrida com outro cadastro usando o mesmo CPF/apelido (índices únicos no banco).
-    if (error && typeof error === "object" && "code" in error && error.code === "23505")
+    if (isUniqueViolation(error))
       return { ok: false, error: "Esse CPF ou apelido acabou de ser usado por outra conta." }
     throw error
   }
