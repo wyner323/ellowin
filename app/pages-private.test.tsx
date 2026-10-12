@@ -242,12 +242,20 @@ describe("detalhe do pedido", () => {
     }
   })
 
-  it("moderação abre qualquer pedido (comportamento atual: vê também os dados de entrega)", async () => {
+  it("moderação abre qualquer pedido, mas só lê os dados de entrega se houver disputa aberta", async () => {
     const id = await addOrder({ payload: "login: abc123" })
     as("mod")
-    const t1 = await txt(PedidoPage(props({ id: String(id) })))
-    expect(t1).toContain("Conta Valorant")
-    expect(t1).toContain("login: abc123")
+    const semDisputa = await txt(PedidoPage(props({ id: String(id) })))
+    expect(semDisputa).toContain("Conta Valorant")
+    expect(semDisputa).not.toContain("Dados da entrega")
+    expect(semDisputa).not.toContain("login: abc123")
+
+    const disputeId = await addDispute(id)
+    const comDisputa = await txt(PedidoPage(props({ id: String(id) })))
+    expect(comDisputa).toContain("login: abc123")
+
+    await t.query(`UPDATE "dispute" SET "status" = 'resolvida_vendedor' WHERE "id" = $1`, [disputeId])
+    expect(await txt(PedidoPage(props({ id: String(id) })))).not.toContain("login: abc123")
   })
 
   it("sem dados de entrega, a seção não aparece", async () => {
@@ -387,6 +395,15 @@ describe("moderação", () => {
     expect(t1).toContain("NOTA INTERNA suspeita de golpe")
     expect(t1).toContain("Relato do comprador")
     expect(t1).toContain("Conta Valorant")
+  })
+
+  it("caso de disputa: dados de entrega só enquanto a disputa está aberta", async () => {
+    const orderId = await addOrder({ status: "em_disputa", payload: "login: abc123 senha: segredo" })
+    const disputeId = await addDispute(orderId)
+    as("mod")
+    expect(await txt(CasoDisputaPage(props({ id: String(disputeId) })))).toContain("login: abc123 senha: segredo")
+    await t.query(`UPDATE "dispute" SET "status" = 'cancelada' WHERE "id" = $1`, [disputeId])
+    expect(await txt(CasoDisputaPage(props({ id: String(disputeId) })))).not.toContain("segredo")
   })
 
   it("caso inexistente ou id inválido: 404", async () => {

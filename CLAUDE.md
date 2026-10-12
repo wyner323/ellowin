@@ -129,7 +129,9 @@ The seller onboarding order (store → phone → document → Pix) is enforced s
 wizard, and editing an already-approved seller never lowers their status/level. Delivery data (`order.deliveryPayload`, game
 credentials) is encrypted at rest with `lib/secret-box.ts` when `DELIVERY_ENCRYPTION_KEY` is set (plaintext otherwise, so the
 variable must exist in Vercel before it takes effect; `scripts/encrypt-delivery-payloads.mjs` migrates old rows). Only
-`getOrderDetail` reads/decrypts it — list queries must not select it.
+`getOrderDetail` reads/decrypts it — list queries must not select it. Staff who are not a party to the order get the decrypted
+payload only while the order's dispute is open (`aberta`/`em_analise`, `OPEN_DISPUTE_STATUSES` in `lib/orders.ts`); with no dispute or a
+closed one they see the order without the credentials.
 
 Two names exist per user, and mixing them up is a real privacy bug, not just a style issue:
 - `user.name` (and `profile.fullName`) — the legal name tied to CPF/KYC. Internal/staff use only.

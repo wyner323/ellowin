@@ -21,6 +21,9 @@ import {
  * esquecer de aplicá-lo.
  */
 
+/** Disputa ainda em andamento (a moderação só lê os dados de entrega enquanto for um destes). */
+const OPEN_DISPUTE_STATUSES = ["aberta", "em_analise"]
+
 const buyer = aliasedTable(user, "buyer")
 const seller = aliasedTable(user, "seller")
 
@@ -324,9 +327,16 @@ export async function getOrderDetail(
     .where(eq(dispute.orderId, orderId))
     .limit(1)
 
+  // Credenciais de terceiros: comprador e vendedor leem sempre; a moderação (quando não é parte)
+  // só enquanto a disputa do pedido está aberta, que é quando precisa conferir o que foi entregue.
+  const staffOnly = !isBuyer && !isSeller
+  const disputeOpen = disputeRow ? OPEN_DISPUTE_STATUSES.includes(disputeRow.status) : false
+  const mayReadPayload = !staffOnly || disputeOpen
+
   return {
     ...row,
-    deliveryPayload: row.deliveryPayload ? decryptField(row.deliveryPayload, `order:${orderId}`) : null,
+    deliveryPayload:
+      row.deliveryPayload && mayReadPayload ? decryptField(row.deliveryPayload, `order:${orderId}`) : null,
     viewer: { isBuyer, isSeller, isStaff },
     review: reviewRow ?? null,
     dispute: disputeRow ?? null,

@@ -469,7 +469,31 @@ describe("getOrderDetail", () => {
     await t.query(`UPDATE "order" SET "deliveryPayload" = $2 WHERE "id" = $1`, [id, cifrado])
     expect((await getOrderDetail(id, "comprador"))?.deliveryPayload).toBe("login: abc / senha: 123")
     expect((await getOrderDetail(id, "ana"))?.deliveryPayload).toBe("login: abc / senha: 123")
+  })
+
+  it("moderação (que não é parte) só lê os dados de entrega com disputa ABERTA", async () => {
+    const id = await addOrder({ status: "em_disputa" })
+    await t.query(`UPDATE "order" SET "deliveryPayload" = $2 WHERE "id" = $1`, [id, encryptField("login: abc / senha: 123", `order:${id}`)])
+    // sem disputa registrada
+    expect((await getOrderDetail(id, "mod", true))?.deliveryPayload).toBeNull()
+    const d = await addDispute(id, { status: "aberta" })
     expect((await getOrderDetail(id, "mod", true))?.deliveryPayload).toBe("login: abc / senha: 123")
+    await t.query(`UPDATE "dispute" SET "status" = 'em_analise' WHERE "id" = $1`, [d])
+    expect((await getOrderDetail(id, "mod", true))?.deliveryPayload).toBe("login: abc / senha: 123")
+    // encerrada, de qualquer forma: a moderação deixa de ler as credenciais
+    for (const status of ["resolvida_comprador", "resolvida_vendedor", "cancelada"]) {
+      await t.query(`UPDATE "dispute" SET "status" = $2 WHERE "id" = $1`, [d, status])
+      expect((await getOrderDetail(id, "mod", true))?.deliveryPayload).toBeNull()
+    }
+    // as partes continuam lendo sempre, inclusive depois de encerrada
+    expect((await getOrderDetail(id, "comprador"))?.deliveryPayload).toBe("login: abc / senha: 123")
+    expect((await getOrderDetail(id, "ana"))?.deliveryPayload).toBe("login: abc / senha: 123")
+  })
+
+  it("moderador que é a própria parte lê como parte", async () => {
+    const id = await addOrder({ status: "entregue", buyer: "mod" })
+    await t.query(`UPDATE "order" SET "deliveryPayload" = $2 WHERE "id" = $1`, [id, encryptField("meu acesso", `order:${id}`)])
+    expect((await getOrderDetail(id, "mod", true))?.deliveryPayload).toBe("meu acesso")
   })
 
   it("dado legado em texto puro continua legível; sem dado devolve nulo", async () => {

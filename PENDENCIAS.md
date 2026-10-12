@@ -59,10 +59,11 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
   descrição da loja continuam visíveis em `/loja/<nome>` (os anúncios já estão pausados, mas a loja segue no ar).
   Decisão: esconder a loja e limpar esses campos quando a conta for excluída? O Claude recomenda que sim e implementa
   em minutos, mas é você quem decide o que a retenção legal permite manter público.
-- [ ] **Moderação vê os dados de entrega dos pedidos.** Hoje moderador e administrador abrem qualquer pedido em
-  `/pedidos/<id>` e leem, decifrados, os "Dados da entrega" (login/senha de contas de jogo, códigos). Pode ser útil para
-  julgar uma disputa, mas é acesso amplo a credenciais de terceiros. Decisão: manter, mostrar só quando o pedido estiver
-  em disputa, ou esconder da moderação? (O Claude implementa qualquer das três; hoje um teste descreve o comportamento atual.)
+- [x] **Moderação e os dados de entrega — resolvido por padrão (2026-10-12):** moderador e administrador (quando não são
+  parte do pedido) só leem os "Dados da entrega" decifrados **enquanto a disputa do pedido está aberta** (`aberta` ou
+  `em_analise`); sem disputa ou com a disputa encerrada, veem o pedido mas não as credenciais. Comprador e vendedor leem
+  sempre. É a opção de menor acesso que ainda permite julgar. Se preferir outra (manter tudo aberto à moderação, ou
+  esconder sempre), é só dizer: é uma constante e um teste.
 - [ ] **Texto do e-mail do código de telefone.** Diz "no ambiente de testes enviamos por email", e é enviado também a
   clientes reais. Defina a redação final (ou, com SMS/KYC real, o canal), e o Claude troca o texto.
 - [ ] **Conflito de interesse na moderação de denúncias** (mudança já publicada em `be45763`): moderador que é parte
