@@ -26,10 +26,14 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
   `SENTRY_ORG`, `SENTRY_PROJECT` e `SENTRY_AUTH_TOKEN`.
 - [ ] **Confirmar o envio de e-mail em produção:** `RESEND_API_KEY` e `ELLOWIN_EMAIL_FROM` na Vercel e o domínio remetente
   verificado no Resend. Sem isso, os e-mails de pedido, disputa e o alerta da conferência falham em silêncio.
-- [ ] **Login com Google (opcional):** criar o cliente OAuth no Google Cloud (Web, tela de consentimento "Ellowin"),
-  URI de redirecionamento `https://ellowin.com.br/api/auth/callback/google`, e então `GOOGLE_CLIENT_ID` e
-  `GOOGLE_CLIENT_SECRET` na Vercel + redeploy. Faça **depois** de trocar o `BETTER_AUTH_SECRET`. O botão só aparece
-  quando as duas chaves existem.
+- [ ] **Login com Google — quase pronto (2026-10-12):** o cliente OAuth "Ellowin (site)" foi criado no Google Cloud (projeto
+  "My First Project", tela de consentimento Externa), as variáveis `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` estão na Vercel
+  (Produção) e o botão "Continuar com Google" já aparece em produção. **Falta:** (1) em Google Auth Platform → Público-alvo,
+  **Publicar app** (em modo de teste só entram os e-mails cadastrados como testadores); (2) **entrar uma vez com uma conta
+  Google real** para confirmar o fluxo (callback, `/completar-cadastro`); (3) trocar o e-mail de suporte da tela de
+  consentimento (hoje é o e-mail pessoal) em Branding quando houver um e-mail de suporte do domínio; (4) guardar a chave
+  secreta em local seguro (o Google não a mostra de novo; se perder, crie outra no mesmo cliente). Idealmente, trocar também
+  o `BETTER_AUTH_SECRET` (item acima), que derruba as sessões atuais.
 
 ## 2. Dados de demonstração no banco de produção
 
