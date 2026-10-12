@@ -50,6 +50,8 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: `/produtos/${item.slug}` },
+    // Anúncio pausado não aceita compra: o link continua abrindo (quem já o tinha), mas não deve ser indexado.
+    ...(item.status !== "ativo" ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       type: "website",
       locale: "pt_BR",
