@@ -33,7 +33,7 @@ function otpTemplate({
           <h1 style="margin:0 0 12px;font-size:20px;color:#1f1235;">${title}</h1>
           <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4b4563;">${intro}</p>
           <div style="text-align:center;margin:0 0 24px;">
-            <span style="display:inline-block;padding:16px 28px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:12px;font-size:32px;font-weight:700;letter-spacing:10px;color:#5b21b6;">${code}</span>
+            <span style="display:inline-block;padding:16px 28px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:12px;font-size:32px;font-weight:700;letter-spacing:10px;color:#5b21b6;">${escapeHtml(code)}</span>
           </div>
           <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#6b6480;">
             O código expira em 10 minutos e só pode ser usado uma vez.
@@ -111,7 +111,7 @@ export async function sendPhoneOtpByEmail(
       html: otpTemplate({
         code,
         title: "Confirme seu telefone",
-        intro: `Este é o código de verificação do telefone <strong>${phone}</strong>. Em produção ele chegaria por SMS; no ambiente de testes enviamos por email.`,
+        intro: `Este é o código de verificação do telefone <strong>${escapeHtml(phone)}</strong>. Em produção ele chegaria por SMS; no ambiente de testes enviamos por email.`,
       }),
     })
     if (error) {
