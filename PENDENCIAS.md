@@ -64,8 +64,9 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
   `em_analise`); sem disputa ou com a disputa encerrada, veem o pedido mas não as credenciais. Comprador e vendedor leem
   sempre. É a opção de menor acesso que ainda permite julgar. Se preferir outra (manter tudo aberto à moderação, ou
   esconder sempre), é só dizer: é uma constante e um teste.
-- [ ] **Texto do e-mail do código de telefone.** Diz "no ambiente de testes enviamos por email", e é enviado também a
-  clientes reais. Defina a redação final (ou, com SMS/KYC real, o canal), e o Claude troca o texto.
+- [x] **Texto do código de telefone — ajustado (2026-10-12):** o e-mail e o aviso na tela agora dizem "Ainda não enviamos
+  códigos por SMS, por isso ele chega por email" (antes citavam "ambiente de testes", e isso chegava a clientes reais).
+  Quando houver SMS de verdade (item de KYC/SMS), o canal e o texto mudam juntos; se quiser outra redação, é só dizer.
 - [ ] **Conflito de interesse na moderação de denúncias** (mudança já publicada em `be45763`): moderador que é parte
   do caso (quem denunciou, o denunciado ou o dono do anúncio) não assume nem decide a denúncia, a mesma regra que
   as disputas já tinham. Confirme que é isso mesmo que você quer.

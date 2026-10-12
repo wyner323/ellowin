@@ -510,7 +510,9 @@ describe("telefone", () => {
     const user = await register()
     holder.userId = user.id
 
-    expect(await sendPhoneCode()).toMatchObject({ ok: true })
+    const first = await sendPhoneCode()
+    expect(first).toEqual({ ok: true, message: "Código enviado para o seu email. Ainda não enviamos códigos por SMS." })
+    expect(first.message).not.toMatch(/ambiente de testes/i)
     const sent = holder.emailSent.at(-1)!
     expect(sent).toMatchObject({ kind: "phone", to: "maria@teste.dev" })
 

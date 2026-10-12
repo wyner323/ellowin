@@ -237,7 +237,7 @@ async function issueOtp(
     return { ...result, code }
   }
 
-  // Código de telefone vai para o email confirmado (não há provedor de SMS aqui).
+  // Código de telefone vai para o email confirmado (ainda não há provedor de SMS).
   const [row] = await db
     .select({ email: user.email })
     .from(user)
@@ -322,7 +322,7 @@ export async function sendPhoneCode(): Promise<ActionResult> {
 
   return {
     ok: true,
-    message: "Código enviado. No ambiente de testes ele chega por email.",
+    message: "Código enviado para o seu email. Ainda não enviamos códigos por SMS.",
   }
 }
 

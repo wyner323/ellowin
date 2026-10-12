@@ -88,9 +88,9 @@ export async function sendEmailOtp(
 }
 
 /**
- * Não há provedor de SMS configurado neste ambiente de testes, então o código
- * do telefone é enviado para o email verificado do usuário, deixando isso
- * explícito no conteúdo da mensagem.
+ * Ainda não há provedor de SMS, então o código do telefone é enviado para o
+ * email verificado do usuário, deixando isso explícito no conteúdo da mensagem
+ * (que também chega a clientes reais: nada de "ambiente de testes" no texto).
  */
 export async function sendPhoneOtpByEmail(
   to: string,
@@ -111,7 +111,7 @@ export async function sendPhoneOtpByEmail(
       html: otpTemplate({
         code,
         title: "Confirme seu telefone",
-        intro: `Este é o código de verificação do telefone <strong>${escapeHtml(phone)}</strong>. Em produção ele chegaria por SMS; no ambiente de testes enviamos por email.`,
+        intro: `Este é o código de verificação do telefone <strong>${escapeHtml(phone)}</strong>. Ainda não enviamos códigos por SMS, por isso ele chega por email.`,
       }),
     })
     if (error) {

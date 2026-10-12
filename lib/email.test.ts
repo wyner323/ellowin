@@ -160,6 +160,13 @@ describe("códigos de verificação", () => {
     expect(c.html).toContain("<strong>(11) 94567-8901</strong>")
   })
 
+  it("telefone: o texto explica que não há SMS e nunca fala em 'ambiente de testes' (vai para clientes reais)", async () => {
+    await email.sendPhoneOtpByEmail("ana@teste.dev", "112233", "(11) 94567-8901")
+    const html = lastCall().html
+    expect(html).toContain("Ainda não enviamos códigos por SMS")
+    expect(html).not.toMatch(/ambiente de testes/i)
+  })
+
   it("telefone: o número é escapado (não vira HTML)", async () => {
     await email.sendPhoneOtpByEmail("ana@teste.dev", "112233", '<img src=x onerror="a">')
     const c = lastCall()
