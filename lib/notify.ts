@@ -59,29 +59,37 @@ async function deliver(userId: string, kind: string, refId: string, message: Mes
     .returning({ id: notificationLog.id })
   if (!claimed) return
 
-  const [recipient] = await db
-    .select({ email: user.email })
-    .from(user)
-    .where(eq(user.id, userId))
-    .limit(1)
-  if (!recipient?.email) return
+  const release = () => db.delete(notificationLog).where(eq(notificationLog.id, claimed.id))
 
-  const result = await sendMail(
-    recipient.email,
-    message.subject,
-    actionTemplate({
-      title: message.title,
-      intro: message.intro,
-      buttonLabel: message.buttonLabel,
-      buttonUrl: `${SITE_URL}${message.path}`,
-      footnote:
-        "Você recebe este email por causa de uma atividade na sua conta Ellowin. Por segurança, nunca pedimos senhas nem dados de acesso por email.",
-    }),
-    kind,
-  )
+  try {
+    const [recipient] = await db
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1)
+    if (!recipient?.email) return
 
-  // Falhou: libera a reserva para uma próxima tentativa poder enviar.
-  if (!result.sent) await db.delete(notificationLog).where(eq(notificationLog.id, claimed.id))
+    const result = await sendMail(
+      recipient.email,
+      message.subject,
+      actionTemplate({
+        title: message.title,
+        intro: message.intro,
+        buttonLabel: message.buttonLabel,
+        buttonUrl: `${SITE_URL}${message.path}`,
+        footnote:
+          "Você recebe este email por causa de uma atividade na sua conta Ellowin. Por segurança, nunca pedimos senhas nem dados de acesso por email.",
+      }),
+      kind,
+    )
+
+    // Falhou: libera a reserva para uma próxima tentativa poder enviar.
+    if (!result.sent) await release()
+  } catch (error) {
+    // Erro inesperado depois de reservar (banco, template): sem liberar, o aviso nunca mais sairia.
+    await release().catch(() => {})
+    throw error
+  }
 }
 
 /** Avisa comprador e/ou vendedor de um pedido. `extra` só é usado por alguns tipos. */
