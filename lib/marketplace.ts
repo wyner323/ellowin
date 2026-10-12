@@ -503,8 +503,9 @@ export async function getSellerQuestionsPage(
     .innerJoin(product, eq(product.id, productQuestion.productId))
     .leftJoin(user, eq(user.id, productQuestion.askerId))
     .where(where)
-    // Postgres ordena NULL primeiro em ASC — sem resposta sobe pro topo sozinho.
-    .orderBy(asc(productQuestion.answer), desc(productQuestion.createdAt), desc(productQuestion.id))
+    // Sem resposta primeiro. (Não dá para ordenar pela própria coluna: no Postgres NULL vem por ÚLTIMO em ASC,
+    // e as respondidas ficariam em ordem alfabética da resposta em vez de por data.)
+    .orderBy(asc(sql`(${productQuestion.answer} is not null)`), desc(productQuestion.createdAt), desc(productQuestion.id))
     .limit(limit)
     .offset(offset)
 
@@ -690,11 +691,13 @@ export async function getSellerListingSummary(sellerId: string) {
       total: sql<number>`count(*)::int`,
       active: sql<number>`(count(*) filter (where ${product.status} = 'ativo'))::int`,
       paused: sql<number>`(count(*) filter (where ${product.status} = 'pausado'))::int`,
+      // `"product"."id"` por texto, não `${product.id}`: numa consulta de uma tabela só o Drizzle
+      // renderiza a coluna sem qualificador, e dentro da subquery `"id"` vira o id da própria variante.
       outOfStock: sql<number>`(count(*) filter (
         where ${product.status} = 'ativo'
           and not exists (
             select 1 from "product_variant" v
-             where v."productId" = ${product.id} and v."active" and v."stock" > 0
+             where v."productId" = "product"."id" and v."active" and v."stock" > 0
           )
       ))::int`,
     })
