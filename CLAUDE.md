@@ -33,7 +33,10 @@ the platform and only released to the seller after delivery is confirmed.
   race) are not exercised; `auth.test.ts` fakes Better Auth itself (user creation / password check), so the
   real hashing, session cookies and Google linking are untested (so is the Better Auth catch-all route,
   `app/api/auth/[...all]`); the other API routes are covered (`app/api/cron/sla/route.test.ts`,
-  `app/api/uploads.test.ts`, `app/api/busca/sugestoes/route.test.ts`) and the read-only pages/queries are not.
+  `app/api/uploads.test.ts`, `app/api/busca/sugestoes/route.test.ts`). The buyer-facing listing SQL
+  (`searchListings`, `getRelatedListings`, `getGameListingCounts` in `lib/marketplace-search.test.ts`; the public numbers in
+  `lib/market-stats.test.ts`) is covered too; page components and the other `lib/marketplace.ts` readers
+  (`getProductBySlug`, `getSellerStorefront`, seller dashboards) are not.
   `lib/test-db.ts` hands out its single connection to ONE transaction at a time (like `FOR UPDATE` waits on
   Neon) — without that, code that opens transactions in parallel (the cron route runs three sweeps at once)
   interleaves BEGIN/COMMIT on the shared connection and loses updates. If you change money code, add a case there and confirm it fails when you break the

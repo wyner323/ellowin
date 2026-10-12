@@ -850,7 +850,8 @@ export async function getGameListingCounts(): Promise<Record<string, number>> {
   const rows = await db
     .select({ game: product.game })
     .from(product)
-    .where(and(eq(product.status, "ativo"), sql`${product.game} is not null`))
+    // Mesma regra de "à venda" da página do jogo, para o número do índice bater com a lista.
+    .where(and(eq(product.status, "ativo"), sql`${product.game} is not null`, FOR_SALE_SQL))
 
   const counts: Record<string, number> = {}
   for (const row of rows) {
