@@ -38,7 +38,13 @@ the platform and only released to the seller after delivery is confirmed.
   `lib/market-stats.test.ts`) is covered too, and so are the order/dispute readers (`lib/orders.test.ts`: who may see an
   order, internal dispute notes hidden from the parties, delivery payload decryption, queue order/pagination) and the other
   `lib/marketplace.ts` readers (`lib/marketplace-readers.test.ts`: home cards, product page, questions, seller stats, "Meus anúncios",
-  public storefront); page components are not. In a single-table Drizzle select, never interpolate a column (`${product.id}`) inside a
+  public storefront). Pages are rendered for real too (`app/pages-public.test.tsx`, `app/pages-private.test.tsx`): call the async page
+  component and render it with `renderHtml()` from `lib/test-render.tsx` (a `renderToReadableStream`, because
+  `renderToStaticMarkup` cannot handle the async server components inside a page; `htmlToText()` gives the visible text), with
+  `@/lib/auth`, `next/navigation` (`notFound`/`redirect` throw), `next/headers`, `next/server` and the header/footer mocked. They check the
+  access control (login redirect, 404 for non-parties, internal dispute notes hidden, admin/staff gates, seller panel gate), public
+  names instead of legal names, and that seller-typed text never escapes into the HTML/JSON-LD. Client components are not exercised
+  (no hooks run); nothing here looks at CSS/layout. In a single-table Drizzle select, never interpolate a column (`${product.id}`) inside a
   raw correlated subquery — it renders unqualified and binds to the subquery's own table; write `"product"."id"` as text, and in tests
   offset the variant ids from the product ids so a wrong correlation can't pass by coincidence.
   `lib/test-db.ts` hands out its single connection to ONE transaction at a time (like `FOR UPDATE` waits on
