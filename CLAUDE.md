@@ -43,8 +43,10 @@ the platform and only released to the seller after delivery is confirmed.
   `renderToStaticMarkup` cannot handle the async server components inside a page; `htmlToText()` gives the visible text), with
   `@/lib/auth`, `next/navigation` (`notFound`/`redirect` throw), `next/headers`, `next/server` and the header/footer mocked. They check the
   access control (login redirect, 404 for non-parties, internal dispute notes hidden, admin/staff gates, seller panel gate), public
-  names instead of legal names, and that seller-typed text never escapes into the HTML/JSON-LD. Client components are not exercised
-  (no hooks run); nothing here looks at CSS/layout. In a single-table Drizzle select, never interpolate a column (`${product.id}`) inside a
+  names instead of legal names, and that seller-typed text never escapes into the HTML/JSON-LD. `app/pages-conventions.test.tsx` renders EVERY screen
+  (public, account, seller panel, moderation — add yours to its `screens` list) and enforces the page conventions: exactly one
+  `<main id="conteudo">`, a single `<h1>`, `alt` on every image, `href` on every link, no `undefined`/`NaN`/`[object Object]`/`null` in the
+  text. Client components are not exercised (no hooks run); nothing here looks at CSS/layout. In a single-table Drizzle select, never interpolate a column (`${product.id}`) inside a
   raw correlated subquery — it renders unqualified and binds to the subquery's own table; write `"product"."id"` as text, and in tests
   offset the variant ids from the product ids so a wrong correlation can't pass by coincidence.
   `lib/test-db.ts` hands out its single connection to ONE transaction at a time (like `FOR UPDATE` waits on

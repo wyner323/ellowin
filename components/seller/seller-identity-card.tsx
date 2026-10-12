@@ -25,9 +25,9 @@ export function SellerIdentityCard({
         </div>
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-display text-2xl font-bold tracking-tight text-balance">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-balance">
               {storeName}
-            </span>
+            </h1>
             <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold">
               Nível {level}
             </span>
