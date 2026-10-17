@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto"
+import * as Sentry from "@sentry/nextjs"
 import { NextResponse } from "next/server"
 import { runWalletReconciliation } from "@/lib/reconcile"
 import { alertIfReconciliationBroken } from "@/lib/reconcile-alert"
@@ -9,6 +10,20 @@ function safeEqual(a: string, b: string) {
   const x = Buffer.from(a)
   const y = Buffer.from(b)
   return x.length === y.length && timingSafeEqual(x, y)
+}
+
+/**
+ * O corpo da resposta vai para o log do GitHub Actions (.github/workflows/sla-sweep.yml), e o
+ * repositório é público: nada de texto de exceção (SQL, nomes de tabela, host do banco) nem o nome
+ * das conferências da carteira que falharam. O detalhe fica no log do servidor e no Sentry; quem
+ * administra recebe o e-mail da conferência e vê /admin/conferencia.
+ */
+const FAILED = "falhou"
+
+function report(step: string, reason: unknown) {
+  console.error(`[cron/sla] ${step} falhou:`, reason)
+  Sentry.captureException(reason, { tags: { cron: step } })
+  return FAILED
 }
 
 /**
@@ -38,22 +53,33 @@ export async function GET(request: Request) {
   // Depois das varreduras (que movem dinheiro): confere se a carteira continua batendo.
   // Só lê; se algo não bater, alerta os admins (no máximo 1 email por dia por problema).
   const reconciliation = await runWalletReconciliation()
-    .then(async (report) => {
-      await alertIfReconciliationBroken(report)
-      return { ok: report.ok, findings: report.findings.map((f) => ({ check: f.check, count: f.rows.length })) }
+    .then(async (result) => {
+      await alertIfReconciliationBroken(result)
+      // Só quantas conferências falharam; quais são, só o admin vê (e-mail e /admin/conferencia).
+      return { ok: result.ok, problems: result.findings.length }
     })
-    .catch((error) => ({ ok: false as const, error: String(error) }))
+    .catch((error) => ({ ok: false as const, error: report("conferência", error) }))
 
-  return NextResponse.json({
-    ok: true,
-    reconciliation,
-    disputeProcessed: disputeResult.status === "fulfilled" ? disputeResult.value : null,
-    disputeError: disputeResult.status === "rejected" ? String(disputeResult.reason) : null,
-    deliveryProcessed: deliveryResult.status === "fulfilled" ? deliveryResult.value : null,
-    deliveryError: deliveryResult.status === "rejected" ? String(deliveryResult.reason) : null,
-    autoReleaseProcessed:
-      autoReleaseResult.status === "fulfilled" ? autoReleaseResult.value : null,
-    autoReleaseError:
-      autoReleaseResult.status === "rejected" ? String(autoReleaseResult.reason) : null,
-  })
+  const disputeError = disputeResult.status === "rejected" ? report("disputas", disputeResult.reason) : null
+  const deliveryError = deliveryResult.status === "rejected" ? report("entrega", deliveryResult.reason) : null
+  const autoReleaseError =
+    autoReleaseResult.status === "rejected" ? report("liberação automática", autoReleaseResult.reason) : null
+
+  // Uma etapa que quebrou devolve 500: o workflow fica vermelho (e o GitHub avisa) em vez de verde.
+  // Conferência com problemas NÃO é erro da rotina: o alerta já foi enviado e a resposta só traz a contagem.
+  const failed = Boolean(disputeError || deliveryError || autoReleaseError || "error" in reconciliation)
+
+  return NextResponse.json(
+    {
+      ok: !failed,
+      reconciliation,
+      disputeProcessed: disputeResult.status === "fulfilled" ? disputeResult.value : null,
+      disputeError,
+      deliveryProcessed: deliveryResult.status === "fulfilled" ? deliveryResult.value : null,
+      deliveryError,
+      autoReleaseProcessed: autoReleaseResult.status === "fulfilled" ? autoReleaseResult.value : null,
+      autoReleaseError,
+    },
+    { status: failed ? 500 : 200 },
+  )
 }

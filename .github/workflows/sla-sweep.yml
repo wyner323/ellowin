@@ -32,6 +32,8 @@ jobs:
             echo "::warning::Segredo CRON_SECRET não configurado no GitHub; varredura não executada."
             exit 0
           fi
+          # O repositório é público e o corpo da resposta aparece neste log: a rota devolve só contagens
+          # e a palavra "falhou" (o detalhe vai para o Sentry); um erro vira HTTP 500 e deixa a execução vermelha.
           curl --fail-with-body --silent --show-error --max-time 60 --retry 2 --retry-delay 5 \
             -H "Authorization: Bearer $CRON_SECRET" \
             https://ellowin.com.br/api/cron/sla

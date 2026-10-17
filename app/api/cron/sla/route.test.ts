@@ -15,6 +15,8 @@ const holder = vi.hoisted(() => ({
   pool: null as unknown as TestDb["pool"],
   failSweep: null as "dispute" | "delivery" | "autoRelease" | null,
   sentryMessages: [] as { message: string; level?: string }[],
+  sentryErrors: [] as unknown[],
+  failReconcile: false,
   notifications: [] as [string, number][],
 }))
 
@@ -23,7 +25,8 @@ vi.mock("@/lib/db", () => ({
     return holder.db
   },
   pool: {
-    query: (text: string, params?: unknown[]) => holder.pool.query(text, params),
+    query: (text: string, params?: unknown[]) =>
+      holder.failReconcile ? Promise.reject(new Error('relation "wallet" does not exist (host=db.interno)')) : holder.pool.query(text, params),
     connect: () => holder.pool.connect(),
   },
 }))
@@ -34,7 +37,9 @@ vi.mock("@/lib/notify", () => ({
   notificationsLive: () => false,
 }))
 vi.mock("@sentry/nextjs", () => ({
-  captureException: () => {},
+  captureException: (error: unknown) => {
+    holder.sentryErrors.push(error)
+  },
   captureMessage: (message: string, options?: { level?: string }) => {
     holder.sentryMessages.push({ message, level: options?.level })
   },
@@ -74,6 +79,8 @@ beforeEach(async () => {
   vi.stubEnv("CRON_SECRET", SECRET)
   holder.failSweep = null
   holder.sentryMessages.length = 0
+  holder.sentryErrors.length = 0
+  holder.failReconcile = false
   holder.notifications.length = 0
   await t.query(
     `TRUNCATE "notification_log", "order_message", "dispute_message", "dispute", "wallet_transaction", "order", "product_variant", "product", "wallet", "user" RESTART IDENTITY CASCADE`,
@@ -209,48 +216,78 @@ describe("GET /api/cron/sla: o que ela faz", () => {
 
   it("sem nada para fazer responde ok com zeros e a conferência batendo", async () => {
     const body = await (await call()).json()
-    expect(body).toMatchObject({ ok: true, disputeProcessed: 0, deliveryProcessed: 0, autoReleaseProcessed: 0, reconciliation: { ok: true, findings: [] } })
+    expect(body).toMatchObject({ ok: true, disputeProcessed: 0, deliveryProcessed: 0, autoReleaseProcessed: 0, reconciliation: { ok: true, problems: 0 } })
   })
 
-  it("uma varredura que quebra não impede as outras e o erro aparece no resultado", async () => {
+  it("uma varredura que quebra não impede as outras; a resposta só diz que falhou, sem o texto do erro", async () => {
     const atrasado = await createOrder({ status: "aguardando_entrega", deliveryDueAt: PAST })
     const semConfirmar = await createOrder({ status: "entregue", autoReleaseAt: PAST })
     holder.failSweep = "dispute"
 
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
     const res = await call()
     const body = await res.json()
+    const logged = consoleError.mock.calls.flat().map(String).join(" ")
+    consoleError.mockRestore()
 
-    expect(res.status).toBe(200)
+    // 500: o workflow do GitHub fica vermelho em vez de verde.
+    expect(res.status).toBe(500)
+    expect(body.ok).toBe(false)
     expect(body.disputeProcessed).toBeNull()
-    expect(body.disputeError).toContain("falha simulada em dispute")
+    expect(body.disputeError).toBe("falhou")
+    expect(JSON.stringify(body)).not.toContain("falha simulada") // o repositório é público: o log do Actions mostra isto
     expect(body).toMatchObject({ deliveryProcessed: 1, autoReleaseProcessed: 1, deliveryError: null, autoReleaseError: null })
+    // O detalhe vai para o log do servidor e para o Sentry.
+    expect(logged).toContain("falha simulada em dispute")
+    expect(holder.sentryErrors).toEqual([expect.objectContaining({ message: "falha simulada em dispute" })])
     expect(await statusOf(atrasado.orderId)).toBe("reembolsado")
     expect(await statusOf(semConfirmar.orderId)).toBe("concluido")
   })
 
   it("cada uma das três pode falhar sozinha", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
     for (const which of ["delivery", "autoRelease"] as const) {
       holder.failSweep = which
-      const body = await (await call()).json()
-      expect(body[`${which}Error`], which).toContain(`falha simulada em ${which}`)
+      const res = await call()
+      const body = await res.json()
+      expect(body[`${which}Error`], which).toBe("falhou")
       expect(body[`${which}Processed`], which).toBeNull()
-      expect(body.ok).toBe(true)
+      expect(body.ok).toBe(false)
+      expect(res.status).toBe(500)
+      expect(JSON.stringify(body)).not.toContain("falha simulada")
     }
+    consoleError.mockRestore()
   })
 })
 
 describe("GET /api/cron/sla: conferência do dinheiro", () => {
+  it("se a própria conferência quebra, responde 500 sem o texto do erro do banco", async () => {
+    holder.failReconcile = true
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+    const res = await call()
+    const body = await res.json()
+    const logged = consoleError.mock.calls.flat().map(String).join(" ")
+    consoleError.mockRestore()
+
+    expect(res.status).toBe(500)
+    expect(body).toMatchObject({ ok: false, reconciliation: { ok: false, error: "falhou" } })
+    expect(JSON.stringify(body)).not.toContain("relation")
+    expect(JSON.stringify(body)).not.toContain("db.interno")
+    expect(logged).toContain("db.interno") // o detalhe fica no log do servidor
+    expect(holder.sentryErrors).toHaveLength(1)
+  })
+
   it("depois das varreduras a carteira bate e não há alerta", async () => {
     await createOrder({ status: "aguardando_entrega", deliveryDueAt: PAST })
     await createOrder({ status: "entregue", autoReleaseAt: PAST })
 
     const body = await (await call()).json()
 
-    expect(body.reconciliation).toEqual({ ok: true, findings: [] })
+    expect(body.reconciliation).toEqual({ ok: true, problems: 0 })
     expect(holder.sentryMessages).toEqual([])
   })
 
-  it("se a carteira NÃO bate, a resposta traz quais conferências falharam e o Sentry recebe um alerta fatal", async () => {
+  it("se a carteira NÃO bate, a resposta só conta os problemas (quais, só o admin vê) e o Sentry recebe um alerta fatal", async () => {
     await createOrder({ status: "aguardando_entrega" })
     // Saldo mexido à mão, como um bug de código faria.
     await t.query(`UPDATE "wallet" SET "availableCents" = "availableCents" + 777 WHERE "userId" = 'buyer'`)
@@ -261,7 +298,10 @@ describe("GET /api/cron/sla: conferência do dinheiro", () => {
 
     expect(body.ok).toBe(true) // a rotina em si funcionou; o problema vem no relatório
     expect(body.reconciliation.ok).toBe(false)
-    expect(body.reconciliation.findings.map((f: { check: string }) => f.check)).toEqual(expect.arrayContaining(["saldo_vs_extrato", "conservacao_do_dinheiro"]))
+    expect(body.reconciliation.problems).toBeGreaterThanOrEqual(2)
+    // O log público do Actions não pode dizer QUAL conferência do dinheiro quebrou.
+    expect(JSON.stringify(body)).not.toContain("saldo_vs_extrato")
+    expect(JSON.stringify(body)).not.toContain("conservacao_do_dinheiro")
     expect(holder.sentryMessages).toEqual([expect.objectContaining({ message: expect.stringContaining("carteira"), level: "fatal" })])
   })
 })
