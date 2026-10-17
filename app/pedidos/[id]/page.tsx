@@ -181,6 +181,14 @@ export default async function PedidoPage({
                       {detail.deliveryPayload}
                     </pre>
                   </section>
+                ) : detail.payloadUnreadable ? (
+                  <section className="flex flex-col gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-5">
+                    <h2 className="text-sm font-semibold">Dados da entrega</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Não foi possível exibir os dados da entrega deste pedido. Se você é o comprador, ainda pode
+                      abrir uma disputa para o suporte da Ellowin analisar o caso.
+                    </p>
+                  </section>
                 ) : null}
 
                 {detail.dispute ? (

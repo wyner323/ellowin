@@ -8,7 +8,7 @@ import { getOrderMessages } from "@/lib/orders"
 import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, formatCents, splitOrderAmount } from "@/lib/money"
 import { notifyOrder } from "@/lib/notify"
-import { encryptField } from "@/lib/secret-box"
+import { encryptField, isEncrypted } from "@/lib/secret-box"
 import { accountBlock, getUserId } from "@/lib/session"
 import {
   StateConflictError,
@@ -162,6 +162,10 @@ export async function markDelivered(input: {
     return { ok: false, field: "payload", error: "Informe os dados da entrega." }
   if (input.payload.trim().length > 5000)
     return { ok: false, field: "payload", error: "Os dados da entrega podem ter até 5000 caracteres." }
+  // "enc:v1:" é o marcador do dado cifrado (lib/secret-box.ts): texto digitado com esse início seria
+  // lido como cifra e a página do pedido deixaria de abrir.
+  if (isEncrypted(input.payload.trim()))
+    return { ok: false, field: "payload", error: "Os dados da entrega não podem começar com enc:v1:." }
 
   // O status vai no WHERE: se o comprador cancelou (ou o prazo estourou) entre
   // a leitura acima e aqui, nada é atualizado e a entrega não ressuscita um

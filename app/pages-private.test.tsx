@@ -225,6 +225,18 @@ describe("detalhe do pedido", () => {
     as("ana") // vendedora de OUTRO pedido? não: é a dona deste; abaixo testamos outro vendedor
   })
 
+  it("dado de entrega ilegível não derruba a página: o comprador ainda vê as ações de proteção", async () => {
+    const id = await addOrder({ status: "entregue", payload: "login: abc123" })
+    // o que está gravado deixa de decifrar (chave ausente): antes isso derrubava a página inteira
+    await t.query(`UPDATE "order" SET "deliveryPayload" = $2 WHERE "id" = $1`, [id, "enc:v1:a:b:c"])
+    as("comprador")
+    const text = await txt(PedidoPage(props({ id: String(id) })))
+    expect(text).toContain("Não foi possível exibir os dados da entrega")
+    expect(text).toContain("Confirmar recebimento")
+    expect(text).toContain("Tenho um problema com este pedido")
+    expect(text).not.toContain("enc:v1:")
+  })
+
   it("outro vendedor, mesmo com loja, não abre pedido alheio", async () => {
     await t.query(`INSERT INTO "user" ("id", "name", "email") VALUES ('bia', 'Bia', 'bia@teste.dev')`)
     await t.query(`INSERT INTO "seller_application" ("userId", "storeName", "storeSlug", "status") VALUES ('bia', 'Loja Bia', 'loja-bia', 'aprovado')`)

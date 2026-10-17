@@ -508,14 +508,25 @@ describe("getOrderDetail", () => {
     const a = await addOrder({ status: "entregue" })
     const b = await addOrder({ status: "entregue" })
     await t.query(`UPDATE "order" SET "deliveryPayload" = $2 WHERE "id" = $1`, [b, encryptField("segredo do pedido A", `order:${a}`)])
-    await expect(getOrderDetail(b, "comprador")).rejects.toThrow()
+    // Não derruba a página do pedido: o dado vem nulo e a tela explica que não pôde ser lido.
+    const d = await getOrderDetail(b, "comprador")
+    expect(d?.deliveryPayload).toBeNull()
+    expect(d?.payloadUnreadable).toBe(true)
   })
 
-  it("dado cifrado sem a chave configurada falha em vez de mostrar lixo", async () => {
+  it("dado cifrado sem a chave configurada não é mostrado nem derruba o pedido", async () => {
     const id = await addOrder({ status: "entregue" })
     await t.query(`UPDATE "order" SET "deliveryPayload" = $2 WHERE "id" = $1`, [id, encryptField("x", `order:${id}`)])
     delete process.env.DELIVERY_ENCRYPTION_KEY
-    await expect(getOrderDetail(id, "comprador")).rejects.toThrow(/DELIVERY_ENCRYPTION_KEY/)
+    const d = await getOrderDetail(id, "comprador")
+    expect(d).toMatchObject({ deliveryPayload: null, payloadUnreadable: true })
+    expect(d?.buyerId).toBe("comprador") // o resto do pedido continua acessível (confirmar, disputar)
+  })
+
+  it("dado legível não marca payloadUnreadable", async () => {
+    const id = await addOrder({ status: "entregue" })
+    await t.query(`UPDATE "order" SET "deliveryPayload" = $2 WHERE "id" = $1`, [id, encryptField("login: x", `order:${id}`)])
+    expect(await getOrderDetail(id, "comprador")).toMatchObject({ deliveryPayload: "login: x", payloadUnreadable: false })
   })
 
   it("anexa a avaliação e a disputa do pedido", async () => {

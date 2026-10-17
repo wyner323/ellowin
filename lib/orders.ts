@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs"
 import { aliasedTable, and, asc, desc, eq, gte, inArray, notInArray, or, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { resolvePage } from "@/lib/pagination"
@@ -333,10 +334,23 @@ export async function getOrderDetail(
   const disputeOpen = disputeRow ? OPEN_DISPUTE_STATUSES.includes(disputeRow.status) : false
   const mayReadPayload = !staffOnly || disputeOpen
 
+  // Um dado de entrega que não decifra (chave trocada ou ausente, texto malformado) não pode derrubar
+  // a página do pedido: é nela que o comprador confirma o recebimento ou abre a disputa.
+  let deliveryPayload: string | null = null
+  let payloadUnreadable = false
+  if (row.deliveryPayload && mayReadPayload) {
+    try {
+      deliveryPayload = decryptField(row.deliveryPayload, `order:${orderId}`)
+    } catch (error) {
+      payloadUnreadable = true
+      Sentry.captureException(error)
+    }
+  }
+
   return {
     ...row,
-    deliveryPayload:
-      row.deliveryPayload && mayReadPayload ? decryptField(row.deliveryPayload, `order:${orderId}`) : null,
+    deliveryPayload,
+    payloadUnreadable,
     viewer: { isBuyer, isSeller, isStaff },
     review: reviewRow ?? null,
     dispute: disputeRow ?? null,

@@ -361,6 +361,20 @@ describe("markDelivered", () => {
     expect(await markDelivered({ orderId, payload: "outros dados" })).toMatchObject({ ok: false })
   })
 
+  it("recusa dados que imitam dado cifrado (o marcador enc:v1: travaria a página do pedido)", async () => {
+    const { variantId } = await addListing()
+    const orderId = await buy(variantId)
+    holder.userId = "seller"
+    for (const payload of ["enc:v1:a:b:c", "  enc:v1:qualquer coisa  "]) {
+      expect(await markDelivered({ orderId, payload })).toMatchObject({ ok: false, field: "payload" })
+    }
+    const row = await orderRow(orderId)
+    expect(row.status).toBe("aguardando_entrega")
+    expect(row.deliveryPayload).toBeNull()
+    // texto comum que só CONTÉM o marcador no meio continua valendo
+    expect(await markDelivered({ orderId, payload: "login: x / nota: enc:v1:" })).toMatchObject({ ok: true })
+  })
+
   it("não ressuscita pedido cancelado", async () => {
     const { variantId } = await addListing()
     const orderId = await buy(variantId)

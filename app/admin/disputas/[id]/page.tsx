@@ -135,6 +135,14 @@ export default async function CasoDisputaPage({
             {order.deliveryPayload}
           </pre>
         </section>
+      ) : order.payloadUnreadable ? (
+        <section className="flex flex-col gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-5">
+          <h2 className="text-sm font-semibold">Dados entregues pelo vendedor</h2>
+          <p className="text-sm text-muted-foreground">
+            O dado de entrega gravado não pôde ser lido (formato inválido ou chave de criptografia
+            ausente/diferente). Peça ao vendedor para reenviar os dados pelo chat do caso.
+          </p>
+        </section>
       ) : null}
 
       <section className="flex flex-col gap-3">
