@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/nextjs"
 import { aliasedTable, and, asc, desc, eq, gte, inArray, notInArray, or, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { resolvePage } from "@/lib/pagination"
+import { publicNameCol } from "@/lib/public-name"
 import { decryptField } from "@/lib/secret-box"
 import {
   dispute,
@@ -28,10 +29,6 @@ const OPEN_DISPUTE_STATUSES = ["aberta", "em_analise"]
 const buyer = aliasedTable(user, "buyer")
 const seller = aliasedTable(user, "seller")
 
-/** Apelido público (fallback pro nome legal) — nunca expõe o nome real. */
-function publicNameCol(t: typeof user) {
-  return sql<string>`coalesce(${t.displayName}, ${t.name})`
-}
 
 export const ORDER_STATUS_LABEL: Record<string, string> = {
   aguardando_entrega: "Aguardando entrega",

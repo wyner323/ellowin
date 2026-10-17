@@ -98,7 +98,8 @@ export function CompleteProfileForm({
           placeholder="Como quer ser chamado no site"
         />
         <p className="text-xs text-muted-foreground">
-          Aparece no chat e nas avaliações no lugar do seu nome.
+          Aparece no chat e nas avaliações no lugar do seu nome. Em branco, mostramos “Usuário” e um código,
+          nunca o seu nome completo.
         </p>
       </div>
 

@@ -10,6 +10,7 @@ import {
   type Message,
   type OrderNotifyKind,
 } from "@/lib/notification-messages"
+import { publicNameRaw } from "@/lib/public-name"
 import { SITE_URL } from "@/lib/site"
 
 /**
@@ -109,10 +110,10 @@ export function notifyOrder(
         amountCents: order.amountCents,
         sellerNetCents: order.sellerNetCents,
         deliveryDueAt: order.deliveryDueAt,
-        buyerName: sql<string>`(select coalesce(u."displayName", u."name") from "user" u where u."id" = ${order.buyerId})`,
+        buyerName: sql<string>`(select ${sql.raw(publicNameRaw("u"))} from "user" u where u."id" = ${order.buyerId})`,
         sellerName: sql<string>`coalesce(
           (select s."storeName" from "seller_application" s where s."userId" = ${order.sellerId}),
-          (select coalesce(u."displayName", u."name") from "user" u where u."id" = ${order.sellerId})
+          (select ${sql.raw(publicNameRaw("u"))} from "user" u where u."id" = ${order.sellerId})
         )`,
       })
       .from(order)
@@ -140,7 +141,7 @@ export function notifyQuestion(kind: "question_asked" | "question_answered", que
         sellerId: product.sellerId,
         productTitle: product.title,
         productSlug: product.slug,
-        askerName: sql<string>`(select coalesce(u."displayName", u."name") from "user" u where u."id" = ${productQuestion.askerId})`,
+        askerName: sql<string>`(select ${sql.raw(publicNameRaw("u"))} from "user" u where u."id" = ${productQuestion.askerId})`,
       })
       .from(productQuestion)
       .innerJoin(product, eq(product.id, productQuestion.productId))

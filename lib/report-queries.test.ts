@@ -102,7 +102,7 @@ describe("getReportQueue", () => {
     expect(doAnuncio).toMatchObject({ targetProductId: productId, targetProductTitle: "Conta suspeita", targetProductSlug: "conta-suspeita", targetUserId: null, targetUserName: null })
     const deAna = fila.find((r) => r.targetUserId === "ana")!
     expect(deAna).toMatchObject({ targetType: "usuario", targetUserName: "AnaGames", targetProductId: null, targetProductTitle: null })
-    expect(fila.find((r) => r.targetUserId === "bia")!.targetUserName).toBe("Bia Souza") // sem apelido: nome
+    expect(fila.find((r) => r.targetUserId === "bia")!.targetUserName).toBe("Usuário BIA") // sem apelido: rótulo anônimo
     expect(fila.every((r) => r.reporterName === "RitaDenuncia")).toBe(true)
     expect(JSON.stringify(fila)).not.toContain("Rita Santos Oliveira")
     expect(JSON.stringify(fila)).not.toContain("Ana Maria da Silva")

@@ -5,7 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/** Apelido escolhido pelo usuário, com o nome legal como fallback. */
+/**
+ * Apelido escolhido pelo usuário, com o nome legal como fallback. SÓ para o usuário ver o
+ * PRÓPRIO nome (menu, saudação). O que outras pessoas veem passa por lib/public-name.ts,
+ * que nunca cai no nome legal.
+ */
 export function publicName(name: string, displayName?: string | null) {
   return displayName?.trim() || name
 }

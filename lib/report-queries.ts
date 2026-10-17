@@ -2,6 +2,7 @@ import { aliasedTable, and, desc, eq, inArray, notInArray, sql } from "drizzle-o
 import { db } from "@/lib/db"
 import { product, report, user } from "@/lib/db/schema"
 import { PAGE_SIZE, resolvePage } from "@/lib/pagination"
+import { publicNameCol } from "@/lib/public-name"
 
 /**
  * Consultas da fila de denúncias — separado de lib/marketplace.ts/lib/orders.ts
@@ -11,10 +12,6 @@ import { PAGE_SIZE, resolvePage } from "@/lib/pagination"
 
 const reporter = aliasedTable(user, "reporter")
 const targetUser = aliasedTable(user, "target_user")
-
-function publicNameCol(t: typeof user) {
-  return sql<string>`coalesce(${t.displayName}, ${t.name})`
-}
 
 const reportColumns = {
   id: report.id,

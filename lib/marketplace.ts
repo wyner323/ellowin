@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, sql, type SQL } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { escapeLike, resolvePage } from "@/lib/pagination"
+import { anonymousName, publicNameCol } from "@/lib/public-name"
 import {
   dispute,
   order,
@@ -127,7 +128,7 @@ function activeRealProductsQuery(
       ratingCount: product.ratingCount,
       salesCount: product.salesCount,
       sellerId: product.sellerId,
-      sellerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
+      sellerName: publicNameCol(user),
       storeName: sellerApplication.storeName,
       sellerLevel: sellerApplication.level,
       // Correlaciona com `"product"."id"` por texto, não interpolando
@@ -314,7 +315,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       ratingSum: product.ratingSum,
       ratingCount: product.ratingCount,
       sellerId: product.sellerId,
-      sellerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
+      sellerName: publicNameCol(user),
       storeName: sellerApplication.storeName,
       storeSlug: sellerApplication.storeSlug,
       sellerLevel: sellerApplication.level,
@@ -346,7 +347,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       rating: review.rating,
       comment: review.comment,
       createdAt: review.createdAt,
-      buyerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
+      buyerName: publicNameCol(user),
     })
     .from(review)
     .leftJoin(user, eq(user.id, review.buyerId))
@@ -423,7 +424,7 @@ export async function getProductQuestions(productId: number): Promise<ProductQue
       answeredAt: productQuestion.answeredAt,
       createdAt: productQuestion.createdAt,
       askerId: productQuestion.askerId,
-      askerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
+      askerName: publicNameCol(user),
     })
     .from(productQuestion)
     .leftJoin(user, eq(user.id, productQuestion.askerId))
@@ -490,7 +491,7 @@ export async function getSellerQuestionsPage(
       answeredAt: productQuestion.answeredAt,
       createdAt: productQuestion.createdAt,
       askerId: productQuestion.askerId,
-      askerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
+      askerName: publicNameCol(user),
       productTitle: product.title,
       productSlug: product.slug,
       productCoverUrl: sql<string | null>`(
@@ -626,7 +627,7 @@ export async function getSellerRecentReviews(sellerId: string, limit = 5) {
       rating: review.rating,
       comment: review.comment,
       createdAt: review.createdAt,
-      buyerName: sql<string>`coalesce(${user.displayName}, ${user.name})`,
+      buyerName: publicNameCol(user),
     })
     .from(review)
     .leftJoin(user, eq(user.id, review.buyerId))
@@ -814,7 +815,7 @@ export async function getSellerStorefront(slug: string) {
 
   return {
     sellerId: row.sellerId,
-    name: row.storeName ?? row.displayName ?? row.name,
+    name: row.storeName ?? row.displayName ?? anonymousName(row.sellerId),
     image: row.image,
     bio: row.bio,
     bannerUrl: row.bannerUrl,
@@ -832,7 +833,7 @@ export async function getSellerStorefront(slug: string) {
     products: activeProducts.map((p) => ({
       ...realRowToCard(p),
       seller: {
-        name: row.storeName ?? row.displayName ?? row.name,
+        name: row.storeName ?? row.displayName ?? anonymousName(row.sellerId),
         level: row.level,
         rating: stats.rating,
         sales: stats.salesCount,

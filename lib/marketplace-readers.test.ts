@@ -244,15 +244,16 @@ describe("getRealStorefrontCards / getStorefrontCards", () => {
     expect(c.instant).toBe(false)
   })
 
-  it("nome do vendedor: loja > apelido > nome; sem candidatura, nível 1", async () => {
+  it("nome do vendedor: loja > apelido > rótulo anônimo (nunca o nome legal); sem candidatura, nível 1", async () => {
     await addListing({ seller: "bia" }) // sem nome de loja, sem apelido
     await addListing({ seller: "cadu" }) // sem candidatura
     const cards = await getRealStorefrontCards(5)
-    const bia = cards.find((c) => c.seller.name === "Bia Souza")!
-    const cadu = cards.find((c) => c.seller.name === "Cadu Lima")!
+    const bia = cards.find((c) => c.seller.name === "Usuário BIA")!
+    const cadu = cards.find((c) => c.seller.name === "Usuário CADU")!
     expect(bia.seller.level).toBe(2)
     expect(cadu.seller.level).toBe(1)
     expect(JSON.stringify(await getRealStorefrontCards(5))).not.toContain("Ana Maria da Silva")
+    expect(JSON.stringify(await getRealStorefrontCards(5))).not.toContain("Bia Souza")
   })
 
   it("destaques do jogo: até 2 atributos marcados como destaque", async () => {
@@ -387,13 +388,13 @@ describe("getProductBySlug", () => {
     expect((await getProductBySlug("sem-fotos"))?.images).toEqual([])
   })
 
-  it("vendedor: loja > apelido > nome; sem candidatura, nível 1 e sem página de loja", async () => {
+  it("vendedor: loja > apelido > rótulo anônimo; sem candidatura, nível 1 e sem página de loja", async () => {
     await addListing({ slug: "da-bia", seller: "bia" })
     await addListing({ slug: "do-cadu", seller: "cadu" })
     const bia = await getProductBySlug("da-bia")
     const cadu = await getProductBySlug("do-cadu")
-    expect(bia?.seller).toMatchObject({ name: "Bia Souza", level: 2, storeSlug: "loja-da-bia" })
-    expect(cadu?.seller).toMatchObject({ name: "Cadu Lima", level: 1, storeSlug: null })
+    expect(bia?.seller).toMatchObject({ name: "Usuário BIA", level: 2, storeSlug: "loja-da-bia" })
+    expect(cadu?.seller).toMatchObject({ name: "Usuário CADU", level: 1, storeSlug: null })
   })
 
   it("só aponta para a loja se o vendedor está aprovado", async () => {
@@ -412,10 +413,11 @@ describe("getProductBySlug", () => {
     await addReview(id, 3, { buyer: "outro", createdAt: "2026-03-30 10:00:00", comment: "a mais recente" })
     const d = await getProductBySlug("com-avaliacoes")
     expect(d?.reviews).toHaveLength(20)
-    expect(d?.reviews[0]).toMatchObject({ rating: 3, comment: "a mais recente", buyerName: "Outro Comprador" })
+    expect(d?.reviews[0]).toMatchObject({ rating: 3, comment: "a mais recente", buyerName: "Usuário UTRO" })
     expect(d?.reviews[1].buyerName).toBe("CarlosPlay")
     expect(JSON.stringify(d?.reviews)).not.toContain("de outro anúncio")
     expect(JSON.stringify(d?.reviews)).not.toContain("Carlos Pereira Lima")
+    expect(JSON.stringify(d?.reviews)).not.toContain("Outro Comprador") // nome legal de quem não tem apelido
     const datas = d!.reviews.map((r) => r.createdAt.getTime())
     expect(datas).toEqual([...datas].sort((a, b) => b - a))
   })
@@ -445,9 +447,10 @@ describe("getProductQuestions", () => {
     await addQuestion(b, { question: "de outro anúncio" })
     const qs = await getProductQuestions(a)
     expect(qs.map((q) => q.question)).toEqual(["nova", "velha"])
-    expect(qs[0]).toMatchObject({ answer: "Sim", askerName: "Outro Comprador", askerId: "outro" })
+    expect(qs[0]).toMatchObject({ answer: "Sim", askerName: "Usuário UTRO", askerId: "outro" })
     expect(qs[1]).toMatchObject({ answer: null, askerName: "CarlosPlay", answeredAt: null })
     expect(JSON.stringify(qs)).not.toContain("Carlos Pereira Lima")
+    expect(JSON.stringify(qs)).not.toContain("Outro Comprador")
   })
 
   it("no máximo 50", async () => {
@@ -751,10 +754,10 @@ describe("getSellerStorefront", () => {
     expect(s?.memberSince).toBeInstanceOf(Date)
   })
 
-  it("nome: loja > apelido > nome; nunca o nome legal quando há apelido", async () => {
+  it("nome: loja > apelido > rótulo anônimo; nunca o nome legal", async () => {
     await t.query(`UPDATE "seller_application" SET "storeName" = NULL WHERE "userId" = 'ana'`)
     expect((await getSellerStorefront("loja-da-ana"))?.name).toBe("AnaGames")
-    expect((await getSellerStorefront("loja-da-bia"))?.name).toBe("Bia Souza")
+    expect((await getSellerStorefront("loja-da-bia"))?.name).toBe("Usuário BIA")
   })
 
   it("lista só anúncios À VENDA do vendedor (ativo, com item ativo em estoque), mais novos primeiro", async () => {

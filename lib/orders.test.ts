@@ -225,11 +225,12 @@ describe("getBuyerOrdersPage", () => {
     expect(o.productSlug).toBe("conta-valorant")
   })
 
-  it("sem apelido, cai no nome; vendedor sem loja deixa storeName nulo", async () => {
+  it("sem apelido, vira rótulo anônimo (nunca o nome legal); vendedor sem loja deixa storeName nulo", async () => {
     const p = await addProduct("bia")
     await addOrder({ seller: "bia", product: p })
     const [o] = (await getBuyerOrdersPage("comprador", { page: 1 })).orders
-    expect(o.sellerName).toBe("Bia Souza")
+    expect(o.sellerName).toBe("Usuário BIA")
+    expect(JSON.stringify(o)).not.toContain("Bia Souza")
     expect(o.storeName).toBeNull()
   })
 
@@ -330,12 +331,13 @@ describe("getSellerOrdersPage", () => {
     expect([r.page, r.pages, r.total, r.orders.length]).toEqual([2, 2, 21, 1])
   })
 
-  it("comprador aparece pelo apelido (ou nome, sem apelido); nunca o nome legal", async () => {
+  it("comprador aparece pelo apelido (ou rótulo anônimo, sem apelido); nunca o nome legal", async () => {
     await addOrder()
     await addOrder({ buyer: "outro" })
     const orders = (await getSellerOrdersPage("ana", { page: 1 })).orders
-    expect(orders.map((o) => o.buyerName).sort()).toEqual(["CarlosPlay", "Outro Comprador"])
+    expect(orders.map((o) => o.buyerName).sort()).toEqual(["CarlosPlay", "Usuário UTRO"])
     expect(JSON.stringify(orders)).not.toContain("Carlos Pereira Lima")
+    expect(JSON.stringify(orders)).not.toContain("Outro Comprador")
     expect(orders[0].productSlug).toBe("conta-valorant")
   })
 
@@ -585,7 +587,8 @@ describe("getDisputeMessages", () => {
     const msgs = await getDisputeMessages(d, true)
     expect(msgs.map((m) => m.body)).toEqual(["relato do comprador", "NOTA INTERNA: suspeita de golpe", "resposta do vendedor"])
     expect(msgs[1].internal).toBe(true)
-    expect(msgs[1].authorName).toBe("Moderadora")
+    expect(msgs[1].authorName).toBe("Usuário MOD")
+    expect(JSON.stringify(msgs)).not.toContain("Moderadora Legal")
   })
 
   it("não mistura mensagens de outras disputas", async () => {

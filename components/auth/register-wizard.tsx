@@ -178,7 +178,7 @@ export function RegisterWizard({ googleEnabled = false }: { googleEnabled?: bool
               autoComplete="nickname"
               valid={form.displayName.length > 0 && isValidDisplayName(form.displayName)}
               invalid={form.displayName.length > 0 && !isValidDisplayName(form.displayName)}
-              hint="Aparece no chat e nas avaliações no lugar do seu nome — pode deixar em branco e definir depois."
+              hint={"Aparece no chat e nas avaliações no lugar do seu nome. Em branco, mostramos “Usuário” e um código, nunca o seu nome completo."}
             />
             <Field
               id="email"

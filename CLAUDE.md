@@ -138,9 +138,11 @@ closed one they see the order without the credentials.
 Two names exist per user, and mixing them up is a real privacy bug, not just a style issue:
 - `user.name` (and `profile.fullName`) — the legal name tied to CPF/KYC. Internal/staff use only.
 - `user.displayName` — the public nickname (unique, case-insensitive). This is what must render
-  anywhere a buyer/seller identity is shown (chat, reviews, storefront, order pages). Reads go
-  through `publicNameCol()` (SQL, in `lib/orders.ts` / `lib/marketplace.ts`) or `publicName()` /
-  `initialsOf()` (JS, in `lib/utils.ts`) — always prefer `displayName`, fall back to `name`.
+  anywhere a buyer/seller identity is shown (chat, reviews, storefront, order pages, emails). Reads go
+  through `lib/public-name.ts` (`publicNameCol()` in SQL selects, `publicNameRaw(alias)` in hand-written
+  subqueries, `anonymousName(userId)` in JS): the nickname or, without one, "Usuário" + the last 4 characters
+  of the id — **never** `user.name`. `publicName()` in `lib/utils.ts` (nickname, falling back to the legal
+  name) is only for a user seeing their OWN name (menu, greeting); `initialsOf()` stays there.
 
 ### Database access has two layers on purpose
 

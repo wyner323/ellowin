@@ -186,7 +186,7 @@ describe("notifyOrder", () => {
     for (const m of mails().filter((x) => x[0] === "carlos@teste.dev")) expect(m[2]).not.toContain("ana@teste.dev")
   })
 
-  it("vendedor sem loja: usa o apelido; sem apelido, o nome", async () => {
+  it("vendedor sem loja: usa o apelido; sem apelido, um rótulo anônimo (nunca o nome legal)", async () => {
     await t.query(`DELETE FROM "seller_application"`)
     const id = await addOrder({ status: "entregue" })
     notifyOrder("order_delivered", id)
@@ -198,7 +198,8 @@ describe("notifyOrder", () => {
     await t.query(`UPDATE "user" SET "displayName" = NULL WHERE "id" = 'ana'`)
     notifyOrder("order_delivered", id)
     await settle()
-    expect(mailTo("carlos@teste.dev")![2]).toContain("Ana Maria da Silva")
+    expect(mailTo("carlos@teste.dev")![2]).toContain("Usuário ANA")
+    expect(mailTo("carlos@teste.dev")![2]).not.toContain("Ana Maria da Silva")
   })
 
   it("NUNCA manda os dados de entrega por email", async () => {
