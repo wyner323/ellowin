@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { order, orderMessage, product } from "@/lib/db/schema"
@@ -8,6 +8,7 @@ import { getOrderMessages } from "@/lib/orders"
 import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, formatCents, splitOrderAmount } from "@/lib/money"
 import { notifyOrder } from "@/lib/notify"
+import { hitRateLimit } from "@/lib/rate-limit"
 import { encryptField, isEncrypted } from "@/lib/secret-box"
 import { accountBlock, getUserId } from "@/lib/session"
 import {
@@ -21,6 +22,15 @@ import {
 import type { ActionResult } from "@/app/actions/auth"
 
 class PriceChangedError extends Error {}
+
+/**
+ * Compra e cancelamento gratuitos seguram o estoque de qualquer anúncio (o pedido decrementa o estoque
+ * e o cancelamento do comprador devolve tudo, sem taxa): sem freio, uma conta esgotava o anúncio de outro
+ * vendedor em laço. Pedidos aguardando entrega por comprador, compras por hora e cancelamentos por hora têm teto.
+ */
+const MAX_OPEN_ORDERS_PER_BUYER = 10
+const MAX_PURCHASES_PER_HOUR = 20
+const MAX_BUYER_CANCELS_PER_HOUR = 10
 
 /**
  * Compra de uma variante.
@@ -42,6 +52,19 @@ export async function purchase(
 
   const blocked = await accountBlock(buyerId, "comprar")
   if (blocked) return blocked
+
+  if (!(await hitRateLimit(`purchase:${buyerId}`, MAX_PURCHASES_PER_HOUR, 60 * 60)))
+    return { ok: false, error: "Muitas compras em pouco tempo. Tente novamente mais tarde." }
+
+  const [open] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(order)
+    .where(and(eq(order.buyerId, buyerId), eq(order.status, "aguardando_entrega")))
+  if ((open?.n ?? 0) >= MAX_OPEN_ORDERS_PER_BUYER)
+    return {
+      ok: false,
+      error: "Você já tem muitos pedidos aguardando entrega. Espere alguma entrega ou cancele um pedido antes de comprar mais.",
+    }
 
   try {
     const orderId = await withTransaction(async (client) => {
@@ -259,6 +282,10 @@ export async function cancelOrder(orderId: number): Promise<ActionResult> {
     return { ok: false, error: "Você não participa deste pedido." }
   if (row.status !== "aguardando_entrega")
     return { ok: false, error: "Este pedido não pode mais ser cancelado." }
+
+  // Só o cancelamento do COMPRADOR repõe estoque sem custo para ele; o do vendedor não é o vetor.
+  if (userId === row.buyerId && !(await hitRateLimit(`cancel:${userId}`, MAX_BUYER_CANCELS_PER_HOUR, 60 * 60)))
+    return { ok: false, error: "Muitos cancelamentos em pouco tempo. Tente novamente mais tarde." }
 
   try {
     await withTransaction(async (client) => {

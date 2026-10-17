@@ -68,7 +68,7 @@ beforeEach(async () => {
   holder.notifications.length = 0
   holder.revalidated.length = 0
   await t.query(
-    `TRUNCATE "wallet_transaction", "order_message", "dispute_message", "dispute", "order", "product_variant", "product", "wallet", "profile", "user" RESTART IDENTITY CASCADE`,
+    `TRUNCATE "auth_attempt", "wallet_transaction", "order_message", "dispute_message", "dispute", "order", "product_variant", "product", "wallet", "profile", "user" RESTART IDENTITY CASCADE`,
   )
   // Pedidos 1–5 são a carga de demonstração antiga para a conferência (lib/reconcile.ts).
   await t.query(`SELECT setval(pg_get_serial_sequence('"order"', 'id'), 100)`)
@@ -447,6 +447,53 @@ describe("confirmReceipt", () => {
 /* ---------------------------------------------------------------------------
  * cancelOrder
  * ------------------------------------------------------------------------ */
+
+describe("freios contra segurar o estoque de graça", () => {
+  const seed = (key: string, n: number) =>
+    t.query(`INSERT INTO "auth_attempt" ("key") SELECT $1 FROM generate_series(1, $2)`, [key, n])
+
+  it("no máximo 10 pedidos aguardando entrega por comprador; entregar ou cancelar libera vaga", async () => {
+    const { variantId } = await addListing({ stock: 30, priceCents: 100 })
+    holder.userId = "buyer"
+    const ids: number[] = []
+    for (let i = 0; i < 10; i++) {
+      const r = await purchase(variantId, 100)
+      expect(r.ok, r.error).toBe(true)
+      ids.push(r.orderId as number)
+    }
+    const blocked = await purchase(variantId, 100)
+    expect(blocked).toMatchObject({ ok: false })
+    expect(blocked.error).toContain("aguardando entrega")
+    expect(await stockOf(variantId)).toBe(20) // a compra recusada não mexeu no estoque
+
+    expect((await cancelOrder(ids[0])).ok).toBe(true)
+    expect((await purchase(variantId, 100)).ok).toBe(true)
+  })
+
+  it("no máximo 20 compras por hora, mesmo cancelando para abrir vaga", async () => {
+    const { variantId } = await addListing({ stock: 5, priceCents: 100 })
+    await seed("purchase:buyer", 20)
+    holder.userId = "buyer"
+    expect(await purchase(variantId, 100)).toMatchObject({ ok: false, error: expect.stringContaining("Muitas compras") })
+    expect(await stockOf(variantId)).toBe(5)
+    expect(await orderCount()).toBe(0)
+  })
+
+  it("o comprador cancela no máximo 10 vezes por hora; o vendedor não é limitado", async () => {
+    const { variantId } = await addListing({ stock: 3 })
+    const a = await buy(variantId)
+    const b = await buy(variantId)
+    await seed("cancel:buyer", 10)
+
+    holder.userId = "buyer"
+    expect(await cancelOrder(a)).toMatchObject({ ok: false, error: expect.stringContaining("Muitos cancelamentos") })
+    expect((await orderRow(a)).status).toBe("aguardando_entrega")
+    expect(await stockOf(variantId)).toBe(1)
+
+    holder.userId = "seller"
+    expect((await cancelOrder(b)).ok).toBe(true)
+  })
+})
 
 describe("cancelOrder", () => {
   it("o comprador cancela antes da entrega: dinheiro e estoque voltam", async () => {

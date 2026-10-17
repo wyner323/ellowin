@@ -48,7 +48,7 @@ afterAll(async () => {
 beforeEach(async () => {
   // Cada teste começa do zero; ordem respeita as chaves estrangeiras.
   await db.query(
-    `TRUNCATE "wallet_transaction", "dispute_message", "dispute", "order", "product_variant", "product", "wallet", "user" RESTART IDENTITY CASCADE`,
+    `TRUNCATE "auth_attempt", "wallet_transaction", "dispute_message", "dispute", "order", "product_variant", "product", "wallet", "user" RESTART IDENTITY CASCADE`,
   )
   // Pedidos 1–5 são a carga de demonstração antiga e a conferência os trata à parte
   // (LEGACY_SEED_ORDER_IDS em lib/reconcile.ts); pedidos de teste começam depois deles.

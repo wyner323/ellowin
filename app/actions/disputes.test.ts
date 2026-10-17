@@ -69,7 +69,7 @@ beforeEach(async () => {
   holder.userId = null
   holder.notifications.length = 0
   await t.query(
-    `TRUNCATE "seller_account_flag", "wallet_transaction", "order_message", "dispute_message", "dispute", "order", "product_variant", "product", "wallet", "profile", "user" RESTART IDENTITY CASCADE`,
+    `TRUNCATE "auth_attempt", "seller_account_flag", "wallet_transaction", "order_message", "dispute_message", "dispute", "order", "product_variant", "product", "wallet", "profile", "user" RESTART IDENTITY CASCADE`,
   )
   // Pedidos 1–5 são a carga de demonstração antiga para a conferência (lib/reconcile.ts).
   await t.query(`SELECT setval(pg_get_serial_sequence('"order"', 'id'), 100)`)
