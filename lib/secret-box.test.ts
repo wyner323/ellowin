@@ -55,3 +55,53 @@ describe("secret-box sem chave", () => {
     expect(() => encryptField("x", "order:1")).toThrow(/32 bytes/)
   })
 })
+
+describe("sem a chave em produção", () => {
+  // O aviso é uma vez por processo: cada teste importa o módulo de novo.
+  async function load() {
+    vi.resetModules()
+    const messages: { message: string; level?: string }[] = []
+    vi.doMock("@sentry/nextjs", () => ({
+      captureMessage: (message: string, options?: { level?: string }) => messages.push({ message, level: options?.level }),
+    }))
+    const mod = await import("@/lib/secret-box")
+    return { mod, messages }
+  }
+
+  afterEach(() => {
+    vi.doUnmock("@sentry/nextjs")
+    vi.restoreAllMocks()
+  })
+
+  it("segue gravando em texto puro, mas avisa (uma vez só) no log e no Sentry", async () => {
+    vi.stubEnv("DELIVERY_ENCRYPTION_KEY", "")
+    vi.stubEnv("NODE_ENV", "production")
+    vi.stubEnv("VERCEL_ENV", "production")
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const { mod, messages } = await load()
+
+    expect(mod.encryptField("login: x", "order:1")).toBe("login: x")
+    expect(mod.encryptField("login: y", "order:2")).toBe("login: y")
+
+    expect(messages).toEqual([{ message: expect.stringContaining("DELIVERY_ENCRYPTION_KEY ausente"), level: "warning" }])
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(messages)).not.toContain("login") // o aviso nunca carrega o dado
+  })
+
+  it("fora de produção não avisa", async () => {
+    vi.stubEnv("DELIVERY_ENCRYPTION_KEY", "")
+    vi.stubEnv("NODE_ENV", "test")
+    const { mod, messages } = await load()
+    expect(mod.encryptField("x", "order:1")).toBe("x")
+    expect(messages).toEqual([])
+  })
+
+  it("com a chave configurada não avisa", async () => {
+    vi.stubEnv("DELIVERY_ENCRYPTION_KEY", KEY)
+    vi.stubEnv("NODE_ENV", "production")
+    vi.stubEnv("VERCEL_ENV", "production")
+    const { mod, messages } = await load()
+    expect(mod.isEncrypted(mod.encryptField("x", "order:1"))).toBe(true)
+    expect(messages).toEqual([])
+  })
+})

@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto"
+import * as Sentry from "@sentry/nextjs"
 
 /**
  * Criptografia em repouso (AES-256-GCM) para dados que não devem ficar legíveis
@@ -31,9 +32,28 @@ export function isEncrypted(value: string) {
   return value.startsWith(PREFIX)
 }
 
+let warnedPlaintext = false
+
+/**
+ * Sem a chave os valores continuam em texto puro (para o deploy não quebrar antes da variável existir), mas
+ * em produção isso não pode passar em silêncio: um redeploy sem a variável faria os pedidos novos voltarem a
+ * ser gravados sem cifra, sem erro nenhum. Avisa uma vez por processo (log e Sentry); não bloqueia a entrega.
+ */
+function warnPlaintext() {
+  if (warnedPlaintext) return
+  if (process.env.NODE_ENV !== "production" || process.env.VERCEL_ENV !== "production") return
+  warnedPlaintext = true
+  const message = "DELIVERY_ENCRYPTION_KEY ausente em produção: dados de entrega estão sendo gravados em texto puro"
+  console.warn(`[secret-box] ${message}`)
+  Sentry.captureMessage(message, { level: "warning" })
+}
+
 export function encryptField(plain: string, context: string): string {
   const k = key()
-  if (!k) return plain
+  if (!k) {
+    warnPlaintext()
+    return plain
+  }
 
   const iv = randomBytes(12)
   const cipher = createCipheriv("aes-256-gcm", k, iv)
