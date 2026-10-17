@@ -1,9 +1,16 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import {
+  CHAT_FULL_MESSAGE,
+  CHAT_RATE_MESSAGE,
+  MAX_CHAT_MESSAGES_PER_HOUR,
+  MAX_CHAT_MESSAGES_PER_THREAD,
+} from "@/lib/chat-limits"
 import { db } from "@/lib/db"
-import { dispute, order } from "@/lib/db/schema"
+import { dispute, disputeMessage, order } from "@/lib/db/schema"
+import { hitRateLimit } from "@/lib/rate-limit"
 import { isUniqueViolation } from "@/lib/db-errors"
 import { DISPUTE_REASONS } from "@/lib/disputes"
 import { getDisputeMessages } from "@/lib/orders"
@@ -198,6 +205,16 @@ export async function postDisputeMessage(input: {
   }
 
   const internal = Boolean(input.internal) && participation.role === "moderator"
+
+  if (participation.role !== "moderator") {
+    if (!(await hitRateLimit(`dispute-msg:${userId}:${input.disputeId}`, MAX_CHAT_MESSAGES_PER_HOUR, 60 * 60)))
+      return { ok: false, error: CHAT_RATE_MESSAGE }
+    const [thread] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(disputeMessage)
+      .where(eq(disputeMessage.disputeId, input.disputeId))
+    if (thread.n >= MAX_CHAT_MESSAGES_PER_THREAD) return { ok: false, error: CHAT_FULL_MESSAGE }
+  }
 
   await withTransaction(async (client) => {
     await client.query(

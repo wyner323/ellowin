@@ -131,20 +131,23 @@ function slugify(value: string) {
 /** Garante slug único acrescentando um sufixo numérico quando necessário. */
 async function uniqueSlug(base: string) {
   const root = base || "anuncio"
+
+  // Uma consulta só (e não uma por sufixo tentado): títulos repetidos, como "conta-valorant", fariam
+  // cada publicação custar tantas idas ao banco quanto anúncios iguais já existem. `root` só tem
+  // [a-z0-9-], então não há metacaractere de regex para escapar.
+  const rows = await db
+    .select({ slug: product.slug })
+    .from(product)
+    .where(sql`${product.slug} ~ ${`^${root}(-[0-9]+)?$`}`)
+  const taken = new Set(rows.map((r) => r.slug))
+
   let candidate = root
   let n = 1
-
-  while (true) {
-    const [existing] = await db
-      .select({ id: product.id })
-      .from(product)
-      .where(eq(product.slug, candidate))
-      .limit(1)
-
-    if (!existing) return candidate
+  while (taken.has(candidate)) {
     n += 1
     candidate = `${root}-${n}`
   }
+  return candidate
 }
 
 export type VariantInput = {

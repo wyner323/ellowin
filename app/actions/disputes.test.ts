@@ -49,6 +49,12 @@ import {
   resolveDispute,
 } from "@/app/actions/disputes"
 import { cancelOrder, confirmReceipt, markDelivered, purchase } from "@/app/actions/orders"
+import {
+  CHAT_FULL_MESSAGE,
+  CHAT_RATE_MESSAGE,
+  MAX_CHAT_MESSAGES_PER_HOUR,
+  MAX_CHAT_MESSAGES_PER_THREAD,
+} from "@/lib/chat-limits"
 import { sweepDisputeSla } from "@/lib/sla-sweeps"
 import { creditAvailable, withTransaction } from "@/lib/wallet"
 import { runWalletReconciliation } from "@/lib/reconcile"
@@ -286,6 +292,30 @@ describe("chat da disputa", () => {
     expect(await sweepDisputeSla()).toBe(1)
     expect(await wallet("buyer")).toEqual({ availableCents: 100_000, heldCents: 0 })
     expect((await disputeRow(disputeId)).status).toBe("resolvida_comprador")
+  })
+
+  it("freia quem manda mensagens sem parar (por hora) e fecha a conversa que passou do teto; a moderação não é limitada", async () => {
+    const { orderId } = await createOrder({ delivered: true })
+    const disputeId = await openAsBuyer(orderId)
+
+    holder.userId = "buyer"
+    for (let i = 0; i < MAX_CHAT_MESSAGES_PER_HOUR; i++)
+      expect((await postDisputeMessage({ disputeId, body: `mensagem ${i}` })).ok, `mensagem ${i}`).toBe(true)
+    expect(await postDisputeMessage({ disputeId, body: "uma a mais" })).toEqual({ ok: false, error: CHAT_RATE_MESSAGE })
+    // o teto é por pessoa: a outra parte continua falando
+    holder.userId = "seller"
+    expect((await postDisputeMessage({ disputeId, body: "Vou verificar a conta agora." })).ok).toBe(true)
+
+    // conversa já grande (500 mensagens): partes são barradas, moderação não
+    await t.query(
+      `INSERT INTO "dispute_message" ("disputeId", "authorId", "authorRole", "body")
+       SELECT $1, 'buyer', 'buyer', 'enchendo ' || g FROM generate_series(1, $2) g`,
+      [disputeId, MAX_CHAT_MESSAGES_PER_THREAD],
+    )
+    await t.query(`TRUNCATE "auth_attempt"`)
+    expect(await postDisputeMessage({ disputeId, body: "não cabe mais" })).toEqual({ ok: false, error: CHAT_FULL_MESSAGE })
+    holder.userId = "mod"
+    expect((await postDisputeMessage({ disputeId, body: "Olá, vou analisar o caso." })).ok).toBe(true)
   })
 
   it("quem não participa não escreve nem lê; a moderação sim", async () => {

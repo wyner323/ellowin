@@ -4,6 +4,12 @@ import { and, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { order, orderMessage, product } from "@/lib/db/schema"
+import {
+  CHAT_FULL_MESSAGE,
+  CHAT_RATE_MESSAGE,
+  MAX_CHAT_MESSAGES_PER_HOUR,
+  MAX_CHAT_MESSAGES_PER_THREAD,
+} from "@/lib/chat-limits"
 import { getOrderMessages } from "@/lib/orders"
 import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, formatCents, splitOrderAmount } from "@/lib/money"
@@ -356,6 +362,14 @@ export async function postOrderMessage(input: {
   if (body.length < 2) return { ok: false, field: "body", error: "Escreva uma mensagem." }
   if (body.length > 2000)
     return { ok: false, field: "body", error: "Mensagem muito longa (máximo 2000 caracteres)." }
+
+  if (!(await hitRateLimit(`order-msg:${userId}:${input.orderId}`, MAX_CHAT_MESSAGES_PER_HOUR, 60 * 60)))
+    return { ok: false, error: CHAT_RATE_MESSAGE }
+  const [thread] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(orderMessage)
+    .where(eq(orderMessage.orderId, input.orderId))
+  if (thread.n >= MAX_CHAT_MESSAGES_PER_THREAD) return { ok: false, error: CHAT_FULL_MESSAGE }
 
   await db.insert(orderMessage).values({
     orderId: input.orderId,

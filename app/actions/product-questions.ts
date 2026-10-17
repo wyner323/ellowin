@@ -5,8 +5,12 @@ import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { product, productQuestion } from "@/lib/db/schema"
 import { notifyQuestion } from "@/lib/notify"
+import { hitRateLimit } from "@/lib/rate-limit"
 import { getUserId } from "@/lib/session"
 import type { ActionResult } from "@/app/actions/auth"
+
+const MAX_QUESTIONS_PER_HOUR = 20
+const MAX_QUESTIONS_PER_LISTING_PER_HOUR = 5
 
 /** Qualquer visitante logado pode perguntar num anúncio que não é o próprio. */
 export async function askProductQuestion(
@@ -33,6 +37,15 @@ export async function askProductQuestion(
   if (item.sellerId === userId) {
     return { ok: false, error: "Você não pode perguntar no seu próprio anúncio." }
   }
+
+  // Perguntas são públicas e geram e-mail ao vendedor: sem teto, uma conta enche a página de um anúncio
+  // (ou a caixa do vendedor) de lixo. Há um teto geral e outro, menor, por anúncio contra a mesma pergunta repetida.
+  const [overall, perListing] = await Promise.all([
+    hitRateLimit(`question:${userId}`, MAX_QUESTIONS_PER_HOUR, 60 * 60),
+    hitRateLimit(`question:${userId}:${item.id}`, MAX_QUESTIONS_PER_LISTING_PER_HOUR, 60 * 60),
+  ])
+  if (!overall || !perListing)
+    return { ok: false, error: "Muitas perguntas em pouco tempo. Tente novamente mais tarde." }
 
   const [created] = await db
     .insert(productQuestion)

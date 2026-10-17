@@ -189,6 +189,14 @@ phrase + rate limit) and the danger-zone section on `/conta`. The rows stay (ret
 `getSellerStorefront()` and `getProductBySlug()` return null when `user.deletedAt` is set (so `/loja/<slug>` and a paused listing 404), and the
 action deletes the user's avatar and banner from Blob (best effort, only URLs that pass `isOwnBlobUrl`). A new public reader must also hide `deletedAt` users.
 
+### Volume limits
+
+Anything a logged-in user can repeat has a cap through `hitRateLimit` (`lib/rate-limit.ts`): purchases, cancels, listing questions
+(`askProductQuestion`: 20/h per user, 5/h per user per listing), reports, deposits, withdrawals and the order/dispute chats
+(`lib/chat-limits.ts`: 100 messages/h per person per thread, 500 messages per thread; staff exempt in the dispute chat). New repeatable
+actions need one. Readers that feed every visit must not load a whole table to show a few rows: `getRealCards` pushes "for sale" and the
+limit into SQL, and `uniqueSlug` (`app/actions/products.ts`) resolves the next free slug in a single query.
+
 ### Wallet reconciliation
 
 `lib/reconcile.ts` (read-only, 10 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =

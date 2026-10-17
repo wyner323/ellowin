@@ -47,7 +47,13 @@ vi.mock("@/lib/notify", () => ({
   },
 }))
 
-import { cancelOrder, confirmReceipt, markDelivered, purchase } from "@/app/actions/orders"
+import { cancelOrder, confirmReceipt, markDelivered, postOrderMessage, purchase } from "@/app/actions/orders"
+import {
+  CHAT_FULL_MESSAGE,
+  CHAT_RATE_MESSAGE,
+  MAX_CHAT_MESSAGES_PER_HOUR,
+  MAX_CHAT_MESSAGES_PER_THREAD,
+} from "@/lib/chat-limits"
 import { creditAvailable, withTransaction } from "@/lib/wallet"
 import { runWalletReconciliation } from "@/lib/reconcile"
 
@@ -311,6 +317,47 @@ describe("purchase", () => {
     expect(await orderCount()).toBe(1)
     expect(await stockOf(variantId)).toBe(0)
     expect(await wallet("buyer2")).toEqual({ availableCents: 100_000, heldCents: 0 })
+  })
+})
+
+/* ---------------------------------------------------------------------------
+ * postOrderMessage (chat do pedido)
+ * ------------------------------------------------------------------------ */
+
+describe("postOrderMessage", () => {
+  it("só comprador e vendedor do pedido escrevem; texto vazio ou longo é recusado", async () => {
+    const { variantId } = await addListing()
+    const orderId = await buy(variantId)
+
+    holder.userId = "stranger"
+    expect(await postOrderMessage({ orderId, body: "Intrometido" })).toEqual({ ok: false, error: "Pedido não encontrado." })
+    holder.userId = "buyer"
+    expect(await postOrderMessage({ orderId, body: " a " })).toMatchObject({ ok: false, field: "body" })
+    expect(await postOrderMessage({ orderId, body: "x".repeat(2001) })).toMatchObject({ ok: false, field: "body" })
+    expect(await postOrderMessage({ orderId, body: "Oi, quando entrega?" })).toEqual({ ok: true })
+    holder.userId = "seller"
+    expect(await postOrderMessage({ orderId, body: "Em instantes." })).toEqual({ ok: true })
+    expect((await one<{ n: number }>(`SELECT count(*)::int AS n FROM "order_message"`)).n).toBe(2)
+  })
+
+  it("freia quem manda mensagens sem parar (por hora, por pessoa) e fecha a conversa que passou do teto", async () => {
+    const { variantId } = await addListing()
+    const orderId = await buy(variantId)
+
+    holder.userId = "buyer"
+    for (let i = 0; i < MAX_CHAT_MESSAGES_PER_HOUR; i++)
+      expect(await postOrderMessage({ orderId, body: `mensagem ${i}` }), `mensagem ${i}`).toEqual({ ok: true })
+    expect(await postOrderMessage({ orderId, body: "uma a mais" })).toEqual({ ok: false, error: CHAT_RATE_MESSAGE })
+    holder.userId = "seller"
+    expect(await postOrderMessage({ orderId, body: "Em instantes." })).toEqual({ ok: true })
+
+    await t.query(
+      `INSERT INTO "order_message" ("orderId", "authorId", "authorRole", "body")
+       SELECT $1, 'buyer', 'buyer', 'enchendo ' || g FROM generate_series(1, $2) g`,
+      [orderId, MAX_CHAT_MESSAGES_PER_THREAD],
+    )
+    await t.query(`TRUNCATE "auth_attempt"`)
+    expect(await postOrderMessage({ orderId, body: "não cabe mais" })).toEqual({ ok: false, error: CHAT_FULL_MESSAGE })
   })
 })
 

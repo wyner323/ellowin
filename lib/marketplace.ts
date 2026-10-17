@@ -196,12 +196,14 @@ function realRowToCard(r: ActiveRealProductRow): StorefrontCard {
 }
 
 /** Produtos reais ativos, com preço mínimo e nome da loja. */
-async function getRealCards(filters: {
-  categorySlug?: string
-  query?: string
-}): Promise<StorefrontCard[]> {
-  const conditions = scopeConditions(filters)
-  const rows = await activeRealProductsQuery(conditions)
+async function getRealCards(
+  filters: { categorySlug?: string; query?: string },
+  limit?: number,
+): Promise<StorefrontCard[]> {
+  // "À venda" e o limite vão para o SQL: ler todos os anúncios ativos (cada um com subconsultas de preço,
+  // capa e reputação) para mostrar 3 ou 8 deles custava mais a cada anúncio novo, em toda visita à home.
+  const conditions = [...scopeConditions(filters), FOR_SALE_SQL]
+  const rows = await activeRealProductsQuery(conditions, { limit })
   return rows.filter((r) => r.minPrice !== null).map(realRowToCard)
 }
 
@@ -226,15 +228,17 @@ function scopeConditions(scope: { categorySlug?: string; query?: string }): SQL[
 
 /** Só anúncios reais (os mais recentes), para áreas que não podem exibir demonstração. */
 export async function getRealStorefrontCards(limit: number): Promise<StorefrontCard[]> {
-  return (await getRealCards({})).slice(0, limit)
+  return getRealCards({}, limit)
 }
 
 /** Produtos reais primeiro, anúncios de demonstração depois. */
 export async function getStorefrontCards(filters: {
   categorySlug?: string
   query?: string
+  /** Quantos anúncios reais ler (os mais recentes). Sem isso lê todos. */
+  limit?: number
 } = {}): Promise<StorefrontCard[]> {
-  const real = await getRealCards(filters)
+  const real = await getRealCards(filters, filters.limit)
 
   let demo = demoListings.map(demoToCard)
 

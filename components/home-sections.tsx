@@ -187,7 +187,7 @@ export async function GameStrip() {
 
 export async function FeaturedListings() {
   // Produtos reais do banco na frente, anúncios de demonstração completando.
-  const cards = await getStorefrontCards()
+  const cards = await getStorefrontCards({ limit: 8 })
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-14">

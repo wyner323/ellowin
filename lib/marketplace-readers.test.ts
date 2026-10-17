@@ -212,6 +212,15 @@ describe("getRealStorefrontCards / getStorefrontCards", () => {
     expect((await getRealStorefrontCards(1)).map((c) => c.key)).toEqual([`real-${novo}`])
   })
 
+  it("o limite vale DEPOIS de tirar o que não está à venda: um anúncio novo sem estoque não ocupa a vaga de um à venda", async () => {
+    const disponivel = await addListing({ createdAt: "2026-01-01 10:00:00" })
+    const esgotado = await addProduct({ createdAt: "2026-03-01 10:00:00" })
+    await addVariant(esgotado, { stock: 0 })
+
+    expect((await getRealStorefrontCards(1)).map((c) => c.key)).toEqual([`real-${disponivel}`])
+    expect((await getStorefrontCards({ limit: 1 })).filter((c) => c.source === "real").map((c) => c.key)).toEqual([`real-${disponivel}`])
+  })
+
   it("monta o cartão: menor preço disponível, capa, link, vendedor, estoque e entrega imediata", async () => {
     const id = await addProduct({ title: "Conta Imortal", game: "Valorant", deliveryType: "automatica", deliveryTime: "imediata", ratingSum: 14, ratingCount: 3, salesCount: 7 })
     await addVariant(id, { price: 9_000, stock: 2 })

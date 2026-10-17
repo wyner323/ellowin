@@ -201,6 +201,20 @@ describe("createProduct: o que é gravado", () => {
     expect(b.slug).toBe(`${a.slug}-2`)
   })
 
+  it("o slug acha o primeiro número livre numa só consulta e ignora slugs parecidos que não são o mesmo título", async () => {
+    const a = await create({ title: "Conta Fortnite" })
+    // "-2" some (anúncio apagado): o próximo é o -2 de novo, e "-3" já tomado continua sendo respeitado
+    await t.query(`INSERT INTO "product" ("sellerId", "slug", "title", "categorySlug") VALUES ('ana', $1, 'x', 'contas')`, [`${a.slug}-3`])
+    // parecidos que NÃO contam: sufixo não numérico e outro título que começa igual
+    await t.query(`INSERT INTO "product" ("sellerId", "slug", "title", "categorySlug") VALUES ('ana', $1, 'x', 'contas')`, [`${a.slug}-ps5`])
+    await t.query(`INSERT INTO "product" ("sellerId", "slug", "title", "categorySlug") VALUES ('ana', $1, 'x', 'contas')`, [`${a.slug}-2-extra`])
+
+    const b = await create({ title: "Conta Fortnite" })
+    expect(b.slug).toBe(`${a.slug}-2`)
+    const c = await create({ title: "Conta Fortnite" })
+    expect(c.slug).toBe(`${a.slug}-4`)
+  })
+
   it("jogo em branco vira nulo", async () => {
     const { id } = await create({ game: "   " })
     expect((await productRow(id)).game).toBeNull()
