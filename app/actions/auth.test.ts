@@ -491,6 +491,43 @@ describe("resendEmailCode", () => {
     expect(await otps(user.id)).toHaveLength(2)
   })
 
+  it("no máximo 5 códigos por hora para o mesmo e-mail, mesmo respeitando o intervalo de 30 s", async () => {
+    const user = await register({ email: "vitima@teste.dev" })
+    holder.userId = user.id
+    holder.emailSent.length = 0
+    const ageEverything = async () => {
+      await t.query(`UPDATE "otp_code" SET "createdAt" = now() - interval '31 seconds'`)
+      await t.query(`UPDATE "auth_attempt" SET "createdAt" = now() - interval '31 seconds'`)
+    }
+
+    for (let i = 0; i < 5; i++) {
+      await ageEverything()
+      expect(await resendEmailCode(), `pedido ${i + 1}`).toMatchObject({ ok: true })
+    }
+    await ageEverything()
+    expect(await resendEmailCode()).toEqual({ ok: false, error: "Muitos códigos pedidos. Aguarde um pouco e tente de novo." })
+    expect(holder.emailSent).toHaveLength(5) // o sexto não foi enviado
+  })
+
+  it("pedidos paralelos com o intervalo vencido não passam todos juntos", async () => {
+    const user = await register()
+    holder.userId = user.id
+    holder.emailSent.length = 0
+    await t.query(`UPDATE "otp_code" SET "createdAt" = now() - interval '31 seconds' WHERE "userId" = $1`, [user.id])
+
+    const burst = await Promise.all([resendEmailCode(), resendEmailCode(), resendEmailCode(), resendEmailCode()])
+    expect(burst.filter((r) => r.ok).length).toBeLessThanOrEqual(1)
+    expect(holder.emailSent.length).toBeLessThanOrEqual(1)
+  })
+
+  it("teto por IP: 20 pedidos por hora vindos do mesmo IP, de contas diferentes", async () => {
+    const user = await register()
+    holder.userId = user.id
+    await t.query(`INSERT INTO "auth_attempt" ("key") SELECT 'otp:ip:' || $1 FROM generate_series(1, 20)`, [holder.ip])
+    await t.query(`UPDATE "otp_code" SET "createdAt" = now() - interval '31 seconds' WHERE "userId" = $1`, [user.id])
+    expect(await resendEmailCode()).toMatchObject({ ok: false, error: expect.stringContaining("Muitos códigos") })
+  })
+
   it("falha de envio não entrega o código ao navegador", async () => {
     const user = await register()
     holder.userId = user.id
@@ -508,6 +545,7 @@ describe("resendEmailCode", () => {
 describe("telefone", () => {
   it("o código do telefone vai para o e-mail e, confirmado, marca o telefone", async () => {
     const user = await register()
+    await t.query(`UPDATE "user" SET "emailVerified" = true WHERE "id" = $1`, [user.id])
     holder.userId = user.id
 
     const first = await sendPhoneCode()
@@ -521,12 +559,21 @@ describe("telefone", () => {
     expect(await sendPhoneCode()).toMatchObject({ ok: true, message: "Seu telefone já está confirmado." })
   })
 
+  it("com o e-mail ainda não confirmado, o código do telefone não é enviado (iria para a caixa de outra pessoa)", async () => {
+    const user = await register()
+    holder.userId = user.id
+    holder.emailSent.length = 0
+    expect(await sendPhoneCode()).toEqual({ ok: false, error: "Confirme seu email antes de receber o código do telefone." })
+    expect(holder.emailSent).toHaveLength(0)
+  })
+
   it("sem telefone cadastrado, intervalo entre códigos e falha de envio", async () => {
     await addBareUser("u9")
     holder.userId = "u9"
     expect(await sendPhoneCode()).toEqual({ ok: false, error: "Nenhum telefone cadastrado." })
 
     const user = await register()
+    await t.query(`UPDATE "user" SET "emailVerified" = true WHERE "id" = $1`, [user.id])
     holder.userId = user.id
     await sendPhoneCode()
     expect((await sendPhoneCode()).error).toMatch(/Aguarde \d+s/)

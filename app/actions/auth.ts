@@ -266,6 +266,28 @@ async function otpCooldownRemaining(
   return Math.max(0, Math.ceil(RESEND_COOLDOWN_SECONDS - elapsedSeconds))
 }
 
+// Reenvio de código: além do intervalo de 30 s, teto por hora por destinatário, por usuário e por IP. Sem isso,
+// uma conta aberta com o e-mail de outra pessoa (o cadastro abre sessão sem provar posse do e-mail) mandava
+// centenas de e-mails da Ellowin a ela por hora e gastava a cota de envio compartilhada com a redefinição de senha.
+const OTP_MAX_PER_EMAIL_PER_HOUR = 5
+const OTP_MAX_PER_USER_PER_HOUR = 10
+const OTP_MAX_PER_IP_PER_HOUR = 20
+
+const OTP_TOO_MANY = "Muitos códigos pedidos. Aguarde um pouco e tente de novo."
+
+/** Registra o pedido de código e diz se pode enviar. Cada chave registra ANTES de contar (rajada paralela não passa junta). */
+async function otpSendAllowed(userId: string, channel: "email" | "phone", email: string) {
+  const ip = await clientIp()
+  const [gap, perEmail, perUser, perIp] = await Promise.all([
+    // 1 por intervalo, atômico: o otpCooldownRemaining abaixo só dá a mensagem amigável, lendo sem trava.
+    hitRateLimit(`otp:gap:${userId}:${channel}`, 1, RESEND_COOLDOWN_SECONDS),
+    hitRateLimit(`otp:email:${email.toLowerCase()}`, OTP_MAX_PER_EMAIL_PER_HOUR, 60 * 60),
+    hitRateLimit(`otp:user:${userId}`, OTP_MAX_PER_USER_PER_HOUR, 60 * 60),
+    ip ? hitRateLimit(`otp:ip:${ip}`, OTP_MAX_PER_IP_PER_HOUR, 60 * 60) : true,
+  ])
+  return gap && perEmail && perUser && perIp
+}
+
 export async function resendEmailCode(): Promise<ActionResult> {
   const session = await getSession()
   if (!session?.user) return { ok: false, error: "Sessão expirada." }
@@ -275,6 +297,8 @@ export async function resendEmailCode(): Promise<ActionResult> {
   const wait = await otpCooldownRemaining(session.user.id, "email")
   if (wait > 0)
     return { ok: false, error: `Aguarde ${wait}s antes de pedir um novo código.` }
+  if (!(await otpSendAllowed(session.user.id, "email", session.user.email)))
+    return { ok: false, error: OTP_TOO_MANY }
 
   const result = await issueOtp(session.user.id, "email", session.user.email)
   if (!result.sent) {
@@ -294,6 +318,13 @@ export async function resendEmailCode(): Promise<ActionResult> {
 export async function sendPhoneCode(): Promise<ActionResult> {
   const userId = await getUserId()
 
+  // O código do telefone vai por e-mail (ainda não há SMS): só para um e-mail já confirmado, senão uma conta
+  // aberta com o e-mail de outra pessoa mandaria códigos a ela.
+  const [owner] = await db
+    .select({ email: user.email, emailVerified: user.emailVerified })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1)
   const [p] = await db
     .select()
     .from(profile)
@@ -303,10 +334,14 @@ export async function sendPhoneCode(): Promise<ActionResult> {
   if (!p?.phone) return { ok: false, error: "Nenhum telefone cadastrado." }
   if (p.phoneVerified)
     return { ok: true, message: "Seu telefone já está confirmado." }
+  if (!owner?.emailVerified)
+    return { ok: false, error: "Confirme seu email antes de receber o código do telefone." }
 
   const wait = await otpCooldownRemaining(userId, "phone")
   if (wait > 0)
     return { ok: false, error: `Aguarde ${wait}s antes de pedir um novo código.` }
+  if (!(await otpSendAllowed(userId, "phone", owner!.email)))
+    return { ok: false, error: OTP_TOO_MANY }
 
   const result = await issueOtp(userId, "phone", p.phone)
   if (!result.sent) {
