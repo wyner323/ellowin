@@ -10,6 +10,42 @@ import { SITE_URL } from "@/lib/site"
 /** Login com Google só liga quando as duas chaves existem (o botão some sem elas). */
 export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
 
+/**
+ * O catch-all (app/api/auth/[...all]) expõe TODA a superfície do Better Auth, e o app só usa
+ * o login com Google (`sign-in/social` + `callback/:id`), `get-session` e `sign-out`.
+ * Todo o resto fica desligado: são caminhos que pulariam as regras das server actions
+ * (limite de taxa em banco, validação de nome/imagem, OTP de e-mail), e `verify-email`
+ * aceitaria qualquer token assinado só com o BETTER_AUTH_SECRET.
+ */
+export const DISABLED_AUTH_PATHS = [
+  // Login, cadastro e redefinição de senha: só pelas server actions.
+  "/sign-in/email",
+  "/sign-up/email",
+  "/request-password-reset",
+  "/reset-password",
+  // Confirmação de e-mail e troca de dados da conta: o app tem OTP e actions próprias.
+  "/verify-email",
+  "/send-verification-email",
+  "/change-email",
+  "/delete-user",
+  "/update-user",
+  "/update-session",
+  "/change-password",
+  "/verify-password",
+  "/set-password",
+  // Gestão de sessões e contas vinculadas que o app não oferece.
+  "/list-sessions",
+  "/revoke-session",
+  "/revoke-sessions",
+  "/revoke-other-sessions",
+  "/link-social",
+  "/unlink-account",
+  "/list-accounts",
+  "/account-info",
+  "/get-access-token",
+  "/refresh-token",
+]
+
 export const auth = betterAuth({
   database: pool,
   baseURL:
@@ -26,7 +62,7 @@ export const auth = betterAuth({
   // (app/actions/auth.ts), que aplicam o limitador em banco (e a validação de
   // CPF/perfil no cadastro). Pelo handler HTTP eles ignorariam ambos — e o pedido
   // de redefinição serviria para encher a caixa de email de alguém.
-  disabledPaths: ["/sign-in/email", "/sign-up/email", "/request-password-reset", "/reset-password"],
+  disabledPaths: DISABLED_AUTH_PATHS,
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
