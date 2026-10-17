@@ -23,7 +23,7 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers(holder.headers),
 }))
 
-import { clearRateLimit, clientIp, hitRateLimit } from "@/lib/rate-limit"
+import { clearRateLimit, clientIp, hitRateLimit, isRateLimited, recordFailure } from "@/lib/rate-limit"
 
 let t: TestDb
 
@@ -45,6 +45,26 @@ beforeEach(async () => {
 afterEach(() => vi.restoreAllMocks())
 
 const rows = async (key: string) => Number((await t.query(`SELECT count(*) AS n FROM "auth_attempt" WHERE "key" = $1`, [key])).rows[0].n)
+
+describe("isRateLimited / recordFailure (teto de falhas que não renova com a tentativa bloqueada)", () => {
+  it("só passa a limitar depois de `max` falhas registradas, e consultar não registra nada", async () => {
+    expect(await isRateLimited("falhas:ana", 3, 60)).toBe(false)
+    await recordFailure("falhas:ana")
+    await recordFailure("falhas:ana")
+    expect(await isRateLimited("falhas:ana", 3, 60)).toBe(false)
+    await recordFailure("falhas:ana")
+    expect(await isRateLimited("falhas:ana", 3, 60)).toBe(true)
+    for (let i = 0; i < 5; i++) await isRateLimited("falhas:ana", 3, 60)
+    expect(await rows("falhas:ana")).toBe(3) // as consultas bloqueadas não contam
+  })
+
+  it("falhas fora da janela deixam de contar e chaves são independentes", async () => {
+    for (let i = 0; i < 3; i++) await recordFailure("falhas:ana")
+    expect(await isRateLimited("falhas:bia", 3, 60)).toBe(false)
+    await t.query(`UPDATE "auth_attempt" SET "createdAt" = (now() at time zone 'UTC') - interval '2 minutes'`)
+    expect(await isRateLimited("falhas:ana", 3, 60)).toBe(false)
+  })
+})
 
 describe("hitRateLimit", () => {
   it("permite até o máximo e bloqueia a tentativa seguinte", async () => {

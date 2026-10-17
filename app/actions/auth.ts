@@ -8,7 +8,7 @@ import { db } from "@/lib/db"
 import { isUniqueViolation } from "@/lib/db-errors"
 import { otpCode, profile, user } from "@/lib/db/schema"
 import { sendEmailOtp, sendPhoneOtpByEmail } from "@/lib/email"
-import { clearRateLimit, clientIp, hitRateLimit } from "@/lib/rate-limit"
+import { clearRateLimit, clientIp, hitRateLimit, isRateLimited, recordFailure } from "@/lib/rate-limit"
 import { getSession, getUserId } from "@/lib/session"
 import {
   isValidBirthDate,
@@ -428,8 +428,14 @@ export async function verifyPhoneCode(code: string): Promise<ActionResult> {
 /* -------------------------------------------------------------------------- */
 
 const LOGIN_WINDOW_SECONDS = 10 * 60
-const LOGIN_MAX_PER_EMAIL = 8
+// Por PAR e-mail+IP: quem erra a senha de um e-mail bloqueia só o PRÓPRIO IP para aquele e-mail, nunca o dono da
+// conta (que entra de outro IP). Contar só por e-mail deixava qualquer anônimo manter a vítima bloqueada.
+const LOGIN_MAX_PER_PAIR = 8
 const LOGIN_MAX_PER_IP = 30
+// Teto global por e-mail contra senha chutada a partir de muitos IPs: alto e só de FALHAS reais (a tentativa
+// bloqueada não conta), então manter a vítima bloqueada exige errar a senha dela sem parar durante uma hora.
+const LOGIN_MAX_FAILURES_PER_EMAIL = 150
+const LOGIN_EMAIL_WINDOW_SECONDS = 60 * 60
 
 /* -------------------------------------------------------------------------- */
 /*                 Completar cadastro (quem entrou pelo Google)               */
@@ -616,17 +622,18 @@ export async function loginUser(input: {
 }): Promise<ActionResult> {
   const email = input.email.trim().toLowerCase().slice(0, 254)
 
-  // auth.api.signInEmail não passa pelo limitador do Better Auth (ele só roda no
-  // handler HTTP), então o freio contra tentativa de senha em massa é este:
-  // por email (senha chutada a partir de vários IPs) e por IP (vários emails
-  // de um IP só).
-  const emailKey = `login:email:${email}`
+  // auth.api.signInEmail não passa pelo limitador do Better Auth (ele só roda no handler HTTP), então o
+  // freio contra tentativa de senha em massa é este: por par e-mail+IP, por IP (vários e-mails de um IP só)
+  // e um teto global de falhas por e-mail (senha chutada a partir de vários IPs).
   const ip = await clientIp()
-  const [emailOk, ipOk] = await Promise.all([
-    hitRateLimit(emailKey, LOGIN_MAX_PER_EMAIL, LOGIN_WINDOW_SECONDS),
+  const pairKey = `login:pair:${email}|${ip ?? "sem-ip"}`
+  const emailKey = `login:email:${email}`
+  const [pairOk, ipOk, emailBlocked] = await Promise.all([
+    hitRateLimit(pairKey, LOGIN_MAX_PER_PAIR, LOGIN_WINDOW_SECONDS),
     ip ? hitRateLimit(`login:ip:${ip}`, LOGIN_MAX_PER_IP, LOGIN_WINDOW_SECONDS) : true,
+    isRateLimited(emailKey, LOGIN_MAX_FAILURES_PER_EMAIL, LOGIN_EMAIL_WINDOW_SECONDS),
   ])
-  if (!emailOk || !ipOk)
+  if (!pairOk || !ipOk || emailBlocked)
     return {
       ok: false,
       error: "Muitas tentativas de login. Aguarde alguns minutos e tente novamente.",
@@ -638,10 +645,11 @@ export async function loginUser(input: {
       headers: new Headers(),
     })
   } catch {
+    await recordFailure(emailKey)
     return { ok: false, error: "Email ou senha incorretos." }
   }
 
-  await clearRateLimit(emailKey)
+  await clearRateLimit(pairKey)
   revalidatePath("/")
   return { ok: true }
 }

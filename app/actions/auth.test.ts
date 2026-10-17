@@ -652,13 +652,38 @@ describe("loginUser", () => {
     expect(holder.signInCalls).toHaveLength(calls) // nem chegou a conferir a senha
   })
 
-  it("o bloqueio por e-mail vale de qualquer IP (senha chutada a partir de vários IPs)", async () => {
-    for (let i = 0; i < 8; i++) {
-      holder.ip = `203.0.113.${i + 10}`
-      await loginUser({ email: "ana@teste.dev", password: `errada${i}123` })
+  it("o bloqueio vale por par e-mail+IP: quem erra a senha bloqueia só o PRÓPRIO IP, não o dono da conta", async () => {
+    holder.ip = "203.0.113.50" // o atacante
+    for (let i = 0; i < 8; i++) await loginUser({ email: "ana@teste.dev", password: `errada${i}123` })
+    expect((await loginUser({ email: "ana@teste.dev", password: "senha1234" })).error).toContain("Muitas tentativas de login")
+
+    holder.ip = "198.51.100.77" // a dona, de outro IP, com a senha certa
+    expect(await loginUser({ email: "ana@teste.dev", password: "senha1234" })).toEqual({ ok: true })
+  })
+
+  it("senha errada vinda de muitos IPs não bloqueia a dona (cada IP gasta só a própria cota)", async () => {
+    for (let ip = 0; ip < 12; ip++) {
+      holder.ip = `203.0.113.${ip + 10}`
+      for (let i = 0; i < 8; i++) await loginUser({ email: "ana@teste.dev", password: `errada${i}123` })
     }
     holder.ip = "198.51.100.77"
-    expect((await loginUser({ email: "ana@teste.dev", password: "senha1234" })).ok).toBe(false)
+    expect((await loginUser({ email: "ana@teste.dev", password: "senha1234" })).ok).toBe(true)
+  })
+
+  it("teto global: 150 senhas erradas em 1 h bloqueiam o e-mail em qualquer IP, mas tentativa bloqueada não conta", async () => {
+    await t.query(`INSERT INTO "auth_attempt" ("key") SELECT 'login:email:ana@teste.dev' FROM generate_series(1, 150)`)
+    const count = async () =>
+      (await rows(`SELECT count(*)::int AS n FROM "auth_attempt" WHERE "key" = 'login:email:ana@teste.dev'`))[0].n as number
+
+    for (let i = 0; i < 5; i++) {
+      holder.ip = `198.51.100.${i + 1}`
+      expect((await loginUser({ email: "ana@teste.dev", password: "senha1234" })).error).toContain("Muitas tentativas de login")
+    }
+    expect(await count()).toBe(150) // as bloqueadas não renovam a janela
+
+    await t.query(`UPDATE "auth_attempt" SET "createdAt" = now() - interval '61 minutes'`)
+    holder.ip = "198.51.100.99"
+    expect((await loginUser({ email: "ana@teste.dev", password: "senha1234" })).ok).toBe(true)
   })
 
   it("o bloqueio por IP vale para vários e-mails (30 em 10 min)", async () => {

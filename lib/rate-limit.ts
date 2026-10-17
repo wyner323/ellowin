@@ -38,6 +38,36 @@ export async function hitRateLimit(
   return (row?.n ?? 0) <= max
 }
 
+/**
+ * Contagem SEM registrar nada: 'true' se a chave já tem `max` ou mais registros na janela.
+ * Para tetos globais por alvo (ex.: todos os logins errados contra um e-mail), em que registrar
+ * também a tentativa BLOQUEADA deixaria qualquer anônimo manter a vítima bloqueada. Quem usa isto
+ * registra só as falhas reais, com `recordFailure`.
+ */
+export async function isRateLimited(key: string, max: number, windowSeconds: number): Promise<boolean> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(authAttempt)
+    .where(
+      and(
+        eq(authAttempt.key, key),
+        gt(authAttempt.createdAt, sql`now() - make_interval(secs => ${windowSeconds})`),
+      ),
+    )
+  return (row?.n ?? 0) >= max
+}
+
+/** Registra uma falha para `isRateLimited` (mesma tabela e mesma limpeza oportunista do hitRateLimit). */
+export async function recordFailure(key: string): Promise<void> {
+  await db.insert(authAttempt).values({ key })
+  if (Math.random() < 0.01) {
+    await db
+      .delete(authAttempt)
+      .where(lt(authAttempt.createdAt, sql`now() - interval '1 day'`))
+      .catch(() => {})
+  }
+}
+
 /** Zera o contador de uma chave (ex.: login bem-sucedido não deve pesar nas próximas tentativas). */
 export async function clearRateLimit(key: string) {
   await db.delete(authAttempt).where(eq(authAttempt.key, key))
