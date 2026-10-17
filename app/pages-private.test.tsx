@@ -428,6 +428,20 @@ describe("moderação", () => {
     expect(t1).toContain("Conta Valorant")
   })
 
+  it("caso de disputa: moderador que é parte do pedido é mandado para a visão de parte, sem notas internas", async () => {
+    // "mod" compra o pedido: pela tela da moderação ele leria a nota interna escrita por outro moderador.
+    const orderId = await addOrder({ status: "em_disputa", buyer: "mod" })
+    const disputeId = await addDispute(orderId)
+    await t.query(`UPDATE "dispute_message" SET "authorId" = 'adm' WHERE "internal" = true`)
+    as("mod")
+    await expect(CasoDisputaPage(props({ id: String(disputeId) }))).rejects.toThrow(`NEXT_REDIRECT:/pedidos/${orderId}/disputa`)
+    const parte = await txt(DisputaPage(props({ id: String(orderId) })))
+    expect(parte).not.toContain("NOTA INTERNA")
+    // outro moderador continua vendo o caso inteiro
+    as("adm")
+    expect(await txt(CasoDisputaPage(props({ id: String(disputeId) })))).toContain("NOTA INTERNA suspeita de golpe")
+  })
+
   it("caso de disputa: dados de entrega só enquanto a disputa está aberta", async () => {
     const orderId = await addOrder({ status: "em_disputa", payload: "login: abc123 senha: segredo" })
     const disputeId = await addDispute(orderId)

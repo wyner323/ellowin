@@ -356,6 +356,36 @@ describe("chat da disputa", () => {
  * ------------------------------------------------------------------------ */
 
 describe("claimDispute", () => {
+  it("moderador que é parte do pedido não assume a própria disputa (e outro moderador continua podendo)", async () => {
+    await addUser("mod2", "moderator")
+    await withTransaction((c) => creditAvailable(c, "mod", 50_000, "deposito", "Depósito de teste"))
+    const { rows: p } = await t.query(
+      `INSERT INTO "product" ("sellerId", "slug", "title", "categorySlug") VALUES ('seller', 'p-' || gen_random_uuid()::text, 'Conta', 'contas') RETURNING "id"`,
+    )
+    const { rows: v } = await t.query(
+      `INSERT INTO "product_variant" ("productId", "label", "priceCents", "stock") VALUES ($1, 'Item', 5000, 1) RETURNING "id"`,
+      [p[0].id],
+    )
+    holder.userId = "mod"
+    const bought = await purchase(v[0].id as number, 5_000)
+    await openDispute({ orderId: bought.orderId!, reason: "diferente", description: PROBLEMA })
+    const disputeId = (await one<{ id: number }>(`SELECT "id" FROM "dispute" WHERE "orderId" = $1`, [bought.orderId])).id
+
+    const result = await claimDispute(disputeId)
+    expect(result).toMatchObject({ ok: false })
+    expect(result.error).toContain("parte deste pedido")
+    expect(await disputeRow(disputeId)).toMatchObject({ status: "aberta", moderatorId: null })
+
+    holder.userId = "mod2"
+    expect((await claimDispute(disputeId)).ok).toBe(true)
+    expect(await disputeRow(disputeId)).toMatchObject({ status: "em_analise", moderatorId: "mod2" })
+  })
+
+  it("disputa inexistente", async () => {
+    holder.userId = "mod"
+    expect(await claimDispute(99_999)).toMatchObject({ ok: false, error: "Disputa não encontrada." })
+  })
+
   it("só a moderação assume o caso", async () => {
     const { orderId } = await createOrder({ delivered: true })
     const disputeId = await openAsBuyer(orderId)

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { ArrowLeft, ExternalLink } from "lucide-react"
 import { LiveRefresh } from "@/components/live-refresh"
 import { DisputeChat } from "@/components/disputes/dispute-chat"
@@ -43,6 +43,9 @@ export default async function CasoDisputaPage({
   ])
 
   if (!order) notFound()
+  // Conflito de interesse: quem é parte do pedido vê o caso como parte (sem notas internas nem os
+  // e-mails da contraparte), igual a /pedidos/[id]/disputa; esta tela é só da moderação independente.
+  if (order.viewer.isBuyer || order.viewer.isSeller) redirect(`/pedidos/${dispute.orderId}/disputa`)
   const reasonLabel =
     DISPUTE_REASONS.find((r) => r.value === dispute.reason)?.label ?? dispute.reason
 

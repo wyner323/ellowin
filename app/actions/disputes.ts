@@ -258,6 +258,19 @@ export async function claimDispute(disputeId: number): Promise<ActionResult> {
   const staff = await getStaff()
   if (!staff) return { ok: false, error: "Acesso restrito à moderação." }
 
+  const [row] = await db
+    .select({ buyerId: order.buyerId, sellerId: order.sellerId })
+    .from(dispute)
+    .innerJoin(order, eq(order.id, dispute.orderId))
+    .where(eq(dispute.id, disputeId))
+    .limit(1)
+  if (!row) return { ok: false, error: "Disputa não encontrada." }
+
+  // Conflito de interesse (mesma regra de resolveDispute): quem é parte do pedido não assume a própria disputa.
+  // Assumir muda o status para em_analise, e a contraparte passaria a ver "primeiro contato concluído".
+  if (staff.id === row.buyerId || staff.id === row.sellerId)
+    return { ok: false, error: "Você é parte deste pedido e não pode assumir esta disputa." }
+
   await db
     .update(dispute)
     .set({ moderatorId: staff.id, status: "em_analise" })
