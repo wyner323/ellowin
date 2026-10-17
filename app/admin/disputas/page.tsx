@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { ChevronRight, Inbox } from "lucide-react"
 import { LiveRefresh } from "@/components/live-refresh"
 import { SlaBadge } from "@/components/disputes/sla-panel"
@@ -7,6 +8,7 @@ import { formatCents } from "@/lib/money"
 import { Pagination } from "@/components/pagination"
 import { DISPUTE_STATUS_LABEL, countDisputesExcluding, getDisputeQueue } from "@/lib/orders"
 import { PAGE_SIZE, parsePage, resolvePage } from "@/lib/pagination"
+import { getStaff } from "@/lib/roles"
 import { sweepDisputeSla } from "@/lib/sla-sweeps"
 
 const OPEN_STATUSES = ["aberta", "em_analise"]
@@ -20,6 +22,10 @@ export default async function FilaDisputasPage({
 }: {
   searchParams: Promise<{ pagina?: string }>
 }) {
+  // O layout /admin não basta como guarda: o Next pode não renderizá-lo numa requisição RSC
+  // (state tree do cliente). Cada página confere o cargo antes de qualquer consulta.
+  if (!(await getStaff())) redirect("/")
+
   const sp = await searchParams
   // A trava de SLA roda ao abrir a fila: sem cron, este é o gatilho natural.
   await sweepDisputeSla()

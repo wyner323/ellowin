@@ -65,6 +65,8 @@ import AdminLayout from "@/app/admin/layout"
 import CasoDisputaPage from "@/app/admin/disputas/[id]/page"
 import ConferenciaPage from "@/app/admin/conferencia/page"
 import CargosPage from "@/app/admin/usuarios/page"
+import FilaDisputasPage from "@/app/admin/disputas/page"
+import FilaDenunciasPage from "@/app/admin/denuncias/page"
 
 let t: TestDb
 
@@ -380,6 +382,23 @@ describe("moderação", () => {
     as("adm")
     expect(await txt(CargosPage())).toContain("Cargos")
     expect(await txt(ConferenciaPage())).toContain("Conferência da carteira")
+  })
+
+  it("as filas conferem o cargo por conta própria (o layout pode ser pulado numa requisição RSC)", async () => {
+    // A fila só pode renderizar para moderador/admin, mesmo chamada sem passar pelo AdminLayout.
+    const orderId = await addOrder({ title: "Conta Valorant FILA-SECRETA" })
+    await addDispute(orderId)
+    const search = { searchParams: Promise.resolve({}) }
+    for (const who of [null, "comprador"]) {
+      as(who)
+      await expect(FilaDisputasPage(search)).rejects.toThrow("NEXT_REDIRECT:/")
+      await expect(FilaDenunciasPage(search)).rejects.toThrow("NEXT_REDIRECT:/")
+    }
+    for (const who of ["mod", "adm"]) {
+      as(who)
+      expect(await txt(FilaDisputasPage(search))).toContain("FILA-SECRETA")
+      expect(await txt(FilaDenunciasPage(search))).toContain("denúncias")
+    }
   })
 
   it("a conferência mostra 'Tudo bate' num banco consistente", async () => {

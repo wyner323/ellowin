@@ -1,9 +1,11 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { ChevronRight, Flag, Inbox } from "lucide-react"
 import { Pagination } from "@/components/pagination"
 import { countReportsExcluding, getReportHistoryPage, getReportQueue } from "@/lib/report-queries"
 import { OPEN_REPORT_STATUSES, REPORT_STATUS_LABEL, reportReasonLabel } from "@/lib/reports"
 import { parsePage } from "@/lib/pagination"
+import { getStaff } from "@/lib/roles"
 
 export const metadata = { title: "Fila de denúncias" }
 
@@ -12,6 +14,9 @@ export default async function FilaDenunciasPage({
 }: {
   searchParams: Promise<{ pagina?: string }>
 }) {
+  // O layout /admin não basta como guarda (ver disputas/page.tsx): conferir o cargo aqui.
+  if (!(await getStaff())) redirect("/")
+
   const sp = await searchParams
 
   const closedTotal = await countReportsExcluding(OPEN_REPORT_STATUSES)
