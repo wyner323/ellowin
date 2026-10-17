@@ -125,7 +125,7 @@ is per-instance memory), so those actions use the DB-backed limiter in `lib/rate
 (`auth_attempt` table) and `/api/auth/sign-in/email` + `/sign-up/email` are disabled in
 `lib/auth.ts` (`disabledPaths`) so they can't be used to bypass it. OTP codes are never returned
 to the browser unless `ELLOWIN_DEMO_OTP=true`. User-supplied Blob URLs (product photos, avatar,
-banner) must pass `isOwnBlobUrl()` (`lib/blob-urls.ts`) — never trust just the Blob domain.
+banner) must pass `isOwnBlobUrl()` (`lib/blob-urls.ts`) — never trust just the Blob domain: it checks the user-id path prefix, rejects encoded `/` `.` and, when `ELLOWIN_BLOB_HOST` is set (the exact host of the app's Blob store; also used by `next.config.mjs` `remotePatterns` and the CSP `img-src`), that host only.
 `purchase`, `createProduct`/`updateProduct`/reactivating a listing, `savePayoutStep` (which approves the seller) and
 `requestWithdrawal` all require a confirmed email (`isEmailVerified()`/`emailNotVerified()` in `lib/session.ts`) — sign-up
 does not confirm it on its own.

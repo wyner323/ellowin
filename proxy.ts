@@ -13,11 +13,14 @@ export function proxy(request: NextRequest) {
   // hot reload quebra. Em produção o build não depende de eval.
   const devScript = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""
 
+  // ELLOWIN_BLOB_HOST (host exato da loja de Blob do app) fecha o curinga; sem ela, qualquer loja de Blob.
+  const blobHost = process.env.ELLOWIN_BLOB_HOST?.trim() || "*.public.blob.vercel-storage.com"
+
   const csp = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${devScript};
     style-src 'self' 'unsafe-inline';
-    img-src 'self' blob: data: https://*.public.blob.vercel-storage.com;
+    img-src 'self' blob: data: https://${blobHost};
     font-src 'self' data:;
     connect-src 'self';
     object-src 'none';

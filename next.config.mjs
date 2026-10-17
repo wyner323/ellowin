@@ -11,7 +11,9 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "*.public.blob.vercel-storage.com",
+        // ELLOWIN_BLOB_HOST (host exato da loja de Blob do app) fecha o curinga: sem ela, o otimizador de imagens
+        // serviria e recodificaria imagens de QUALQUER loja de Blob.
+        hostname: process.env.ELLOWIN_BLOB_HOST?.trim() || "*.public.blob.vercel-storage.com",
       },
     ],
   },

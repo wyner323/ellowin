@@ -21,6 +21,13 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
 - [ ] **Definir `DELIVERY_ENCRYPTION_KEY` na Vercel** (32 bytes em base64, mesmo gerador acima) e fazer redeploy. Depois peça
   ao Claude para criptografar os dados de entrega já gravados (`scripts/encrypt-delivery-payloads.mjs`, primeiro em
   simulação). **Guarde a chave em local seguro**: perdê-la torna os dados criptografados ilegíveis.
+- [ ] **Fixar a loja de Blob do app (`ELLOWIN_BLOB_HOST`) na Vercel.** Hoje o site aceita, como foto de anúncio, avatar ou banner,
+  um arquivo de QUALQUER loja do Vercel Blob (o filtro olha só o sufixo `.public.blob.vercel-storage.com` e o seu id no caminho), então
+  alguém com uma loja de Blob própria foge da conferência de tipo/tamanho/limite dos uploads e pode trocar a imagem depois. Para fechar:
+  1. Abra qualquer foto de anúncio no site (clique direito > copiar endereço da imagem) e pegue só o host, por exemplo
+     `abc123xyz.public.blob.vercel-storage.com`.
+  2. Vercel > Settings > Environment Variables > `ELLOWIN_BLOB_HOST` = esse host (Production), e faça redeploy (o `next.config` lê no build).
+  3. Avise o Claude: ele confere que as fotos continuam aparecendo. A variável fecha também o curinga do otimizador de imagens e da CSP.
 - [ ] **Configurar o Sentry (monitoramento de erros):** criar um projeto (plataforma Next.js), colocar
   `NEXT_PUBLIC_SENTRY_DSN` na Vercel e fazer **redeploy** (a variável é lida no build). Opcional, para erros legíveis:
   `SENTRY_ORG`, `SENTRY_PROJECT` e `SENTRY_AUTH_TOKEN`.
