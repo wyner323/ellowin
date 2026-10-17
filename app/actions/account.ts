@@ -1,5 +1,6 @@
 "use server"
 
+import { del } from "@vercel/blob"
 import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
@@ -158,10 +159,21 @@ export async function requestAccountDeletion(input: { confirm: string }): Promis
   const blockers = await getDeletionBlockers(userId)
   if (blockers.length > 0) return { ok: false, error: blockers[0].message }
 
-  const [row] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1)
+  const [row] = await db
+    .select({ email: user.email, image: user.image, bannerUrl: user.bannerUrl })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1)
   const email = row?.email
 
   await anonymizeAccount(userId)
+  // A anonimização zera as colunas, mas os arquivos continuariam no Blob público (caminho fixo por id).
+  // Melhor esforço: só as URLs do próprio usuário, e uma falha do Blob não desfaz a exclusão.
+  const files = [
+    isOwnBlobUrl(row?.image, "avatars", userId) ? row?.image : null,
+    isOwnBlobUrl(row?.bannerUrl, "banners", userId) ? row?.bannerUrl : null,
+  ].filter((url): url is string => Boolean(url))
+  if (files.length > 0) await del(files).catch((error) => console.error("[conta] não removeu as imagens do Blob:", error))
   if (email) await sendAccountDeletedEmail(email).catch(() => {})
 
   revalidatePath("/", "layout")

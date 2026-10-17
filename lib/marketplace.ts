@@ -320,6 +320,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       storeSlug: sellerApplication.storeSlug,
       sellerLevel: sellerApplication.level,
       sellerStatus: sellerApplication.status,
+      sellerDeletedAt: user.deletedAt,
     })
     .from(product)
     .leftJoin(user, eq(user.id, product.sellerId))
@@ -327,7 +328,9 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     .where(eq(product.slug, slug))
     .limit(1)
 
-  if (!row) return null
+  // Conta excluída (LGPD): os Termos prometem que o perfil deixa de ser público, e um anúncio pausado dela
+  // abriria por slug com o nome da loja e o link para a vitrine.
+  if (!row || row.sellerDeletedAt) return null
 
   const variants = await db
     .select()
@@ -785,13 +788,15 @@ export async function getSellerStorefront(slug: string) {
       accentColor: user.accentColor,
       memberSince: user.createdAt,
       lastActiveAt: user.lastActiveAt,
+      deletedAt: user.deletedAt,
     })
     .from(sellerApplication)
     .innerJoin(user, eq(user.id, sellerApplication.userId))
     .where(sql`lower(${sellerApplication.storeSlug}) = lower(${slug})`)
     .limit(1)
 
-  if (!row || row.status !== "aprovado") return null
+  // Conta excluída (LGPD): a vitrine sai do ar junto com o perfil.
+  if (!row || row.status !== "aprovado" || row.deletedAt) return null
 
   const [stats, disputeRow, reputation, recentReviews, delivery, accountFlags] = await Promise.all([
     getSellerStats(row.sellerId),

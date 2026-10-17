@@ -62,10 +62,9 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
 
 ## 3. Decisões suas (negócio e jurídico)
 
-- [ ] **Página pública da loja de uma conta excluída.** Hoje, depois que alguém exclui a conta (LGPD), o nome e a
-  descrição da loja continuam visíveis em `/loja/<nome>` (os anúncios já estão pausados, mas a loja segue no ar).
-  Decisão: esconder a loja e limpar esses campos quando a conta for excluída? O Claude recomenda que sim e implementa
-  em minutos, mas é você quem decide o que a retenção legal permite manter público.
+- [x] **Página pública da loja de uma conta excluída — feito (2026-10-17):** depois da exclusão (LGPD), `/loja/<nome>` e os anúncios
+  pausados da conta passam a dar 404 e o avatar e o banner são apagados do Blob. As linhas continuam no banco (retenção legal); só
+  deixam de ser públicas. Se a retenção exigir manter algo público, é só dizer.
 - [x] **Moderação e os dados de entrega — resolvido por padrão (2026-10-12):** moderador e administrador (quando não são
   parte do pedido) só leem os "Dados da entrega" decifrados **enquanto a disputa do pedido está aberta** (`aberta` ou
   `em_analise`); sem disputa ou com a disputa encerrada, veem o pedido mas não as credenciais. Comprador e vendedor leem

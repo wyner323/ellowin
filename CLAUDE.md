@@ -185,7 +185,9 @@ before `anonymizeAccount()` runs. Anonymization is NOT a row delete — orders/r
 CPF/legal name/document are kept for the legal retention period (comment in `lib/db/schema.ts` on `user.deletedAt`). It clears
 name/displayName/image/bio/banner/phone, sets a unique `excluido+<id>@ellowin.invalid` placeholder email, and deletes the
 `session`/`account` rows so login becomes impossible. Wired into `requestAccountDeletion` (`app/actions/account.ts`, confirmation
-phrase + rate limit) and the danger-zone section on `/conta`.
+phrase + rate limit) and the danger-zone section on `/conta`. The rows stay (retention), but a deleted seller is no longer public:
+`getSellerStorefront()` and `getProductBySlug()` return null when `user.deletedAt` is set (so `/loja/<slug>` and a paused listing 404), and the
+action deletes the user's avatar and banner from Blob (best effort, only URLs that pass `isOwnBlobUrl`). A new public reader must also hide `deletedAt` users.
 
 ### Wallet reconciliation
 

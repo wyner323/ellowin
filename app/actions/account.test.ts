@@ -15,6 +15,8 @@ const holder = vi.hoisted(() => ({
   ip: "203.0.113.7" as string | null,
   deletedEmails: [] as string[],
   deletedEmailFails: false,
+  blobDeleted: [] as string[][],
+  blobFails: false,
 }))
 
 vi.mock("@/lib/db", () => ({
@@ -42,6 +44,12 @@ vi.mock("next/headers", () => ({
 }))
 vi.mock("next/server", () => ({ after: () => {} }))
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }))
+vi.mock("@vercel/blob", () => ({
+  del: async (urls: string | string[]) => {
+    if (holder.blobFails) throw new Error("Blob fora do ar")
+    holder.blobDeleted.push(Array.isArray(urls) ? urls : [urls])
+  },
+}))
 vi.mock("@/lib/email", () => ({
   sendAccountDeletedEmail: async (to: string) => {
     holder.deletedEmails.push(to)
@@ -60,6 +68,7 @@ import {
   updateDisplayName,
 } from "@/app/actions/account"
 import { getDeletionBlockers } from "@/lib/account-deletion"
+import { getProductBySlug, getSellerStorefront } from "@/lib/marketplace"
 import { neutralizeUnverifiedCredentials } from "@/lib/account-link"
 
 let t: TestDb
@@ -79,6 +88,8 @@ beforeEach(async () => {
   holder.ip = "203.0.113.7"
   holder.deletedEmails.length = 0
   holder.deletedEmailFails = false
+  holder.blobDeleted.length = 0
+  holder.blobFails = false
   await t.query(
     `TRUNCATE "auth_attempt", "review", "order", "product_variant", "product", "wallet_transaction", "wallet", "seller_application", "session", "account", "profile", "user" RESTART IDENTITY CASCADE`,
   )
@@ -361,6 +372,49 @@ describe("getDeletionBlockers", () => {
 /* ---------------------------------------------------------------------------
  * Exclusão da conta: a ação
  * ------------------------------------------------------------------------ */
+
+describe("exclusão de conta: o que sai do ar e dos arquivos", () => {
+  const seedStore = async () => {
+    await t.query(`INSERT INTO "seller_application" ("userId", "storeName", "storeSlug", "level", "status") VALUES ('ana', 'Loja da Ana', 'loja-da-ana', 4, 'aprovado')`)
+    await t.query(`INSERT INTO "product" ("sellerId", "slug", "title", "categorySlug", "game", "status") VALUES ('ana', 'anuncio-pausado', 'Conta pausada', 'contas', 'Valorant', 'pausado')`)
+  }
+
+  it("a loja pública e o anúncio pausado deixam de abrir (os Termos prometem que o perfil deixa de ser público)", async () => {
+    await seedStore()
+    expect(await getSellerStorefront("loja-da-ana")).not.toBeNull()
+    expect(await getProductBySlug("anuncio-pausado")).not.toBeNull()
+
+    holder.userId = "ana"
+    expect(await requestAccountDeletion({ confirm: "excluir minha conta" })).toMatchObject({ ok: true })
+
+    expect(await getSellerStorefront("loja-da-ana")).toBeNull()
+    expect(await getProductBySlug("anuncio-pausado")).toBeNull()
+    // as linhas ficam (retenção legal); só deixam de ser públicas
+    expect((await rows(`SELECT 1 FROM "seller_application" WHERE "userId" = 'ana'`)).length).toBe(1)
+  })
+
+  it("apaga do Blob o avatar e o banner do próprio usuário", async () => {
+    holder.userId = "ana"
+    await requestAccountDeletion({ confirm: "excluir minha conta" })
+    expect(holder.blobDeleted).toEqual([[blobAvatar("ana"), blobBanner("ana")]])
+  })
+
+  it("não apaga URL que não é do próprio usuário nem arquivo de quem não tem imagem", async () => {
+    await t.query(`UPDATE "user" SET "image" = $1, "bannerUrl" = NULL WHERE "id" = 'ana'`, [blobAvatar("outro")])
+    holder.userId = "ana"
+    await requestAccountDeletion({ confirm: "excluir minha conta" })
+    expect(holder.blobDeleted).toEqual([])
+  })
+
+  it("se o Blob falhar, a conta é excluída do mesmo jeito", async () => {
+    holder.blobFails = true
+    holder.userId = "ana"
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+    expect(await requestAccountDeletion({ confirm: "excluir minha conta" })).toMatchObject({ ok: true })
+    consoleError.mockRestore()
+    expect((await userRow("ana")).email).toContain("@ellowin.invalid")
+  })
+})
 
 describe("requestAccountDeletion", () => {
   it("exige estar logado", async () => {
