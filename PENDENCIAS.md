@@ -78,13 +78,12 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
   as disputas já tinham. Confirme que é isso mesmo que você quer.
 - [ ] **Nome da proteção ao comprador** (como TradeShield ou GamerProtect nos concorrentes). Verifique se não há marca
   registrada. Hoje o bloco na página do anúncio é "Como protegemos sua compra", sem nome.
-- [ ] **Janela de conferência contada da entrega ou da compra?** Hoje a liberação automática ao vendedor é **7 dias
-  depois da compra**; numa entrega tardia sobra pouco tempo ao comprador para conferir. Se mudar para "7 dias depois
-  da entrega", o Claude ajusta o código, a central de ajuda e os testes. Só então dá para anunciar uma "garantia de N
-  dias".
+- [x] **Janela de conferência contada da entrega** (feito em 2026-10-17): a liberação automática ao vendedor é **7 dias
+  depois da entrega**, e o código, a central de ajuda e a página dos jogos já dizem isso. Pedidos entregues antes dessa
+  data mantêm o prazo antigo (7 dias da compra). Falta só ajustar o texto de `/termos` (próximo item).
 - [ ] **Revisar o texto jurídico de `/termos`** (o Claude não edita texto legal). Há três trechos que contradizem o
   sistema:
-  1. a liberação automática "no prazo indicado no anúncio" (na prática são 7 dias fixos desde a compra);
+  1. a liberação automática "no prazo indicado no anúncio" (na prática são 7 dias fixos desde a entrega);
   2. "cada nível libera novos limites" (não existem limites por nível no código);
   3. "central de segurança" para pedidos de dados (não existe esse canal ainda).
 - [ ] **Canal de contato e horário do suporte.** Defina o e-mail (e o horário, sem prometer 24/7 sem equipe) e coloque

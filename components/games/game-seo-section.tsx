@@ -12,7 +12,7 @@ export function GameSeoSection({ game, seo }: { game: string; seo: GameSeo }) {
   const steps = [
     "Escolha o anúncio e confirme a compra. O valor sai do seu saldo e fica retido pela Ellowin.",
     "O vendedor entrega dentro do prazo do anúncio e você acompanha pela página do pedido.",
-    `Confira o que recebeu e confirme o recebimento. Sem confirmação nem disputa, o valor é liberado ao vendedor automaticamente ${AUTO_RELEASE_DAYS} dias após a compra.`,
+    `Confira o que recebeu e confirme o recebimento. Sem confirmação nem disputa, o valor é liberado ao vendedor automaticamente ${AUTO_RELEASE_DAYS} dias após a entrega.`,
   ]
 
   return (

@@ -203,7 +203,7 @@ export async function sweepDeliveryDeadline() {
 /**
  * Libera automaticamente a custódia ao vendedor quando o pedido foi entregue
  * e o comprador nunca confirmou nem abriu disputa dentro do prazo
- * (order.autoReleaseAt, gravado na compra — ver app/actions/orders.ts). Sem
+ * (order.autoReleaseAt, gravado na entrega — ver markDelivered em app/actions/orders.ts). Sem
  * isso, um comprador que simplesmente some deixa o dinheiro parado na
  * custódia pra sempre, já que confirmReceipt() só roda por ação do comprador.
  * Mesmo padrão de sweepDeliveryDeadline(): sem cron neste ambiente, roda ao

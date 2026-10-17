@@ -104,10 +104,8 @@ export async function purchase(
 
       const { amountCents, feeCents, sellerNetCents } = splitOrderAmount(variant.priceCents)
 
-      const autoReleaseAt = new Date(
-        Date.now() + AUTO_RELEASE_DAYS * 24 * 60 * 60 * 1000,
-      )
-
+      // A liberação automática (autoReleaseAt) só começa a contar na entrega — ver markDelivered —,
+      // para o comprador ter sempre os dias completos para conferir.
       const deliveryHours = hoursForDeliveryTime(variant.deliveryTime)
       const deliveryDueAt =
         deliveryHours != null ? new Date(Date.now() + deliveryHours * 60 * 60 * 1000) : null
@@ -116,8 +114,8 @@ export async function purchase(
         `INSERT INTO "order"
            ("buyerId", "sellerId", "productId", "variantId", "productTitle",
             "variantLabel", "amountCents", "feeCents", "sellerNetCents",
-            "status", "autoReleaseAt", "deliveryDueAt")
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aguardando_entrega', $10, $11)
+            "status", "deliveryDueAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aguardando_entrega', $10)
          RETURNING "id"`,
         [
           buyerId,
@@ -129,7 +127,6 @@ export async function purchase(
           amountCents,
           feeCents,
           sellerNetCents,
-          autoReleaseAt,
           deliveryDueAt,
         ],
       )
@@ -193,13 +190,16 @@ export async function markDelivered(input: {
   // O status vai no WHERE: se o comprador cancelou (ou o prazo estourou) entre
   // a leitura acima e aqui, nada é atualizado e a entrega não ressuscita um
   // pedido já reembolsado.
+  const deliveredAt = new Date()
   const delivered = await db
     .update(order)
     .set({
       status: "entregue",
       // Cifrado em repouso quando DELIVERY_ENCRYPTION_KEY existe (lib/secret-box.ts).
       deliveryPayload: encryptField(input.payload.trim(), `order:${row.id}`),
-      deliveredAt: new Date(),
+      deliveredAt,
+      // Os dias para o comprador conferir contam da entrega, não da compra.
+      autoReleaseAt: new Date(deliveredAt.getTime() + AUTO_RELEASE_DAYS * 24 * 60 * 60 * 1000),
     })
     .where(and(eq(order.id, row.id), eq(order.status, "aguardando_entrega")))
     .returning({ id: order.id })

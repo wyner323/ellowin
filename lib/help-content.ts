@@ -101,7 +101,7 @@ export const HELP_TOPICS: HelpTopic[] = [
         id: "tempo-para-conferir",
         question: "Por quanto tempo posso conferir o produto?",
         answer: [
-          `Você pode confirmar o recebimento ou abrir uma disputa enquanto o pedido estiver aguardando entrega ou entregue. Se você não fizer nenhum dos dois, o valor é liberado ao vendedor automaticamente ${AUTO_RELEASE_DAYS} dias após a compra. Por isso, confira o produto assim que receber.`,
+          `Você pode confirmar o recebimento ou abrir uma disputa enquanto o pedido estiver aguardando entrega ou entregue. Se você não fizer nenhum dos dois, o valor é liberado ao vendedor automaticamente ${AUTO_RELEASE_DAYS} dias após a entrega. Por isso, confira o produto assim que receber.`,
         ],
       },
       {

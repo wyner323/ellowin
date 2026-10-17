@@ -370,8 +370,8 @@ system doesn't back ("em minutos", "24/7", "verificado por CPF"…). Never renam
 (links point at it). The contact channel is **not hard-coded**: `lib/support.ts` reads
 `ELLOWIN_SUPPORT_EMAIL` / `ELLOWIN_SUPPORT_HOURS` per request (no redeploy); unset → the page says there is
 no direct channel yet and points to opening a dispute. Don't add copy that promises support hours or a
-guarantee window the operation or the order rules don't have (`autoReleaseAt` counts 7 days from the
-**purchase**, not the delivery).
+guarantee window the operation or the order rules don't have (`autoReleaseAt` is set by `markDelivered` and counts 7 days from the
+**delivery**; it is NULL while the order awaits delivery. Orders delivered before 2026-10-17 keep the old date, 7 days from the purchase).
 
 ### Security headers
 

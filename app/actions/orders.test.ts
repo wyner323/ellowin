@@ -148,7 +148,7 @@ const orderRow = (id: number) =>
     sellerNetCents: number
     buyerId: string
     sellerId: string
-    autoReleaseAt: Date
+    autoReleaseAt: Date | null
     deliveryDueAt: Date | null
     deliveryPayload: string | null
     deliveredAt: Date | null
@@ -196,23 +196,21 @@ describe("purchase", () => {
     expect(holder.revalidated).toEqual(["/pedidos", "/carteira"])
   })
 
-  it("congela os prazos: liberação automática em 7 dias da compra e entrega no prazo do anúncio", async () => {
+  it("congela o prazo de entrega do anúncio e NÃO começa a contar a liberação automática (só conta da entrega)", async () => {
     const { variantId } = await addListing({ deliveryTime: "Até 24 horas" })
     const orderId = await buy(variantId)
 
     // Calculado no banco (tudo em UTC) para não depender do fuso da máquina que roda o teste.
-    const { releaseMs, dueMs } = await one<{ releaseMs: number; dueMs: number }>(
-      `SELECT extract(epoch FROM ("autoReleaseAt" - (now() AT TIME ZONE 'UTC'))) * 1000 AS "releaseMs",
-              extract(epoch FROM ("deliveryDueAt" - (now() AT TIME ZONE 'UTC'))) * 1000 AS "dueMs"
+    const { dueMs } = await one<{ dueMs: number }>(
+      `SELECT extract(epoch FROM ("deliveryDueAt" - (now() AT TIME ZONE 'UTC'))) * 1000 AS "dueMs"
          FROM "order" WHERE "id" = $1`,
       [orderId],
     )
 
     const day = 24 * 60 * 60 * 1000
-    expect(Number(releaseMs)).toBeGreaterThan(AUTO_RELEASE_DAYS * day - 60_000)
-    expect(Number(releaseMs)).toBeLessThanOrEqual(AUTO_RELEASE_DAYS * day)
     expect(Number(dueMs)).toBeGreaterThan(day - 60_000)
     expect(Number(dueMs)).toBeLessThanOrEqual(day)
+    expect((await orderRow(orderId)).autoReleaseAt).toBeNull()
   })
 
   it("entrega automática não tem prazo de entrega (nada para o reembolso por atraso disparar)", async () => {
@@ -332,6 +330,21 @@ describe("markDelivered", () => {
     expect(o.deliveredAt).not.toBeNull()
     expect(o.deliveryPayload).toContain("senha: 1234")
     expect(holder.notifications.at(-1)).toEqual(["order_delivered", orderId, undefined])
+  })
+
+  it("a liberação automática conta da ENTREGA: mesmo entregue muito depois da compra, o comprador tem os dias completos", async () => {
+    const { variantId } = await addListing()
+    const orderId = await buy(variantId)
+    // compra "antiga": 10 dias atrás, com o prazo de entrega já estourado
+    await one(`UPDATE "order" SET "createdAt" = now() - interval '10 days', "deliveryDueAt" = now() - interval '9 days' WHERE "id" = $1 RETURNING "id"`, [orderId])
+
+    await deliverAs(orderId)
+
+    const day = 24 * 60 * 60 * 1000
+    const o = await orderRow(orderId)
+    const fromDelivery = o.autoReleaseAt!.getTime() - o.deliveredAt!.getTime()
+    expect(fromDelivery).toBe(AUTO_RELEASE_DAYS * day)
+    expect(o.autoReleaseAt!.getTime() - Date.now()).toBeGreaterThan(AUTO_RELEASE_DAYS * day - 60_000)
   })
 
   it("quem não é o vendedor do pedido não encontra o pedido (comprador, estranho)", async () => {

@@ -32,7 +32,7 @@ describe("HELP_TOPICS", () => {
   })
 
   it("os números das respostas vêm das constantes reais do código", () => {
-    expect(allText).toContain(`${AUTO_RELEASE_DAYS} dias após a compra`)
+    expect(allText).toContain(`${AUTO_RELEASE_DAYS} dias após a entrega`)
     expect(allText).toContain(`${PLATFORM_FEE_BPS / 100}% sobre o valor`)
   })
 
