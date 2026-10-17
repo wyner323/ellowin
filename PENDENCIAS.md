@@ -17,7 +17,7 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
   3. Avise o Claude: ele confere login/logout e acrescenta um aviso no código para segredo com menos de 32 caracteres.
 - [ ] **Criar o segredo `CRON_SECRET` no GitHub** (Settings → Secrets and variables → Actions), com o **mesmo valor** do
   `CRON_SECRET` da Vercel. Sem isso, a rotina de 15 em 15 minutos (reembolsos por prazo, liberações automáticas e a
-  conferência do dinheiro) só roda uma vez por dia.
+  conferência do dinheiro) só roda uma vez por dia, e cada execução do workflow "SLA sweep" fica vermelha (com e-mail do GitHub) até o segredo existir.
 - [ ] **Definir `DELIVERY_ENCRYPTION_KEY` na Vercel** (32 bytes em base64, mesmo gerador acima) e fazer redeploy. Depois peça
   ao Claude para criptografar os dados de entrega já gravados (`scripts/encrypt-delivery-payloads.mjs`, primeiro em
   simulação). **Guarde a chave em local seguro**: perdê-la torna os dados criptografados ilegíveis.

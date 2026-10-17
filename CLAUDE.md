@@ -277,7 +277,7 @@ route) and opportunistically whenever a dispute/moderation/orders screen loads (
 job queue here, so a sweep that only ran on cron would lag if nobody hit the cron endpoint). Vercel
 Hobby only allows a daily cron (`vercel.json`, 03:00), so `.github/workflows/sla-sweep.yml` also
 calls the route every 15 minutes with the repo secret `CRON_SECRET` (same value as in Vercel);
-until that secret is set it just logs a warning. The route's JSON body is printed in the PUBLIC GitHub Actions log of that workflow, so it carries only counts and the word `falhou`
+until that secret is set the run FAILS (red, `::error::`) instead of passing silently. The route's JSON body is printed in the PUBLIC GitHub Actions log of that workflow, so it carries only counts and the word `falhou`
 (never exception text or the names of the failed wallet checks; those go to the server log/Sentry and the admin email), and a failed step answers
 HTTP 500 so the workflow goes red. Each auto-action leaves a `system` message in the
 relevant chat so the outcome is auditable. If you build the planned "refund on missed delivery
