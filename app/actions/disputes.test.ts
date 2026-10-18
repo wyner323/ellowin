@@ -451,6 +451,18 @@ describe("resolveDispute", () => {
     expect(holder.notifications.at(-1)).toEqual(["dispute_resolved", orderId, { outcome: "comprador" }])
   })
 
+  it("recusa uma decisão que não seja comprador/vendedor (valor inesperado nunca libera o dinheiro)", async () => {
+    const { orderId } = await createOrder({ delivered: true })
+    const disputeId = await openAsBuyer(orderId)
+
+    holder.userId = "mod"
+    const result = await resolveDispute({ disputeId, outcome: "qualquer" as never, note: "Decisão com valor inválido." })
+
+    expect(result).toEqual({ ok: false, error: "Decisão inválida." })
+    expect(await orderStatus(orderId)).toBe("em_disputa")
+    expect(await wallet("seller")).toBeUndefined()
+  })
+
   it("a favor do vendedor: libera o valor menos a taxa e soma uma venda ao anúncio", async () => {
     const { orderId, productId } = await createOrder({ delivered: true, priceCents: 10_000 })
     const disputeId = await openAsBuyer(orderId)

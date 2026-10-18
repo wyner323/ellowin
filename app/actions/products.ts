@@ -16,6 +16,7 @@ import { sanitizeAttributes } from "@/lib/game-attributes"
 import { MAX_DESCRIPTION, MAX_TITLE } from "@/lib/listing-checks"
 import { parseToCents } from "@/lib/money"
 import { slugifyGame } from "@/lib/product-catalog"
+import { getCategory } from "@/lib/catalog"
 import { accountBlock, getUserId } from "@/lib/session"
 import type { ActionResult } from "@/app/actions/auth"
 
@@ -244,7 +245,7 @@ export async function createProduct(input: {
     return { ok: false, field: "description", error: `A descrição pode ter até ${MAX_DESCRIPTION} caracteres.` }
   if (input.game.trim().length > MAX_GAME)
     return { ok: false, field: "game", error: `O nome do jogo pode ter até ${MAX_GAME} caracteres.` }
-  if (!input.categorySlug)
+  if (!input.categorySlug || !getCategory(input.categorySlug))
     return { ok: false, field: "categorySlug", error: "Escolha a categoria do anúncio." }
   if (input.description.trim().length < 20)
     return {
@@ -360,6 +361,8 @@ export async function updateProduct(input: {
     return { ok: false, field: "description", error: `A descrição pode ter até ${MAX_DESCRIPTION} caracteres.` }
   if (input.game.trim().length > MAX_GAME)
     return { ok: false, field: "game", error: `O nome do jogo pode ter até ${MAX_GAME} caracteres.` }
+  if (!getCategory(input.categorySlug))
+    return { ok: false, field: "categorySlug", error: "Escolha a categoria do anúncio." }
   if (!isAcceptableDeliveryTime(input.deliveryType, input.deliveryTime, owned.deliveryTime))
     return { ok: false, field: "deliveryTime", error: "Escolha um prazo de entrega da lista." }
   if (input.categorySlug === "contas" && !isValidAccountOrigin((input.accountOrigin ?? "").trim()))

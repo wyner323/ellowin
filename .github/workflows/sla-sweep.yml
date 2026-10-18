@@ -16,6 +16,9 @@ on:
     - cron: "*/15 * * * *"
   workflow_dispatch:
 
+# Este job só chama uma URL com curl: não precisa de nenhuma permissão no repositório.
+permissions: {}
+
 concurrency:
   group: sla-sweep
   cancel-in-progress: false

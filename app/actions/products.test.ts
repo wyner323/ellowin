@@ -268,6 +268,17 @@ describe("createProduct: validação de texto", () => {
     expect(await createProduct(valid({ game: "j".repeat(81) }))).toMatchObject({ ok: false, field: "game" })
     expect(await createProduct(valid({ categorySlug: "" }))).toMatchObject({ ok: false, field: "categorySlug" })
   })
+
+  it("categoria que não existe no catálogo é recusada ao criar e ao editar", async () => {
+    holder.userId = "ana"
+    const antes = await t.query(`SELECT count(*)::int AS n FROM "product"`)
+    expect(await createProduct(valid({ categorySlug: "inventada" }))).toMatchObject({ ok: false, field: "categorySlug" })
+    expect((await t.query(`SELECT count(*)::int AS n FROM "product"`)).rows[0].n).toBe(antes.rows[0].n)
+
+    const { id } = await create()
+    expect(await update(id, { categorySlug: "inventada" })).toMatchObject({ ok: false, field: "categorySlug" })
+    expect((await productRow(id)).categorySlug).toBe("moedas")
+  })
 })
 
 describe("createProduct: procedência da conta", () => {

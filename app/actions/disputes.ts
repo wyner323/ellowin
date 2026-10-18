@@ -315,6 +315,10 @@ export async function resolveDispute(input: {
   const staff = await getStaff()
   if (!staff) return { ok: false, error: "Acesso restrito à moderação." }
 
+  // O tipo só vale em tempo de compilação: um valor qualquer não pode cair no ramo "vendedor" (libera o dinheiro).
+  if (input.outcome !== "comprador" && input.outcome !== "vendedor")
+    return { ok: false, error: "Decisão inválida." }
+
   const note = input.note.trim()
   if (note.length > 2000)
     return { ok: false, field: "note", error: "A justificativa pode ter até 2000 caracteres." }

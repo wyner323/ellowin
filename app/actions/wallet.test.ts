@@ -271,6 +271,17 @@ describe("requestWithdrawal", () => {
     expect((await requestWithdrawal("50,00")).ok).toBe(true)
   })
 
+  it("o extrato do saque traz a chave Pix mascarada, nunca completa", async () => {
+    await addSeller("ana")
+    await fund("ana", 50_000)
+    holder.userId = "ana"
+    expect((await requestWithdrawal("50,00")).ok).toBe(true)
+
+    const saque = (await ledger("ana")).find((l) => l.kind === "saque")!
+    expect(saque.description).not.toContain("52998224725")
+    expect(saque.description).toMatch(/^Saque via Pix para \*\*\*\./)
+  })
+
   it("chave que nunca mudou (sem data) não bloqueia", async () => {
     await addSeller("ana", { changedAgo: null })
     await fund("ana", 50_000)

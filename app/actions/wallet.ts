@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { sellerApplication, walletTransaction } from "@/lib/db/schema"
 import { formatCents, parseToCents } from "@/lib/money"
+import { maskPixKey } from "@/lib/pix"
 import { hitRateLimit } from "@/lib/rate-limit"
 import { accountBlock, getUserId } from "@/lib/session"
 import { creditAvailable, debitAvailable, withTransaction } from "@/lib/wallet"
@@ -80,6 +81,7 @@ export async function requestWithdrawal(amount: string): Promise<ActionResult> {
   const [seller] = await db
     .select({
       pixKey: sellerApplication.pixKey,
+      pixKeyType: sellerApplication.pixKeyType,
       status: sellerApplication.status,
       // Comparação no relógio do banco (evita defasagem de fuso do servidor).
       pixKeyRecentlyChanged: sql<boolean>`coalesce(${sellerApplication.pixKeyChangedAt} > now() - interval '24 hours', false)`,
@@ -112,7 +114,8 @@ export async function requestWithdrawal(amount: string): Promise<ActionResult> {
         userId,
         cents,
         "saque",
-        `Saque via Pix para ${seller.pixKey}`,
+        // O extrato aparece em telas e em e-mails de conferência: só a chave mascarada, nunca a completa.
+        `Saque via Pix para ${maskPixKey(seller.pixKeyType, seller.pixKey)}`,
       ),
     )
   } catch {

@@ -292,6 +292,23 @@ describe("purchase", () => {
     expect(await wallet("buyer")).toEqual({ availableCents: 100_000, heldCents: 0 })
   })
 
+  it("erro inesperado do banco não vaza para o comprador: mensagem genérica, nada gravado", async () => {
+    const { variantId } = await addListing({ priceCents: 10_000, stock: 3 })
+    // faz o INSERT do pedido falhar com um erro cru do Postgres (nome de tabela e constraint na mensagem)
+    await t.query(`ALTER TABLE "order" ADD CONSTRAINT "zz_forca_erro" CHECK (false) NOT VALID`)
+    try {
+      holder.userId = "buyer"
+      const result = await purchase(variantId, 10_000)
+      expect(result).toEqual({ ok: false, error: "Não foi possível concluir a compra. Tente novamente." })
+      expect(JSON.stringify(result)).not.toContain("zz_forca_erro")
+    } finally {
+      await t.query(`ALTER TABLE "order" DROP CONSTRAINT "zz_forca_erro"`)
+    }
+    expect(await orderCount()).toBe(0)
+    expect(await stockOf(variantId)).toBe(3)
+    expect(await wallet("buyer")).toEqual({ availableCents: 100_000, heldCents: 0 })
+  })
+
   it("saldo insuficiente desfaz tudo: sem pedido, sem custódia e o estoque não é baixado", async () => {
     const { variantId } = await addListing({ priceCents: 500_000 })
     holder.userId = "buyer"

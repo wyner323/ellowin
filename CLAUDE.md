@@ -197,6 +197,14 @@ Anything a logged-in user can repeat has a cap through `hitRateLimit` (`lib/rate
 actions need one. Readers that feed every visit must not load a whole table to show a few rows: `getRealCards` pushes "for sale" and the
 limit into SQL, and `uniqueSlug` (`app/actions/products.ts`) resolves the next free slug in a single query.
 
+### Hardening conventions
+
+`purchase` only shows the buyer the text of expected refusals (`PurchaseError` plus the wallet's "Saldo insuficiente"); any other exception goes to Sentry
+and the screen gets a generic message, so a raw database error never reaches the browser. `createProduct`/`updateProduct` reject a `categorySlug` that is not in
+`lib/catalog.ts` `categories`; `resolveDispute` rejects an `outcome` other than `comprador`/`vendedor` at runtime (the TypeScript union is not a check). The
+withdrawal ledger line carries the masked Pix key (`maskPixKey`), never the full one. Workflows run with `permissions: contents: read` (CI) or none
+(`sla-sweep.yml`), and `.github/dependabot.yml` opens weekly update PRs (actions are still pinned by tag, not SHA).
+
 ### Wallet reconciliation
 
 `lib/reconcile.ts` (read-only, 10 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =

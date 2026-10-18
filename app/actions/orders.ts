@@ -1,6 +1,7 @@
 "use server"
 
 import { and, eq, sql } from "drizzle-orm"
+import * as Sentry from "@sentry/nextjs"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { order, orderMessage, product } from "@/lib/db/schema"
@@ -27,7 +28,10 @@ import {
 } from "@/lib/wallet"
 import type { ActionResult } from "@/app/actions/auth"
 
-class PriceChangedError extends Error {}
+/** Recusa esperada da compra: a mensagem é escrita para o comprador e pode aparecer na tela. */
+class PurchaseError extends Error {}
+class PriceChangedError extends PurchaseError {}
+
 
 /**
  * Compra e cancelamento gratuitos seguram o estoque de qualquer anúncio (o pedido decrementa o estoque
@@ -97,12 +101,12 @@ export async function purchase(
       )
 
       const variant = rows[0]
-      if (!variant) throw new Error("Item não encontrado.")
+      if (!variant) throw new PurchaseError("Item não encontrado.")
       if (!variant.active || variant.status !== "ativo")
-        throw new Error("Este item não está mais disponível.")
-      if (variant.stock < 1) throw new Error("Item esgotado.")
+        throw new PurchaseError("Este item não está mais disponível.")
+      if (variant.stock < 1) throw new PurchaseError("Item esgotado.")
       if (variant.sellerId === buyerId)
-        throw new Error("Você não pode comprar o seu próprio anúncio.")
+        throw new PurchaseError("Você não pode comprar o seu próprio anúncio.")
       if (variant.priceCents !== expectedPriceCents)
         throw new PriceChangedError(
           `O preço deste item mudou para ${formatCents(variant.priceCents)}. Confira o novo valor e compre de novo.`,
@@ -162,9 +166,14 @@ export async function purchase(
 
     return { ok: true, message: "Compra realizada. O valor ficou em custódia.", orderId }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Não foi possível concluir a compra."
-    // field "price" avisa a tela pra recarregar os valores atuais.
-    return { ok: false, error: message, ...(error instanceof PriceChangedError ? { field: "price" } : {}) }
+    // Só as recusas esperadas chegam ao comprador com o texto original; erro do banco ou da carteira
+    // (nome de tabela, constraint) vai para o Sentry e a tela recebe uma mensagem genérica.
+    if (error instanceof PurchaseError || (error instanceof Error && error.message === "Saldo insuficiente")) {
+      // field "price" avisa a tela pra recarregar os valores atuais.
+      return { ok: false, error: error.message, ...(error instanceof PriceChangedError ? { field: "price" } : {}) }
+    }
+    Sentry.captureException(error)
+    return { ok: false, error: "Não foi possível concluir a compra. Tente novamente." }
   }
 }
 
