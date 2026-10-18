@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { AUTO_RELEASE_DAYS } from "@/lib/money"
 
 export const metadata: Metadata = {
   title: "Termos de uso",
@@ -27,15 +28,15 @@ const sections = [
   {
     title: "3. Cadastro de vendedor",
     body: [
-      "O cadastro de vendedor é feito em níveis: confirmação de email, confirmação de telefone, envio de documento (KYC) e cadastro da chave de saque.",
-      "Cada nível libera novos limites de anúncio e de saque. O envio de documentos falsos resulta em bloqueio definitivo e retenção dos valores para análise.",
+      "O cadastro de vendedor é feito em etapas, nesta ordem: dados da loja, confirmação de telefone, envio de documento (KYC) e cadastro da chave Pix para saque.",
+      "Só é possível anunciar depois de concluir todas as etapas e de ter o email confirmado. O envio de documentos falsos resulta em bloqueio definitivo e retenção dos valores para análise.",
     ],
   },
   {
     title: "4. Pagamento intermediado",
     body: [
       "O valor pago pelo comprador fica retido pela Ellowin até a confirmação da entrega do item.",
-      "Caso o comprador não confirme nem abra disputa no prazo indicado no anúncio, o valor é liberado automaticamente ao vendedor.",
+      `Caso o comprador não confirme o recebimento nem abra disputa em até ${AUTO_RELEASE_DAYS} dias após a entrega registrada pelo vendedor, o valor é liberado automaticamente ao vendedor.`,
       "Em caso de disputa, a Ellowin analisa as provas enviadas pelas duas partes e decide pelo reembolso ou pela liberação do valor.",
     ],
   },
@@ -53,10 +54,10 @@ const sections = [
       "O CPF e o documento de identidade têm base legal no cumprimento de obrigação legal e regulatória (prevenção à fraude e à lavagem de dinheiro) e no legítimo interesse da Ellowin em manter um ambiente de negociação seguro. Os demais dados de cadastro têm base na execução do contrato entre você e a Ellowin.",
       "Documentos enviados para verificação (KYC) são usados exclusivamente na análise de identidade e nunca são exibidos a outros usuários — nem mesmo ao vendedor ou comprador da outra ponta de uma negociação.",
       "O texto exibido no seu perfil, na loja e nas avaliações é sempre o apelido que você escolhe (\"nome de exibição\"), nunca o nome legal.",
-      "Os dados de entrega de um pedido (login, senha e códigos de uma conta de jogo, por exemplo) ficam cifrados no banco de dados e só aparecem, dentro do site, para o comprador daquele pedido específico — nunca por email.",
+      "Os dados de entrega de um pedido (login, senha e códigos de uma conta de jogo, por exemplo) ficam cifrados no banco de dados e só aparecem, dentro do site, para o comprador e o vendedor daquele pedido específico e, enquanto houver uma disputa em aberto sobre ele, para a equipe de moderação da Ellowin — nunca por email.",
       "Guardamos os dados de uma conta encerrada pelo tempo exigido por lei para fins fiscais, contábeis e de prevenção a fraude (tipicamente 5 anos após a última movimentação financeira), mesmo depois de uma solicitação de exclusão — o que muda é que o perfil deixa de ser público e de poder ser usado para novo login.",
       "Você pode, a qualquer momento: acessar e corrigir seus dados em \"Minha conta\"; pedir a portabilidade dos seus dados; revogar consentimentos que dependam dele; e solicitar a exclusão (anonimização) da sua conta pela própria página \"Minha conta\", quando não houver pedido em andamento, anúncio ativo ou saldo na carteira.",
-      "Dúvidas, reclamações ou pedidos sobre seus dados pessoais que não puderem ser resolvidos pela própria conta podem ser enviados pela central de segurança.",
+      "Dúvidas, reclamações ou pedidos sobre seus dados pessoais que não puderem ser resolvidos pela própria conta podem ser enviados pelo canal de contato informado na Central de ajuda.",
     ],
   },
 ]
@@ -94,8 +95,8 @@ export default function TermosPage() {
         </div>
 
         <p className="mt-10 border-t border-border pt-6 text-xs leading-relaxed text-muted-foreground">
-          Última atualização: julho de 2026. Dúvidas sobre estes termos podem ser
-          enviadas pela central de segurança.
+          Última atualização: outubro de 2026. Dúvidas sobre estes termos podem ser
+          enviadas pelo canal de contato informado na Central de ajuda.
         </p>
       </main>
       <SiteFooter />

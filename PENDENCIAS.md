@@ -80,12 +80,12 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
   registrada. Hoje o bloco na página do anúncio é "Como protegemos sua compra", sem nome.
 - [x] **Janela de conferência contada da entrega** (feito em 2026-10-17): a liberação automática ao vendedor é **7 dias
   depois da entrega**, e o código, a central de ajuda e a página dos jogos já dizem isso. Pedidos entregues antes dessa
-  data mantêm o prazo antigo (7 dias da compra). Falta só ajustar o texto de `/termos` (próximo item).
-- [ ] **Revisar o texto jurídico de `/termos`** (o Claude não edita texto legal). Há três trechos que contradizem o
-  sistema:
-  1. a liberação automática "no prazo indicado no anúncio" (na prática são 7 dias fixos desde a entrega);
-  2. "cada nível libera novos limites" (não existem limites por nível no código);
-  3. "central de segurança" para pedidos de dados (não existe esse canal ainda).
+  data mantêm o prazo antigo (7 dias da compra). Os `/termos` foram ajustados (próximo item).
+- [ ] **Revisar o texto jurídico de `/termos` com um advogado.** Em 2026-10-18 o Claude, a seu pedido, corrigiu os três
+  trechos que contradiziam o sistema (liberação automática: 7 dias após a entrega; cadastro de vendedor em etapas, sem
+  "níveis com limites"; "central de segurança" trocada por "canal de contato da Central de ajuda") e incluiu que a moderação vê
+  os dados de entrega durante uma disputa aberta. É correção de fato, não revisão jurídica. Atenção: o texto diz que os dados de
+  entrega "ficam cifrados no banco", o que só é verdade depois de definir `DELIVERY_ENCRYPTION_KEY` (item acima).
 - [ ] **Canal de contato e horário do suporte.** Defina o e-mail (e o horário, sem prometer 24/7 sem equipe) e coloque
   `ELLOWIN_SUPPORT_EMAIL` (e, se quiser, `ELLOWIN_SUPPORT_HOURS`, por exemplo "Segunda a sexta, das 9h às 18h") na
   Vercel. Não precisa de redeploy. Até lá a Central de ajuda diz que ainda não há canal direto.

@@ -66,6 +66,7 @@ import VenderPage from "@/app/vender/page"
 import VerificadorPage from "@/app/verificador/page"
 import AjudaPage from "@/app/ajuda/page"
 import TermosPage from "@/app/termos/page"
+import { AUTO_RELEASE_DAYS } from "@/lib/money"
 
 let t: TestDb
 
@@ -382,5 +383,13 @@ describe("ajuda e termos", () => {
     const t1 = await txt(TermosPage())
     expect(t1).toContain("Termos de uso")
     expect(t1).toContain("Dados pessoais e privacidade")
+  })
+
+  it("os termos só prometem o que o sistema faz: liberação contada da entrega, sem níveis com limites nem central inexistente", async () => {
+    const t1 = await txt(TermosPage())
+    expect(t1).toContain(`${AUTO_RELEASE_DAYS} dias após a entrega`)
+    expect(t1).not.toContain("prazo indicado no anúncio")
+    expect(t1).not.toContain("novos limites")
+    expect(t1).not.toContain("central de segurança")
   })
 })
