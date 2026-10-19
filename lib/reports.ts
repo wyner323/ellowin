@@ -13,7 +13,6 @@ export const REPORT_REASONS = [
 ] as const
 
 export type ReportReason = (typeof REPORT_REASONS)[number]["value"]
-export type ReportTargetType = "anuncio" | "usuario"
 export type ReportStatus = "aberta" | "em_analise" | "resolvida" | "arquivada"
 
 export function reportReasonLabel(value: string) {

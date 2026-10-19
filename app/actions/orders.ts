@@ -4,7 +4,7 @@ import { and, eq, sql } from "drizzle-orm"
 import * as Sentry from "@sentry/nextjs"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
-import { order, orderMessage, product } from "@/lib/db/schema"
+import { order, orderMessage } from "@/lib/db/schema"
 import {
   CHAT_FULL_MESSAGE,
   CHAT_RATE_MESSAGE,
@@ -399,16 +399,4 @@ export async function fetchOrderMessages(orderId: number) {
 
   const messages = await getOrderMessages(orderId)
   return { ok: true as const, messages }
-}
-
-/** Usado pelo painel do vendedor para saber se ele tem anúncios publicados. */
-export async function sellerHasProducts() {
-  const userId = await getUserId()
-  const [row] = await db
-    .select({ id: product.id })
-    .from(product)
-    .where(eq(product.sellerId, userId))
-    .limit(1)
-
-  return Boolean(row)
 }

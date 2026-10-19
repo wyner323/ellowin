@@ -770,8 +770,6 @@ export async function getProductForSeller(sellerId: string, productId: number) {
   return { ...row, variants, images: imageRows.map((i) => i.url) }
 }
 
-export type SellerStorefront = Awaited<ReturnType<typeof getSellerStorefront>>
-
 /**
  * Loja pública de um vendedor aprovado — perfil + vitrine de anúncios ativos.
  * `slug` é comparado sem diferenciar maiúsculas (é assim que o índice único

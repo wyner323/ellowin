@@ -146,17 +146,6 @@ export const games = [
   'EA FC 25',
 ]
 
-export function formatBRL(value: number) {
-  return value.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  })
-}
-
 export function getCategory(slug: string) {
   return categories.find((c) => c.slug === slug)
-}
-
-export function listingsByCategory(slug: string) {
-  return listings.filter((l) => l.category === slug)
 }

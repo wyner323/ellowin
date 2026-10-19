@@ -275,8 +275,6 @@ async function withFlags<T extends { id: number }>(rows: T[]) {
   })
 }
 
-export type OrderDetail = Awaited<ReturnType<typeof getOrderDetail>>
-
 /**
  * Pedido completo com contraparte, avaliação e disputa.
  * Devolve `null` se o visitante não for comprador, vendedor nem moderação.

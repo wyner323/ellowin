@@ -12,9 +12,3 @@ export const DISPUTE_REASONS = [
   { value: "cobranca", label: "Problema de cobrança" },
   { value: "outro", label: "Outro motivo" },
 ] as const
-
-export type DisputeReason = (typeof DISPUTE_REASONS)[number]["value"]
-
-export function disputeReasonLabel(value: string) {
-  return DISPUTE_REASONS.find((r) => r.value === value)?.label ?? "Outro motivo"
-}
