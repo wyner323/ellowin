@@ -170,6 +170,19 @@ describe("crédito e débito", () => {
   })
 })
 
+describe("tetos de tempo da transação", () => {
+  it("cada transação nasce com lock_timeout e statement_timeout (uma presa não segura a conexão para sempre)", async () => {
+    const seen = await withTransaction(async (c) => ({
+      lock: (await c.query(`SHOW lock_timeout`)).rows[0].lock_timeout as string,
+      statement: (await c.query(`SHOW statement_timeout`)).rows[0].statement_timeout as string,
+    }))
+    expect(seen).toEqual({ lock: "10s", statement: "30s" })
+    // SET LOCAL: some com a transação, não vaza para a próxima conexão
+    const after = await holder.pool.query(`SHOW lock_timeout`)
+    expect(after.rows[0].lock_timeout).not.toBe("10s")
+  })
+})
+
 describe("rollback", () => {
   it("erro no meio da transação desfaz tudo, inclusive o que já tinha sido gravado", async () => {
     await deposit("buyer", 5_000)

@@ -10,4 +10,8 @@ if (typeof WebSocket === "undefined") {
 }
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+// Conexão ociosa derrubada pelo banco emite "error" no pool; sem ouvinte o Node trata como exceção não capturada e derruba a função.
+pool.on("error", (error: Error) => {
+  console.error("[db] erro numa conexão ociosa do pool:", error.message)
+})
 export const db = drizzle(pool, { schema })

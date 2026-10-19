@@ -83,7 +83,7 @@ beforeEach(async () => {
   holder.failReconcile = false
   holder.notifications.length = 0
   await t.query(
-    `TRUNCATE "notification_log", "order_message", "dispute_message", "dispute", "wallet_transaction", "order", "product_variant", "product", "wallet", "user" RESTART IDENTITY CASCADE`,
+    `TRUNCATE "otp_code", "verification", "session", "notification_log", "order_message", "dispute_message", "dispute", "wallet_transaction", "order", "product_variant", "product", "wallet", "user" RESTART IDENTITY CASCADE`,
   )
   await t.query(`SELECT setval(pg_get_serial_sequence('"order"', 'id'), 100)`)
   for (const id of ["buyer", "seller"]) {
@@ -216,7 +216,17 @@ describe("GET /api/cron/sla: o que ela faz", () => {
 
   it("sem nada para fazer responde ok com zeros e a conferência batendo", async () => {
     const body = await (await call()).json()
-    expect(body).toMatchObject({ ok: true, disputeProcessed: 0, deliveryProcessed: 0, autoReleaseProcessed: 0, reconciliation: { ok: true, problems: 0 } })
+    expect(body).toMatchObject({ ok: true, disputeProcessed: 0, deliveryProcessed: 0, autoReleaseProcessed: 0, reconciliation: { ok: true, problems: 0 }, housekeeping: { sessions: 0, verifications: 0, otps: 0 } })
+  })
+
+  it("a rotina também apaga sessões e códigos vencidos há mais de um dia e responde só a contagem", async () => {
+    await t.query(`INSERT INTO "session" ("id", "userId", "token", "expiresAt") VALUES ('s-velha', 'buyer', 't1', now() - interval '3 days'), ('s-ok', 'buyer', 't2', now() + interval '1 day')`)
+    await t.query(`INSERT INTO "otp_code" ("userId", "channel", "code", "destination", "expiresAt") VALUES ('buyer', 'email', '111111', 'b@teste.dev', now() - interval '3 days')`)
+
+    const body = await (await call()).json()
+
+    expect(body.housekeeping).toEqual({ sessions: 1, verifications: 0, otps: 1 })
+    expect((await t.query(`SELECT "id" FROM "session"`)).rows.map((r) => r.id)).toEqual(["s-ok"])
   })
 
   it("uma varredura que quebra não impede as outras; a resposta só diz que falhou, sem o texto do erro", async () => {

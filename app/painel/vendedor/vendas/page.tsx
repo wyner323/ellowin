@@ -52,7 +52,7 @@ export default async function VendasPage({
   await Promise.all([sweepDeliveryDeadline(), sweepAutoRelease()])
 
   // Status desconhecido na URL é ignorado (mostra todos), nunca vira filtro.
-  const status = sp.status && sp.status in ORDER_STATUS_LABEL ? sp.status : undefined
+  const status = sp.status && Object.hasOwn(ORDER_STATUS_LABEL, sp.status) ? sp.status : undefined
 
   const [list, aggregates, pendingQuestions] = await Promise.all([
     getSellerOrdersPage(session.user.id, { status, page: parsePage(sp.pagina) }),

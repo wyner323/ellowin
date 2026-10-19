@@ -89,6 +89,8 @@ export const auth = betterAuth({
             clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
             // Sempre deixa a pessoa escolher a conta Google (evita entrar na errada).
             prompt: "select_account" as const,
+            // O app só usa o fluxo de redirecionamento. Com idToken o /sign-in/social aceitaria um token assinado do Google trazido pelo cliente.
+            disableIdTokenSignIn: true,
           },
         },
       }

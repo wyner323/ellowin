@@ -12,7 +12,8 @@ import { isUniqueViolation } from "@/lib/db-errors"
 import { isOwnBlobUrl } from "@/lib/blob-urls"
 import { sendAccountDeletedEmail } from "@/lib/email"
 import { hitRateLimit } from "@/lib/rate-limit"
-import { isValidBio, isValidDisplayName } from "@/lib/validation"
+import { getStaff } from "@/lib/roles"
+import { isReservedName, isValidBio, isValidDisplayName } from "@/lib/validation"
 import type { ActionResult } from "@/app/actions/auth"
 
 /** Atualiza o apelido público exibido no chat, avaliações e anúncios. */
@@ -25,6 +26,14 @@ export async function updateDisplayName(input: { displayName: string }): Promise
       ok: false,
       field: "displayName",
       error: "Use de 2 a 20 caracteres — letras, números, espaço, _ ou -.",
+    }
+
+  // "Suporte", "Ellowin" e afins parecem a plataforma na conversa de um pedido: só a equipe pode usar.
+  if (isReservedName(trimmed) && !(await getStaff()))
+    return {
+      ok: false,
+      field: "displayName",
+      error: "Esse apelido lembra a equipe da Ellowin e não pode ser usado. Escolha outro.",
     }
 
   try {

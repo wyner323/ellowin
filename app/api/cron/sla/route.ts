@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto"
 import * as Sentry from "@sentry/nextjs"
 import { NextResponse } from "next/server"
+import { purgeExpiredRows } from "@/lib/housekeeping"
 import { runWalletReconciliation } from "@/lib/reconcile"
 import { alertIfReconciliationBroken } from "@/lib/reconcile-alert"
 import { sweepAutoRelease, sweepDeliveryDeadline, sweepDisputeSla } from "@/lib/sla-sweeps"
@@ -60,6 +61,9 @@ export async function GET(request: Request) {
     })
     .catch((error) => ({ ok: false as const, error: report("conferência", error) }))
 
+  // Faxina de sessões/códigos vencidos. Não mexe em dinheiro: se falhar, vai para o Sentry mas não derruba a rotina.
+  const housekeeping = await purgeExpiredRows().catch((error) => ({ error: report("faxina", error) }))
+
   const disputeError = disputeResult.status === "rejected" ? report("disputas", disputeResult.reason) : null
   const deliveryError = deliveryResult.status === "rejected" ? report("entrega", deliveryResult.reason) : null
   const autoReleaseError =
@@ -73,6 +77,7 @@ export async function GET(request: Request) {
     {
       ok: !failed,
       reconciliation,
+      housekeeping,
       disputeProcessed: disputeResult.status === "fulfilled" ? disputeResult.value : null,
       disputeError,
       deliveryProcessed: deliveryResult.status === "fulfilled" ? deliveryResult.value : null,

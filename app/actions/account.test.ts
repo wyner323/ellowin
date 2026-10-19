@@ -193,6 +193,19 @@ describe("updateDisplayName", () => {
     expect((await userRow("ana")).displayName).toBe("Ana_Gamer")
   })
 
+  it("apelido que se passa pela plataforma é recusado a usuários comuns, mas a equipe pode usar", async () => {
+    holder.userId = "ana"
+    for (const reserved of ["Suporte", "Ellowin Oficial", "E.l.l.o.w.i.n", "Admin_Ana", "Ｓuporte"]) {
+      expect(await updateDisplayName({ displayName: reserved }), reserved).toMatchObject({ ok: false, field: "displayName" })
+    }
+    expect((await userRow("ana")).displayName).toBe("Ana_Gamer")
+
+    await addUser("mod", { role: "moderator" })
+    holder.userId = "mod"
+    expect(await updateDisplayName({ displayName: "Suporte Ellowin" })).toMatchObject({ ok: true })
+    expect((await userRow("mod")).displayName).toBe("Suporte Ellowin")
+  })
+
   it("apelido de outra pessoa é recusado com mensagem amigável, sem diferenciar maiúsculas", async () => {
     holder.userId = "ana"
     for (const taken of ["Bia", "bia", "BIA"]) {

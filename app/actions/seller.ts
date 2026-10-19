@@ -7,7 +7,7 @@ import { profile, sellerApplication, user } from "@/lib/db/schema"
 import { sendPixKeyChangedEmail } from "@/lib/email"
 import { maskPixKey, PIX_TYPE_LABEL } from "@/lib/pix"
 import { accountBlock, getUserId } from "@/lib/session"
-import { isValidCpf, onlyDigits } from "@/lib/validation"
+import { isReservedName, isValidCpf, onlyDigits } from "@/lib/validation"
 import type { ActionResult } from "@/app/actions/auth"
 
 /**
@@ -109,6 +109,8 @@ export async function saveStoreStep(input: {
     }
   if (storeName.length > 60)
     return { ok: false, field: "storeName", error: "O nome da loja pode ter até 60 caracteres." }
+  if (isReservedName(storeName))
+    return { ok: false, field: "storeName", error: "Esse nome lembra a equipe da Ellowin e não pode ser usado. Escolha outro." }
   if (input.description.trim().length > 1000)
     return { ok: false, field: "description", error: "A descrição pode ter até 1000 caracteres." }
   if (input.category.length > 40) return { ok: false, field: "category", error: "Categoria inválida." }

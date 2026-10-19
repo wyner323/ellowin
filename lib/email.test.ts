@@ -213,6 +213,11 @@ describe("emails de conta", () => {
     expect(c.html).not.toContain("<a href")
   })
 
+  it("quebra de linha no assunto vira espaço (sem injeção de cabeçalho)", async () => {
+    await email.sendMail("ana@teste.dev", "Pedido\r\nBcc: alvo@teste.dev\u2028fim", "<p>oi</p>", "teste")
+    expect(lastCall().subject).toBe("Pedido Bcc: alvo@teste.dev fim")
+  })
+
   it("conta excluída: confirma a exclusão e cita a retenção legal", async () => {
     await email.sendAccountDeletedEmail("ana@teste.dev")
     const c = lastCall()

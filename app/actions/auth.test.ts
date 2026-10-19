@@ -287,6 +287,8 @@ describe("registerUser: validação", () => {
     ["nome com número", { fullName: "Maria 2 Silva" }, "fullName"],
     ["apelido curto demais", { displayName: "a" }, "displayName"],
     ["apelido com símbolo", { displayName: "maria<script>" }, "displayName"],
+    ["apelido que se passa pela plataforma", { displayName: "Suporte_Ellowin" }, "displayName"],
+    ["apelido 'Admin' com letras de largura total", { displayName: "Ａdmin" }, "displayName"],
     ["e-mail sem domínio", { email: "maria@teste" }, "email"],
     ["celular sem o 9", { phone: "(11) 3999-1111" }, "phone"],
     ["celular com DDD inexistente", { phone: "(05) 99999-1111" }, "phone"],

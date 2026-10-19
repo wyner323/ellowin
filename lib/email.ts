@@ -182,7 +182,9 @@ export async function sendMail(to: string, subject: string, html: string, label:
   }
 
   try {
-    const { error } = await resend.emails.send({ from: FROM, to, subject, html })
+    // CR/LF no assunto abre injeção de cabeçalho; o assunto é sempre uma linha só.
+    const oneLine = subject.replace(/[\r\n\u2028\u2029]+/g, " ").trim()
+    const { error } = await resend.emails.send({ from: FROM, to, subject: oneLine, html })
     if (error) {
       console.log(`[email] Erro Resend (${label}):`, error.message)
       return { sent: false, error: error.message }

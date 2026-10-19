@@ -1,6 +1,7 @@
 "use server"
 
 import { randomInt } from "node:crypto"
+import * as Sentry from "@sentry/nextjs"
 import { and, desc, eq, isNull, lt, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -13,6 +14,7 @@ import { getSession, getUserId, isProfileComplete } from "@/lib/session"
 import {
   isValidBirthDate,
   isValidCpf,
+  isReservedName,
   isValidDisplayName,
   isValidEmail,
   isValidFullName,
@@ -88,6 +90,8 @@ export async function registerUser(input: {
       field: "displayName",
       error: "Use de 2 a 20 caracteres — letras, números, espaço, _ ou -.",
     }
+  if (displayName && isReservedName(displayName))
+    return { ok: false, field: "displayName", error: RESERVED_NAME_MESSAGE }
   if (!isValidEmail(email))
     return { ok: false, field: "email", error: "Email inválido." }
   if (!isValidPhone(phone))
@@ -163,7 +167,9 @@ export async function registerUser(input: {
         field: "email",
         error: "Já existe uma conta com este email.",
       }
-    return { ok: false, error: message }
+    // Qualquer outra falha (banco, Better Auth) pode trazer SQL ou detalhe interno: vai para o Sentry, a tela recebe texto fixo.
+    Sentry.captureException(err)
+    return { ok: false, error: "Não foi possível criar a conta agora. Tente novamente em instantes." }
   }
 
   const [created] = await db
@@ -462,6 +468,8 @@ export async function verifyPhoneCode(code: string): Promise<ActionResult> {
 /*                                  Sessão                                    */
 /* -------------------------------------------------------------------------- */
 
+const RESERVED_NAME_MESSAGE = "Esse apelido lembra a equipe da Ellowin e não pode ser usado. Escolha outro."
+
 const LOGIN_WINDOW_SECONDS = 10 * 60
 // Por PAR e-mail+IP: quem erra a senha de um e-mail bloqueia só o PRÓPRIO IP para aquele e-mail, nunca o dono da
 // conta (que entra de outro IP). Contar só por e-mail deixava qualquer anônimo manter a vítima bloqueada.
@@ -505,6 +513,8 @@ export async function completeProfile(input: {
       field: "displayName",
       error: "Use de 2 a 20 caracteres — letras, números, espaço, _ ou -.",
     }
+  if (displayName && isReservedName(displayName))
+    return { ok: false, field: "displayName", error: RESERVED_NAME_MESSAGE }
   if (!isValidPhone(phone))
     return { ok: false, field: "phone", error: "Informe um celular válido com DDD." }
   if (!isValidCpf(cpf))

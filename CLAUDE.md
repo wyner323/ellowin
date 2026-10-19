@@ -205,7 +205,10 @@ and the screen gets a generic message, so a raw database error never reaches the
 withdrawal ledger line carries the masked Pix key (`maskPixKey`), never the full one. Workflows run with `permissions: contents: read` (CI) or none
 (`sla-sweep.yml`), and `.github/dependabot.yml` opens weekly update PRs (actions are still pinned by tag, not SHA). `completeProfile` refuses an already-complete profile (`isProfileComplete`), so legal name/CPF/phone cannot be rewritten after KYC; `addFunds` reads the 24 h
 deposit total inside the transaction with the wallet locked; changing an existing Pix key emails the account owner (`sendPixKeyChangedEmail`, masked key only). Public copy must not
-claim checks the system does not do (no "verified sellers", no "documents under analysis": KYC stores only a file name; `lib/catalog.test.ts` guards the category texts).
+claim checks the system does not do (no "verified sellers", no "documents under analysis": KYC stores only a file name; `lib/catalog.test.ts` guards the category texts). Nicknames and store names that pass for the platform ("Ellowin", "Suporte", "Admin"... see `isReservedName`, folded for accents/width/separators) are refused except
+for staff changing their own nickname. `withTransaction` sets `lock_timeout` 10 s and `statement_timeout` 30 s; the cron route also runs `purgeExpiredRows()` (`lib/housekeeping.ts`: sessions,
+`verification` tokens and OTP codes expired > 1 day) and answers only the counts. `pnpm db:migrate` hits the database in `.env.local` (production) and now asks for confirmation (`--yes` without a terminal).
+`registerUser` never returns a raw exception text (Sentry + fixed message), email subjects are forced to one line, Google `disableIdTokenSignIn` is on, and `.github/CODEOWNERS` + `SECURITY.md` exist.
 
 ### Wallet reconciliation
 

@@ -99,7 +99,9 @@ export function isValidPhone(value: string) {
 /* -------------------------------------------------------------------------- */
 
 export function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test((value ?? "").trim())
+  const trimmed = (value ?? "").trim()
+  // 254 é o teto do endereço (RFC 5321): sem ele, um e-mail gigante vira chave de limite e consulta.
+  return trimmed.length <= 254 && /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(trimmed)
 }
 
 export function isValidFullName(value: string) {
@@ -117,6 +119,37 @@ export function isValidDisplayName(value: string) {
   if (trimmed.length < 2 || trimmed.length > 20) return false
   if (!/^[\p{L}\p{N}\s_.-]+$/u.test(trimmed)) return false
   return /[\p{L}\p{N}]/u.test(trimmed)
+}
+
+/** Forma comparável de um nome: sem acento, sem caixa e sem separadores ("Ｅllowin", "e.l.l.o.w.i.n" e "Ellowin" ficam iguais). */
+export function foldName(value: string) {
+  return (value ?? "")
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, "")
+}
+
+// Quem lê um apelido ou um nome de loja na conversa de um pedido confia que "Suporte" ou "Ellowin" é a plataforma.
+const RESERVED_NAME_PREFIXES = [
+  "suporte",
+  "support",
+  "admin",
+  "administrador",
+  "moderador",
+  "moderacao",
+  "oficial",
+  "equipe",
+  "staff",
+  "atendimento",
+  "sistema",
+  "system",
+]
+
+/** Nome que se passaria pela plataforma. Só vale para apelido e nome de loja; a equipe pode usar (ver updateDisplayName). */
+export function isReservedName(value: string) {
+  const folded = foldName(value)
+  return folded.includes("ellowin") || RESERVED_NAME_PREFIXES.some((p) => folded.startsWith(p))
 }
 
 /** Bio curta do perfil público — até 160 caracteres, pode ser vazia. */

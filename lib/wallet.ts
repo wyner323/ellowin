@@ -39,6 +39,9 @@ export async function withTransaction<T>(
   const client = await pool.connect()
   try {
     await client.query("BEGIN")
+    // Sem estes tetos uma transação presa (lock esperando outra, consulta lenta) segura a conexão até a função morrer.
+    await client.query("SET LOCAL lock_timeout = '10s'")
+    await client.query("SET LOCAL statement_timeout = '30s'")
     const result = await fn(client)
     await client.query("COMMIT")
     return result

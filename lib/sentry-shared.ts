@@ -44,4 +44,8 @@ export const sentrySharedOptions = {
   beforeSendTransaction(event: unknown) {
     return scrubSensitiveData(event) as never
   },
+  // O trilho de eventos (URLs navegadas, requisições) também carrega ?token= e afins.
+  beforeBreadcrumb(breadcrumb: unknown) {
+    return scrubSensitiveData(breadcrumb) as never
+  },
 } as const

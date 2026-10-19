@@ -154,6 +154,8 @@ describe("saveStoreStep", () => {
     ["nome curto", { storeName: "ab" }, "storeName"],
     ["nome só com espaços", { storeName: "     " }, "storeName"],
     ["nome longo", { storeName: "n".repeat(61) }, "storeName"],
+    ["nome que se passa pela plataforma", { storeName: "Ellowin Oficial Games" }, "storeName"],
+    ["nome 'Suporte' disfarçado", { storeName: "S.u.p.o.r.t.e Ellowin" }, "storeName"],
     ["sem categoria", { category: "" }, "category"],
     ["categoria enorme", { category: "c".repeat(41) }, "category"],
     ["descrição curta", { description: "curta demais" }, "description"],

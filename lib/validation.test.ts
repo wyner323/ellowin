@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   cpfRegion,
+  foldName,
   formatBirthDate,
   formatCpf,
   formatPhone,
@@ -11,6 +12,7 @@ import {
   isValidEmail,
   isValidFullName,
   isValidPassword,
+  isReservedName,
   isValidPhone,
   onlyDigits,
   passwordScore,
@@ -143,6 +145,26 @@ describe("email, nome e apelido", () => {
     expect(isValidBio("a".repeat(160))).toBe(true)
     expect(isValidBio("a".repeat(161))).toBe(false)
     expect(isValidBio("  " + "a".repeat(160) + "  ")).toBe(true) // espaços nas pontas não contam
+  })
+})
+
+describe("nomes reservados e e-mail", () => {
+  it("foldName ignora acento, caixa, separadores e letras de largura total", () => {
+    expect(foldName("Ｅllowin")).toBe("ellowin")
+    expect(foldName("E.l-l_o w i n")).toBe("ellowin")
+    expect(foldName("Moderação")).toBe("moderacao")
+  })
+
+  it("isReservedName pega o que se passa pela plataforma e deixa nomes comuns passarem", () => {
+    for (const bad of ["Ellowin", "ellowin games", "Suporte", "SUPORTE_ANA", "Admin", "Moderação", "Ｓupport", "Loja do Ellowin"])
+      expect(isReservedName(bad), bad).toBe(true)
+    for (const ok of ["Ana Pro", "Loja do Beto", "Pedro_Gamer", "Rainha do Valorant"])
+      expect(isReservedName(ok), ok).toBe(false)
+  })
+
+  it("e-mail acima de 254 caracteres é recusado", () => {
+    expect(isValidEmail(`${"a".repeat(64)}@${"b".repeat(180)}.com`)).toBe(true)
+    expect(isValidEmail(`${"a".repeat(64)}@${"b".repeat(200)}.com`)).toBe(false)
   })
 })
 

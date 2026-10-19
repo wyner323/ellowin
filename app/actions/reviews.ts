@@ -3,6 +3,7 @@
 import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
+import { isUniqueViolation } from "@/lib/db-errors"
 import { order, review } from "@/lib/db/schema"
 import { getUserId } from "@/lib/session"
 import { withTransaction } from "@/lib/wallet"
@@ -69,8 +70,9 @@ export async function submitReview(input: {
         [row.productId, rating],
       )
     })
-  } catch {
-    return { ok: false, error: "Você já avaliou este pedido." }
+  } catch (error) {
+    if (isUniqueViolation(error)) return { ok: false, error: "Você já avaliou este pedido." }
+    throw error
   }
 
   revalidatePath(`/pedidos/${row.id}`)

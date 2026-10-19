@@ -1,0 +1,6 @@
+# Quem revisa o quê. Com a proteção de branch "Require review from Code Owners" ligada, mudanças aqui exigem este revisor.
+* @wyner323
+/.github/ @wyner323
+/lib/wallet.ts @wyner323
+/lib/auth.ts @wyner323
+/proxy.ts @wyner323

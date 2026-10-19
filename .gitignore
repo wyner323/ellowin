@@ -22,3 +22,9 @@ next-env.d.ts
 .agents/
 .claude/skills/
 skills-lock.json
+
+# Chaves e certificados nunca entram no repositório
+*.pem
+*.key
+*.p12
+*.pfx
