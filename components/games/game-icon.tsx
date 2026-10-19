@@ -32,7 +32,7 @@ export function GameIcon({
   const image = gameImagePath(slug)
   if (image) {
     return (
-      <span aria-hidden="true" className={box}>
+      <span aria-hidden="true" className={cn(box, "bg-neutral-900")}>
         {/* Arquivo estático pequeno (128px): serve direto, sem passar pelo otimizador de imagens. */}
         <Image src={image} alt="" width={px} height={px} unoptimized className="size-full object-cover" />
       </span>

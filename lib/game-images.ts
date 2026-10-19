@@ -1,11 +1,12 @@
 /**
- * Jogos que têm imagem própria em /public/images/jogos/<slug>.webp (128x128, ícone do aplicativo do jogo na App Store ou Steam).
+ * Jogos que têm imagem própria em /public/images/jogos/<slug>.webp (128x128: ícone do aplicativo na App Store, ícone da Steam ou ícone do site oficial).
  * Os demais usam a marca em `lib/game-brand-icons.ts` ou o ícone gerado (`lib/game-icon.ts`).
  * Os ícones pertencem às respectivas publicadoras e aparecem aqui só para identificar o jogo; um teste confere que a lista
  * e a pasta andam juntas.
  */
 export const GAME_IMAGE_SLUGS: ReadonlySet<string> = new Set([
   "8-ball-pool",
+  "adventure-quest-world",
   "albion-online",
   "apex-legends",
   "arc-raiders",
@@ -14,6 +15,7 @@ export const GAME_IMAGE_SLUGS: ReadonlySet<string> = new Set([
   "avakin-life",
   "black-desert",
   "black-myth-wukong",
+  "blade-and-soul",
   "bleach-brave-souls",
   "bleach-soul-resonance",
   "blood-strike",
@@ -27,6 +29,7 @@ export const GAME_IMAGE_SLUGS: ReadonlySet<string> = new Set([
   "clash-of-clans",
   "clash-royale",
   "coin-master",
+  "cookie-run-kingdom",
   "counter-strike-2",
   "crossfire",
   "dark-and-darker",
@@ -53,12 +56,15 @@ export const GAME_IMAGE_SLUGS: ReadonlySet<string> = new Set([
   "honkai-impact",
   "honkai-star-rail",
   "honor-of-kings",
+  "imvu",
   "jujutsu-kaisen-phantom-parade",
   "kakele-online",
   "last-day-on-earth",
   "league-of-legends-wild-rift",
   "legends-of-runeterra",
+  "lineage-ii",
   "lords-mobile",
+  "lost-ark",
   "magic-the-gathering",
   "marvel-rivals",
   "minecraft",
@@ -70,10 +76,13 @@ export const GAME_IMAGE_SLUGS: ReadonlySet<string> = new Set([
   "new-world",
   "ni-no-kuni",
   "night-crows",
+  "nintendo",
   "odin-valhalla-rising",
   "one-piece-bounty-rush",
   "overwatch",
   "palworld",
+  "path-of-exile",
+  "path-of-exile-2",
   "perfect-world",
   "pixel-gun-3d",
   "pkxd",
@@ -86,11 +95,13 @@ export const GAME_IMAGE_SLUGS: ReadonlySet<string> = new Set([
   "ragnarok-origin",
   "raid-shadow-legends",
   "rainbow-six",
+  "ravendawn",
   "roblox",
   "rocket-league",
   "rucoy-online",
   "runescape",
   "rush-royale",
+  "rust",
   "saint-seiya-awakening",
   "skullgirls",
   "solo-leveling-arise",
@@ -100,6 +111,7 @@ export const GAME_IMAGE_SLUGS: ReadonlySet<string> = new Set([
   "stumble-guys",
   "subway-surfers",
   "summoners-war",
+  "throne-and-liberty",
   "toram-online",
   "tower-of-fantasy",
   "wakfu",
@@ -109,6 +121,7 @@ export const GAME_IMAGE_SLUGS: ReadonlySet<string> = new Set([
   "warspear",
   "world-of-tanks",
   "wuthering-waves",
+  "xbox",
   "zenless-zone-zero",
 ])
 

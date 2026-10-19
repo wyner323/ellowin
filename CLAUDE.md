@@ -316,7 +316,7 @@ only (`getRealStorefrontCards`); demo cards stay confined to the labeled "demons
 ### Game icons
 
 `GameIcon` (`components/games/game-icon.tsx`) shows, in this order: (1) the game's own image from `public/images/jogos/<slug>.webp` (128x128, listed in `lib/game-images.ts`; app icons
-from the App Store and Steam community icons, picked and checked one by one), (2) a platform/game mark from `lib/game-brand-icons.ts` (Simple Icons SVG paths, CC0, on the brand color),
+from the App Store, Steam community icons and icons declared by the game's official site, picked and checked one by one), (2) a platform/game mark from `lib/game-brand-icons.ts` (Simple Icons SVG paths, CC0, on the brand color),
 (3) a generated tile with the initials and a color derived from the slug (`lib/game-icon.ts`). It is decorative (`aria-hidden`) and used in the `/jogos` list, the game page header
 and the home "Jogos com anúncios" strip. These are the publishers' own trademarks used only to identify the game (the owner accepted that risk, no licence); `lib/game-images.test.ts`
 keeps the list and the folder in sync. To add or fix one, drop a square webp in the folder and add the slug to the list (a wrong match is worse than the generated tile: check the image).
