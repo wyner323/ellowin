@@ -1,4 +1,5 @@
 import { pool } from "@/lib/db"
+import { cachedRead } from "@/lib/read-cache"
 import type { CategoryStat, MarketStats } from "@/lib/home-stats"
 import { findGameBySlug, slugifyGame } from "@/lib/product-catalog"
 
@@ -18,7 +19,7 @@ const FOR_SALE = `
     where v."productId" = p."id" and v."active" = true and v."stock" > 0
   )`
 
-export async function getMarketStats(): Promise<MarketStats> {
+async function readMarketStats(): Promise<MarketStats> {
   const { rows } = await pool.query<{
     active_listings: number
     approved_sellers: number
@@ -54,7 +55,7 @@ export async function getMarketStats(): Promise<MarketStats> {
 }
 
 /** Contagem e menor preço por categoria, só de anúncios reais à venda. */
-export async function getCategoryStats(): Promise<Record<string, CategoryStat>> {
+async function readCategoryStats(): Promise<Record<string, CategoryStat>> {
   const { rows } = await pool.query<{
     slug: string
     count: number
@@ -82,7 +83,7 @@ export async function getCategoryStats(): Promise<Record<string, CategoryStat>> 
  * vendedores distintos e menor preço. `product.game` é texto livre, então o
  * cruzamento com o slug é feito em JS, como no resto de /jogos.
  */
-export async function getGameStats(gameSlug: string): Promise<CategoryStat | null> {
+async function readGameStats(gameSlug: string): Promise<CategoryStat | null> {
   const { rows } = await pool.query<{ game: string; count: number; sellers: string[]; min_price: number }>(
     `select p."game" as game, count(*)::int as count,
             array_agg(distinct p."sellerId") as sellers,
@@ -104,7 +105,7 @@ export async function getGameStats(gameSlug: string): Promise<CategoryStat | nul
 }
 
 /** Jogos que têm anúncio real à venda, do mais anunciado para o menos, só os que têm página em /jogos. */
-export async function getListedGames(limit = 10): Promise<{ name: string; slug: string; count: number }[]> {
+async function readListedGames(limit = 10): Promise<{ name: string; slug: string; count: number }[]> {
   const { rows } = await pool.query<{ game: string; count: number }>(
     `select p."game" as game, count(*)::int as count
        from "product" p
@@ -117,3 +118,12 @@ export async function getListedGames(limit = 10): Promise<{ name: string; slug: 
     .filter((g) => findGameBySlug(g.slug) !== null)
     .slice(0, limit)
 }
+
+/**
+ * Versões públicas, com 60 s de cache (ver `lib/read-cache.ts`): são os números da home, das categorias e dos jogos,
+ * iguais para todo visitante.
+ */
+export const getMarketStats = cachedRead(readMarketStats, ["market-stats"], 60)
+export const getCategoryStats = cachedRead(readCategoryStats, ["category-stats"], 60)
+export const getGameStats = cachedRead(readGameStats, ["game-stats"], 60)
+export const getListedGames = cachedRead(readListedGames, ["listed-games"], 60)

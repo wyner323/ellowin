@@ -210,6 +210,14 @@ for staff changing their own nickname. `withTransaction` sets `lock_timeout` 10 
 `verification` tokens and OTP codes expired > 1 day) and answers only the counts. `pnpm db:migrate` hits the database in `.env.local` (production) and now asks for confirmation (`--yes` without a terminal).
 `registerUser` never returns a raw exception text (Sentry + fixed message), email subjects are forced to one line, Google `disableIdTokenSignIn` is on, and `.github/CODEOWNERS` + `SECURITY.md` exist.
 
+### Read cache for public numbers
+
+`cachedRead()` (`lib/read-cache.ts`, a thin `unstable_cache`, 60 s) wraps the public number readers that are identical for every visitor: `getMarketStats`, `getCategoryStats`,
+`getGameStats`, `getListedGames` (`lib/market-stats.ts`) and `getGameListingCounts` (`lib/marketplace.ts`). The cost is up to 60 s of delay in those NUMBERS only (home hero, category and
+game counts, "Jogos com anúncios", sitemap); the listing page, search, cards and purchase price still read the database live. Never wrap anything that reads the session, a cookie or a
+wallet. In tests (`NODE_ENV=test`) it returns the original function, so DB tests see real data. Request time to expect in production: ~130 ms of Brazil↔US network (functions run in `iad1`
+next to the database) plus render; a sleeping Neon adds 1–2 s on the first request.
+
 ### Wallet reconciliation
 
 `lib/reconcile.ts` (read-only, 10 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =

@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, sql, type SQL } from "drizzle-orm"
 import { db } from "@/lib/db"
+import { cachedRead } from "@/lib/read-cache"
 import { escapeLike, resolvePage } from "@/lib/pagination"
 import { anonymousName, publicNameCol } from "@/lib/public-name"
 import {
@@ -857,7 +858,7 @@ export async function getSellerStorefront(slug: string) {
  * ------------------------------------------------------------------------ */
 
 /** Quantidade de anúncios ativos por jogo, para o índice `/jogos`. */
-export async function getGameListingCounts(): Promise<Record<string, number>> {
+async function readGameListingCounts(): Promise<Record<string, number>> {
   const rows = await db
     .select({ game: product.game })
     .from(product)
@@ -872,6 +873,9 @@ export async function getGameListingCounts(): Promise<Record<string, number>> {
   }
   return counts
 }
+
+/** Contagem por jogo, igual para todo visitante: 60 s de cache (ver `lib/read-cache.ts`). */
+export const getGameListingCounts = cachedRead(readGameListingCounts, ["game-listing-counts"], 60)
 
 /**
  * Outros anúncios para o fim da página de um anúncio: do mesmo jogo (ou, sem
