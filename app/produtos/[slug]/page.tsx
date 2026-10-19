@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import {
@@ -102,7 +101,6 @@ export default async function ProductPage({
   const { positivas, neutras, negativas } = item.seller.reputation
   const totalSellerReviews = positivas + neutras + negativas
 
-  const nonce = (await headers()).get("x-nonce") ?? undefined
   const productUrl = `${SITE_URL}/produtos/${item.slug}`
   const fallbackImage = `${SITE_URL}${category?.image ?? "/icon-32x32.png"}`
   const jsonLd = serializeJsonLd(
@@ -123,8 +121,8 @@ export default async function ProductPage({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: breadcrumbLd }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: breadcrumbLd }} />
       <SiteHeader />
 
       <main id="conteudo" className="flex-1">

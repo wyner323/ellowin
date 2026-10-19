@@ -1,12 +1,11 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { Search, ShieldCheck } from 'lucide-react'
 import { eq } from 'drizzle-orm'
-import { auth } from '@/lib/auth'
 import { categories } from '@/lib/catalog'
 import { db } from '@/lib/db'
 import { sellerApplication, user as userTable } from '@/lib/db/schema'
 import { getStaff } from '@/lib/roles'
+import { readSession } from '@/lib/session'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EllowinLogo } from '@/components/ellowin-logo'
@@ -17,7 +16,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { UserMenu } from '@/components/user-menu'
 
 export async function SiteHeader() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await readSession()
 
   // Só consultamos cargo e loja quando há sessão, para não pesar as páginas
   // públicas com duas queries por render.

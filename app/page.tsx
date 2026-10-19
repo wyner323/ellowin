@@ -1,4 +1,3 @@
-import { headers } from 'next/headers'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import {
@@ -12,13 +11,11 @@ import {
 import { serializeJsonLd } from '@/lib/product-jsonld'
 import { websiteJsonLd } from '@/lib/seo'
 
-export default async function HomePage() {
-  const nonce = (await headers()).get('x-nonce') ?? undefined
+export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
       <script
         type="application/ld+json"
-        nonce={nonce}
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteJsonLd()) }}
       />
       <SiteHeader />

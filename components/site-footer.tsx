@@ -1,7 +1,6 @@
-import { headers } from 'next/headers'
 import Link from 'next/link'
-import { auth } from '@/lib/auth'
 import { categories } from '@/lib/catalog'
+import { readSession } from '@/lib/session'
 import { EllowinLogo } from '@/components/ellowin-logo'
 
 const institucional = [
@@ -25,7 +24,7 @@ const contaLogada = [
 ]
 
 export async function SiteFooter() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await readSession()
   const conta = session?.user ? contaLogada : contaDeslogada
 
   return (

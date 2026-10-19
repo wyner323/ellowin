@@ -1,6 +1,5 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ChevronRight } from 'lucide-react'
@@ -61,7 +60,6 @@ export default async function CatalogPage({
   const isEmpty =
     result.realTotal === 0 && result.demoTotal === 0 && activeFilterCount(filters) === 0
 
-  const nonce = (await headers()).get('x-nonce') ?? undefined
   const breadcrumbLd = serializeJsonLd(
     breadcrumbJsonLd([
       { name: 'Início', path: '/' },
@@ -71,7 +69,7 @@ export default async function CatalogPage({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: breadcrumbLd }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: breadcrumbLd }} />
       <SiteHeader />
       <main id="conteudo" className="flex-1">
         <section className="border-b border-border bg-accent/40">

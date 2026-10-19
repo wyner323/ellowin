@@ -190,10 +190,10 @@ describe("página do anúncio", () => {
     await expect(ProductPage(params({ slug: "nao-existe" }))).rejects.toThrow("NEXT_NOT_FOUND")
   })
 
-  it("dados estruturados: JSON válido, com o nonce, e texto do vendedor não fecha o <script>", async () => {
+  it("dados estruturados: JSON válido (dado, não script: sem nonce) e texto do vendedor não fecha o <script>", async () => {
     await addListing({ slug: "malicioso", title: "</script><script>alert(1)</script>", description: "</script><img src=x onerror=alert(1)>" })
     const html = await page(ProductPage(params({ slug: "malicioso" })))
-    const m = /<script type="application\/ld\+json" nonce="nonce-de-teste">([\s\S]*?)<\/script>/.exec(html)
+    const m = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)
     expect(m).not.toBeNull()
     const data = JSON.parse(m![1])
     expect(data["@type"]).toBe("Product")

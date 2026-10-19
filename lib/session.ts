@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { headers } from "next/headers"
 import { after } from "next/server"
 import { and, desc, eq, sql } from "drizzle-orm"
@@ -10,8 +11,15 @@ import { profile, sellerApplication, user } from "@/lib/db/schema"
  * por aqui, então é o lugar certo pra marcar atividade, e cobre os dois sem
  * duplicar a chamada.
  */
+/**
+ * Uma leitura da sessão por requisição: o cabeçalho, o rodapé e a própria página chamam isto, e o `cache` do React
+ * faz as três dividirem uma consulta só (antes eram até três idas ao banco para quem está logado).
+ * Fora de uma requisição do servidor (testes) o `cache` não memoiza, e cada chamada lê normalmente.
+ */
+export const readSession = cache(async () => auth.api.getSession({ headers: await headers() }))
+
 export async function getSession() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await readSession()
   if (session?.user) {
     // Roda depois da resposta (via after/waitUntil do Vercel) — não atrasa a
     // page/action por causa de um detalhe cosmético, mas ainda garante que rode.

@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { eq } from "drizzle-orm"
@@ -84,7 +83,6 @@ export default async function JogoPage({
     }
   }
 
-  const nonce = (await headers()).get("x-nonce") ?? undefined
   const breadcrumbLd = serializeJsonLd(
     breadcrumbJsonLd([
       { name: "Início", path: "/" },
@@ -95,7 +93,7 @@ export default async function JogoPage({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: breadcrumbLd }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: breadcrumbLd }} />
       <SiteHeader />
       <main id="conteudo" className="flex-1">
         <section className="border-b border-border bg-accent/40">
