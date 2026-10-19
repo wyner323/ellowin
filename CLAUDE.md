@@ -218,6 +218,19 @@ game counts, "Jogos com anúncios", sitemap); the listing page, search, cards an
 wallet. In tests (`NODE_ENV=test`) it returns the original function, so DB tests see real data. Request time to expect in production: ~130 ms of Brazil↔US network (functions run in `iad1`
 next to the database) plus render; a sleeping Neon adds 1–2 s on the first request.
 
+### Seller panel: analytics, charts and exports
+
+`/painel/vendedor` is the summary (last 30 days, KPIs with sparkline, revenue and balance charts, top listings, receivables); `/painel/vendedor/analises?periodo=7|30|90` is the full page
+(KPIs vs. the previous period, revenue per day with the previous period overlaid, views and orders per day, funnel views → orders → completed, revenue by game/category, per-listing table with
+views and conversion, health meters for on-time delivery/cancel/refund/dispute rates, returning buyers, expected releases). All numbers come from `getSellerAnalytics()` (`lib/seller-analytics.ts`, SQL only):
+the windows are the last N **São Paulo calendar days** including today and the N before; a sale counts on its `completedAt` day, an order on its `createdAt` day. Pure math is in `lib/analytics-math.ts`
+(`parsePeriod` only accepts 7/30/90), geometry in `lib/chart-geometry.ts`. Charts are hand-drawn SVG in `components/seller/analytics/` (server-renderable, no chart library: Recharts was removed): 2 px lines,
+bars ≤ 24 px with a 4 px rounded end, one hue (`--chart-1`), no dual axis, last-point label, hover/keyboard cursor, and every chart card offers "Ver tabela" (`ChartCard`). Deltas always carry an arrow and
+a sign, health meters a text verdict: never color alone.
+Views come from `product_view_daily` (migration 0009; one aggregate counter per product per São Paulo day, no IP/cookie/visitor, `lib/product-views.ts`): the product page counts a view in `after()` only for an
+active listing, not for its owner and not for bots (`countsAsView`). If the table does not exist yet, `getSellerAnalytics` returns `viewsAvailable: false` and the UI shows "—" instead of failing.
+`/painel/vendedor/vendas/exportar` (GET, seller only, 10/h) returns a spreadsheet CSV (`lib/csv.ts`: `;` separator, comma decimals, BOM, formula-injection neutralized, public buyer names only, max 5000 rows).
+
 ### Wallet reconciliation
 
 `lib/reconcile.ts` (read-only, 10 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =

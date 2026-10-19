@@ -14,6 +14,8 @@ const holder = vi.hoisted(() => ({
   db: null as unknown as TestDb["db"],
   pool: null as unknown as TestDb["pool"],
   userId: null as string | null,
+  userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+  afterTasks: [] as (() => unknown)[],
 }))
 
 vi.mock("@/lib/db", () => ({
@@ -29,7 +31,7 @@ vi.mock("@/lib/auth", () => ({
   auth: { api: { getSession: async () => (holder.userId ? { user: { id: holder.userId } } : null) } },
 }))
 vi.mock("next/headers", () => ({
-  headers: async () => new Headers({ "x-nonce": "nonce-de-teste" }),
+  headers: async () => new Headers({ "x-nonce": "nonce-de-teste", "user-agent": holder.userAgent }),
   cookies: async () => ({ get: () => undefined }),
 }))
 vi.mock("next/navigation", () => ({
@@ -43,7 +45,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
   useSearchParams: () => new URLSearchParams(),
 }))
-vi.mock("next/server", () => ({ after: () => {} }))
+vi.mock("next/server", () => ({ after: (fn: () => unknown) => holder.afterTasks.push(fn) }))
 vi.mock("@/components/site-header", () => ({ SiteHeader: () => null }))
 vi.mock("@/components/site-footer", () => ({ SiteFooter: () => null }))
 
@@ -72,6 +74,7 @@ let n = 0
 
 beforeEach(async () => {
   holder.userId = null
+  holder.afterTasks = []
   await t.query(
     `TRUNCATE "product_question", "review", "dispute", "order", "product_image", "product_variant", "product", "report", "wallet", "seller_application", "profile", "user" RESTART IDENTITY CASCADE`,
   )
@@ -201,6 +204,38 @@ describe("página do anúncio", () => {
     expect(m![1]).not.toContain("</script")
     expect(html).not.toContain("<script>alert(1)")
     expect(html).not.toContain("<img src=x")
+  })
+
+  it("abrir um anúncio ativo conta uma visualização (depois da resposta); dono, robô e anúncio pausado não contam", async () => {
+    const id = await addListing({ slug: "visto" })
+    const visitas = async () => {
+      const { rows } = await t.query(`SELECT coalesce(sum("views"), 0)::int AS n FROM "product_view_daily" WHERE "productId" = $1`, [id])
+      return rows[0].n as number
+    }
+    const rodar = async () => {
+      for (const fn of holder.afterTasks.splice(0)) await fn()
+    }
+
+    await page(ProductPage(params({ slug: "visto" })))
+    await rodar()
+    expect(await visitas()).toBe(1)
+
+    holder.userId = "ana" // o dono olhando o próprio anúncio
+    await page(ProductPage(params({ slug: "visto" })))
+    await rodar()
+    expect(await visitas()).toBe(1)
+
+    holder.userId = null
+    holder.userAgent = "Googlebot/2.1 (+http://www.google.com/bot.html)"
+    await page(ProductPage(params({ slug: "visto" })))
+    await rodar()
+    expect(await visitas()).toBe(1)
+    holder.userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+
+    await t.query(`UPDATE "product" SET "status" = 'pausado' WHERE "id" = $1`, [id])
+    await page(ProductPage(params({ slug: "visto" })))
+    await rodar()
+    expect(await visitas()).toBe(1)
   })
 
   it("anúncio pausado avisa e não oferece compra; fora do índice dos buscadores", async () => {

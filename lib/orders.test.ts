@@ -151,10 +151,6 @@ async function addDispute(
   return rows[0].id as number
 }
 
-function isoUtc(daysAgo: number) {
-  return new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 19).replace("T", " ")
-}
-
 /* ---------------------------------------------------------------------------
  * getBuyerOrdersPage
  * ------------------------------------------------------------------------ */
@@ -377,48 +373,9 @@ describe("getSellerOrderAggregates", () => {
     expect(a.byStatus).toHaveLength(2)
   })
 
-  it("vendas por dia: só concluídas, só os últimos 60 dias, agrupadas pelo dia (UTC)", async () => {
-    await addOrder({ status: "concluido", net: 100, completedAt: isoUtc(2) })
-    await addOrder({ status: "concluido", net: 250, completedAt: isoUtc(2) })
-    await addOrder({ status: "concluido", net: 400, completedAt: isoUtc(10) })
-    await addOrder({ status: "concluido", net: 777, completedAt: isoUtc(61) }) // fora da janela
-    await addOrder({ status: "cancelado", net: 888, completedAt: isoUtc(3) }) // não é concluído
-    const pBia = await addProduct("bia")
-    await addOrder({ seller: "bia", product: pBia, status: "concluido", net: 5000, completedAt: isoUtc(2) }) // outro vendedor
-    const { salesByDay } = await getSellerOrderAggregates("ana")
-    const byDay = Object.fromEntries(salesByDay.map((d) => [d.day, [d.count, d.totalCents]]))
-    expect(byDay).toEqual({
-      [isoUtc(2).slice(0, 10)]: [2, 350],
-      [isoUtc(10).slice(0, 10)]: [1, 400],
-    })
-  })
-
-  it("mais vendidos: até 5 anúncios concluídos, do que mais rendeu para o que menos", async () => {
-    const totals = [100, 700, 300, 900, 500, 200] // 6 anúncios; o de 100 fica de fora
-    for (const [i, net] of totals.entries()) {
-      const p = await addProduct("ana")
-      await addOrder({ product: p, status: "concluido", net, title: `Anúncio ${i}` })
-    }
-    const extra = await addProduct("ana")
-    await addOrder({ product: extra, status: "aguardando_entrega", net: 99_999, title: "Não concluído" })
-    const pBia = await addProduct("bia")
-    await addOrder({ seller: "bia", product: pBia, status: "concluido", net: 50_000, title: "De outro vendedor" })
-    const { topProducts } = await getSellerOrderAggregates("ana")
-    expect(topProducts.map((p) => p.totalCents)).toEqual([900, 700, 500, 300, 200])
-    expect(topProducts[0].title).toBe("Anúncio 3")
-  })
-
-  it("soma vendas do mesmo anúncio e conta quantas foram", async () => {
-    const p = await addProduct("ana")
-    await addOrder({ product: p, net: 300 })
-    await addOrder({ product: p, net: 200 })
-    const { topProducts } = await getSellerOrderAggregates("ana")
-    expect(topProducts).toEqual([{ title: "Conta Valorant", totalCents: 500, count: 2 }])
-  })
-
-  it("sem vendas: listas vazias", async () => {
+  it("sem vendas: lista vazia", async () => {
     const a = await getSellerOrderAggregates("ana")
-    expect([a.byStatus, a.salesByDay, a.topProducts]).toEqual([[], [], []])
+    expect(a.byStatus).toEqual([])
   })
 })
 

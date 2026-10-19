@@ -64,6 +64,13 @@
       "when": 1791666756081,
       "tag": "0008_strong_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792448819213,
+      "tag": "0009_small_steve_rogers",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,6 @@
 import Link from "next/link"
+import { headers } from "next/headers"
+import { after } from "next/server"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import {
@@ -28,6 +30,7 @@ import { getCategory } from "@/lib/catalog"
 import { getProductBySlug, getProductQuestions, getRelatedListings } from "@/lib/marketplace"
 import { findGameBySlug, slugifyGame } from "@/lib/product-catalog"
 import { buildProductJsonLd, serializeJsonLd } from "@/lib/product-jsonld"
+import { countsAsView, recordProductView } from "@/lib/product-views"
 import { breadcrumbJsonLd, productSeo } from "@/lib/seo"
 import { getSession } from "@/lib/session"
 import { SITE_URL } from "@/lib/site"
@@ -75,6 +78,9 @@ export default async function ProductPage({
 
   const session = await getSession()
   const viewerId = session?.user?.id ?? null
+  // Conta a visita depois da resposta (não atrasa a página): só anúncio ativo, que não é do próprio dono nem de robô.
+  if (countsAsView({ productStatus: item.status, sellerId: item.seller.id, viewerId, userAgent: (await headers()).get("user-agent") }))
+    after(() => recordProductView(item.id))
   const [walletSummary, questions, related] = await Promise.all([
     viewerId ? getWalletSummary(viewerId) : Promise.resolve({ availableCents: 0, heldCents: 0 }),
     getProductQuestions(item.id),

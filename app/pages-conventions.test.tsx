@@ -82,6 +82,7 @@ import PedidosPage from "@/app/pedidos/page"
 import PedidoPage from "@/app/pedidos/[id]/page"
 import DisputaPage from "@/app/pedidos/[id]/disputa/page"
 import PainelPage from "@/app/painel/vendedor/page"
+import PainelAnalisesPage from "@/app/painel/vendedor/analises/page"
 import PainelPerguntasPage from "@/app/painel/vendedor/perguntas/page"
 import PainelProdutosPage from "@/app/painel/vendedor/produtos/page"
 import PainelProdutoPage from "@/app/painel/vendedor/produtos/[id]/page"
@@ -190,6 +191,8 @@ const screens: Screen[] = [
   { name: "disputa do pedido", as: "comprador", render: () => DisputaPage(params({ id: String(ids.order) })) },
   // painel do vendedor
   { name: "painel do vendedor", as: "ana", render: () => PainelPage() },
+  { name: "painel: análises", as: "ana", render: () => PainelAnalisesPage(sp({})) },
+  { name: "painel: análises (90 dias)", as: "ana", render: () => PainelAnalisesPage(sp({ periodo: "90" })) },
   { name: "painel: perguntas", as: "ana", render: () => PainelPerguntasPage(sp({})) },
   { name: "painel: meus anúncios", as: "ana", render: () => PainelProdutosPage(sp({})) },
   { name: "painel: editar anúncio", as: "ana", render: () => PainelProdutoPage(params({ id: String(ids.product) })) },

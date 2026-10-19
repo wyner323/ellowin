@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs"
-import { aliasedTable, and, asc, desc, eq, gte, inArray, notInArray, or, sql } from "drizzle-orm"
+import { aliasedTable, and, asc, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { resolvePage } from "@/lib/pagination"
 import { publicNameCol } from "@/lib/public-name"
@@ -201,51 +201,25 @@ export async function getSellerOrdersPage(
 }
 
 /**
- * Números do painel do vendedor calculados no banco — antes o painel carregava
- * TODOS os pedidos só para somar/agrupar em JS. Datas em UTC (como `toISOString`).
+ * Total e quantidade de pedidos do vendedor por situação, calculados no banco (o painel nunca carrega todos os
+ * pedidos para somar em JS).
  */
 export async function getSellerOrderAggregates(userId: string) {
-  const [byStatus, salesByDay, topProducts] = await Promise.all([
-    db
-      .select({
-        status: order.status,
-        count: sql<number>`count(*)::int`,
-        totalCents: sql<number>`coalesce(sum(${order.sellerNetCents}), 0)::int`,
-      })
-      .from(order)
-      .where(eq(order.sellerId, userId))
-      .groupBy(order.status),
-    db
-      .select({
-        day: sql<string>`to_char(${order.completedAt}, 'YYYY-MM-DD')`,
-        count: sql<number>`count(*)::int`,
-        totalCents: sql<number>`coalesce(sum(${order.sellerNetCents}), 0)::int`,
-      })
-      .from(order)
-      .where(
-        and(
-          eq(order.sellerId, userId),
-          eq(order.status, "concluido"),
-          gte(order.completedAt, sql`now() - interval '60 days'`),
-        ),
-      )
-      .groupBy(sql`to_char(${order.completedAt}, 'YYYY-MM-DD')`),
-    db
-      .select({
-        title: sql<string>`max(${order.productTitle})`,
-        totalCents: sql<number>`coalesce(sum(${order.sellerNetCents}), 0)::int`,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(order)
-      .where(and(eq(order.sellerId, userId), eq(order.status, "concluido")))
-      .groupBy(order.productId)
-      .orderBy(desc(sql`sum(${order.sellerNetCents})`))
-      .limit(5),
-  ])
+  // Só o total e a quantidade por situação do pedido. As séries por dia, por jogo, por anúncio e as taxas ficam em
+  // lib/seller-analytics.ts (com o dia de Brasília e a comparação com o período anterior).
+  const byStatus = await db
+    .select({
+      status: order.status,
+      count: sql<number>`count(*)::int`,
+      totalCents: sql<number>`coalesce(sum(${order.sellerNetCents}), 0)::int`,
+    })
+    .from(order)
+    .where(eq(order.sellerId, userId))
+    .groupBy(order.status)
 
   const stat = (status: string) => byStatus.find((r) => r.status === status)
 
-  return { byStatus, stat, salesByDay, topProducts }
+  return { byStatus, stat }
 }
 
 /** Anexa "tem avaliação" e "tem disputa" numa consulta só, evitando N+1. */

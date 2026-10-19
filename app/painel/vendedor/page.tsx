@@ -1,26 +1,15 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import {
-  ExternalLink,
-  Gauge,
-  ImageIcon,
-  Package,
-  PackagePlus,
-  Sparkles,
-  Star,
-  Store,
-  TrendingUp,
-} from "lucide-react"
+import { ArrowRight, ExternalLink, Gauge, ImageIcon, PackagePlus, Sparkles, Star, TrendingUp } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
 import { BannerUpload } from "@/components/account/banner-upload"
-import {
-  BalanceHistoryCard,
-  SalesPerformanceCard,
-  TopProductsChart,
-} from "@/components/seller/dashboard-charts"
+import { BarList } from "@/components/seller/analytics/bar-list"
+import { ChartCard, LegendKey } from "@/components/seller/analytics/chart-card"
+import { KpiCard } from "@/components/seller/analytics/kpi-card"
+import { TimeSeriesChart, type SeriesPoint } from "@/components/seller/analytics/time-series-chart"
 import { ReceivablesBreakdown } from "@/components/seller/receivables-breakdown"
 import { SellerActionItems, type SellerActionItem } from "@/components/seller/seller-action-items"
 import { SellerBalanceHero } from "@/components/seller/seller-balance-hero"
@@ -29,6 +18,8 @@ import { SellerTabs } from "@/components/seller/seller-tabs"
 import { SellerTips, type SellerTip } from "@/components/seller/seller-tips"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatPercent } from "@/lib/analytics-math"
+import { shortDate } from "@/lib/chart-geometry"
 import { db } from "@/lib/db"
 import { sellerApplication, user } from "@/lib/db/schema"
 import {
@@ -37,7 +28,9 @@ import {
   getSellerStats,
   getSellerUnansweredQuestionsCount,
 } from "@/lib/marketplace"
+import { formatCents } from "@/lib/money"
 import { getMyOpenDisputes, getSellerOrderAggregates } from "@/lib/orders"
+import { getSellerAnalytics } from "@/lib/seller-analytics"
 import { getSession } from "@/lib/session"
 import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla-sweeps"
 import { formatDurationHours } from "@/lib/time"
@@ -48,6 +41,9 @@ export const metadata: Metadata = {
   title: "Painel do vendedor",
   description: "Gerencie anúncios, vendas e repasses da sua loja na Ellowin.",
 }
+
+/** O resumo do painel olha sempre os últimos 30 dias; as outras janelas ficam em /painel/vendedor/analises. */
+const SUMMARY_DAYS = 30
 
 export default async function PainelVendedorPage() {
   const session = await getSession()
@@ -68,6 +64,7 @@ export default async function PainelVendedorPage() {
   const [
     stats,
     aggregates,
+    analytics,
     wallet,
     balanceHistory,
     delivery,
@@ -78,6 +75,7 @@ export default async function PainelVendedorPage() {
   ] = await Promise.all([
     getSellerStats(session.user.id),
     getSellerOrderAggregates(session.user.id),
+    getSellerAnalytics(session.user.id, SUMMARY_DAYS),
     getWalletSummary(session.user.id),
     getDailyBalanceHistory(session.user.id, 30),
     getSellerDeliveryStats(session.user.id),
@@ -91,39 +89,7 @@ export default async function PainelVendedorPage() {
     getSellerAccountFlagSummary(session.user.id),
   ])
 
-  // Tudo abaixo vem de agregações SQL (getSellerOrderAggregates): o painel não
-  // carrega mais todos os pedidos só para somar e agrupar em JS.
   const pendingCount = aggregates.stat("aguardando_entrega")?.count ?? 0
-
-  // Vendas concluídas dos últimos 60 dias, agrupadas por dia (dias sem venda
-  // ficam zerados pra manter o eixo contínuo). 60 dias é o dobro do maior
-  // período selecionável no card (30d), pra sempre sobrar um "período
-  // anterior" completo pra comparar (o recorte e a comparação acontecem no
-  // client, em SalesPerformanceCard).
-  const salesByDay = new Map<string, { count: number; totalCents: number }>()
-  for (let i = 59; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    salesByDay.set(d.toISOString().slice(0, 10), { count: 0, totalCents: 0 })
-  }
-  for (const row of aggregates.salesByDay) {
-    const bucket = salesByDay.get(row.day)
-    if (bucket) {
-      bucket.count += row.count
-      bucket.totalCents += row.totalCents
-    }
-  }
-  const salesTimeline = Array.from(salesByDay, ([date, { count, totalCents }]) => {
-    // Monta a data pelos componentes (não `new Date(dateString)`, que o JS
-    // interpreta como UTC-meia-noite) pra garantir que o rótulo sempre bate
-    // com o dia da própria chave, não importa o fuso do processo.
-    const [y, m, d] = date.split("-").map(Number)
-    const label = new Date(y, m - 1, d).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-    })
-    return { label, count, totalCents }
-  })
 
   // Mesmo total do card "A receber", quebrado por etapa — pra o vendedor ver em
   // qual parte do fluxo o dinheiro está parado. A custódia fica na carteira do
@@ -142,35 +108,20 @@ export default async function PainelVendedorPage() {
   // disponível" (o que sobrou depois de saques já feitos).
   const faturamentoTotalCents = aggregates.stat("concluido")?.totalCents ?? 0
 
-  // Ranking dos anúncios que mais faturaram (productTitle já vem congelado no pedido).
-  const topProducts = aggregates.topProducts.map((p) => ({
-    title: p.title,
-    totalCents: p.totalCents,
-    count: p.count,
+  // ---- gráficos (últimos 30 dias) ----
+  const revenuePoints: SeriesPoint[] = analytics.series.map((p, i) => ({
+    day: p.day,
+    value: p.revenueCents,
+    previous: analytics.previousSeries[i]?.revenueCents ?? null,
+    previousDay: analytics.previousSeries[i]?.day,
   }))
+  const balancePoints: SeriesPoint[] = balanceHistory.map((p) => ({ day: p.date, value: p.balanceCents }))
+  const topProducts = analytics.products
+    .filter((p) => p.revenueCents > 0)
+    .slice(0, 5)
+    .map((p) => ({ label: p.title, value: p.revenueCents, hint: `${p.concluded} ${p.concluded === 1 ? "venda" : "vendas"}` }))
 
-  // Estatísticas secundárias, em chips compactos — o saldo disponível e o
-  // faturamento/a receber já ganharam destaque próprio em SellerBalanceHero.
-  const secondaryStats = [
-    {
-      label: stats.salesCount === 1 ? "venda concluída" : "vendas concluídas",
-      value: String(stats.salesCount),
-      icon: Package,
-    },
-    {
-      label: stats.products === 1 ? "anúncio ativo" : "anúncios ativos",
-      value: String(stats.products),
-      icon: Store,
-    },
-    {
-      label:
-        delivery.total > 0
-          ? `no prazo · média ${formatDurationHours(delivery.avgDeliveryHours!)}`
-          : "velocidade de entrega (poucos dados)",
-      value: delivery.total > 0 ? `${delivery.onTimePercent}%` : "—",
-      icon: Gauge,
-    },
-  ]
+  const hasSales = stats.salesCount > 0
 
   // O que precisa de ação agora — disputa primeiro (mais urgente, prazo
   // corre e pode custar a venda), depois entregas pendentes. Junta num só
@@ -216,6 +167,20 @@ export default async function PainelVendedorPage() {
       icon: Gauge,
       title: "Melhore sua velocidade de entrega",
       description: `Só ${delivery.onTimePercent}% das suas entregas saem no prazo prometido. Vendedores rápidos aparecem com destaque e recebem mais confiança dos compradores.`,
+    },
+    {
+      id: "conversao",
+      show:
+        analytics.viewsAvailable &&
+        (analytics.current.views ?? 0) >= 50 &&
+        analytics.current.conversion !== null &&
+        analytics.current.conversion < 0.01,
+      icon: TrendingUp,
+      title: "Muita visita e pouca compra",
+      description:
+        "Seus anúncios recebem acessos, mas poucos viram pedido. Revise preço, fotos e descrição, e veja quais anúncios convertem menos em Análises.",
+      href: "/painel/vendedor/analises",
+      cta: "Ver análises",
     },
     {
       id: "avaliacoes",
@@ -271,7 +236,7 @@ export default async function PainelVendedorPage() {
       <SellerTabs pendingQuestions={pendingQuestions} />
 
       <main id="conteudo" className="flex-1">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
           <SellerIdentityCard
             storeName={application.storeName ?? "Sua loja"}
             level={application.level}
@@ -289,53 +254,140 @@ export default async function PainelVendedorPage() {
             <SellerActionItems items={actionItems} />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            {secondaryStats.map((stat) => (
-              <Card key={stat.label}>
-                <CardContent className="flex flex-row items-center gap-3">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
-                    <stat.icon className="size-4" aria-hidden="true" />
-                  </span>
-                  <div className="flex flex-col">
-                    <strong className="font-display text-lg font-bold tracking-tight">
-                      {stat.value}
-                    </strong>
-                    <span className="text-xs text-muted-foreground">{stat.label}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <section aria-labelledby="resumo-30d" className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 id="resumo-30d" className="text-lg font-semibold">
+                  Últimos {SUMMARY_DAYS} dias
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  {shortDate(analytics.from)} a {shortDate(analytics.to)}, comparado com os {SUMMARY_DAYS} dias anteriores
+                </p>
+              </div>
+              <Button render={<Link href="/painel/vendedor/analises" />} variant="ghost" size="sm">
+                Ver análises completas
+                <ArrowRight className="size-3.5" aria-hidden="true" />
+              </Button>
+            </div>
 
-          <section className="flex flex-col gap-3">
-            <h2 className="text-lg font-semibold">Desempenho</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <BalanceHistoryCard data={balanceHistory} />
-              <SalesPerformanceCard
-                data={salesTimeline}
-                hasAnySale={stats.salesCount > 0}
-                hasProducts={stats.products > 0}
-                storeSlug={application.storeSlug}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <KpiCard
+                label="Receita líquida"
+                value={formatCents(analytics.current.revenueCents)}
+                hint={`${analytics.current.concluded} ${analytics.current.concluded === 1 ? "venda concluída" : "vendas concluídas"}`}
+                delta={analytics.deltas.revenue}
+                spark={analytics.series.map((p) => p.revenueCents)}
+              />
+              <KpiCard
+                label="Pedidos"
+                value={analytics.current.orders.toLocaleString("pt-BR")}
+                hint="criados no período"
+                delta={analytics.deltas.orders}
+                spark={analytics.series.map((p) => p.orders)}
+              />
+              <KpiCard
+                label="Conversão"
+                value={analytics.current.conversion === null ? "—" : formatPercent(analytics.current.conversion * 100)}
+                hint={
+                  analytics.current.views === null
+                    ? "sem dados de visitas ainda"
+                    : `${(analytics.current.views ?? 0).toLocaleString("pt-BR")} visualizações`
+                }
+                delta={analytics.deltas.conversion}
+              />
+              <KpiCard
+                label="Entregas no prazo"
+                value={delivery.total > 0 ? `${delivery.onTimePercent}%` : "—"}
+                hint={delivery.total > 0 ? `média de ${formatDurationHours(delivery.avgDeliveryHours!)}` : "poucos dados"}
               />
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
+          </section>
+
+          <section aria-labelledby="desempenho" className="flex flex-col gap-4">
+            <h2 id="desempenho" className="sr-only">
+              Desempenho
+            </h2>
+            <div className="grid gap-4 lg:grid-cols-2">
+              {hasSales ? (
+                <ChartCard
+                  title="Receita por dia"
+                  subtitle="Valor líquido das vendas concluídas"
+                  legend={
+                    <>
+                      <LegendKey color="primary" label="Este período" />
+                      <LegendKey color="muted" label="Período anterior" />
+                    </>
+                  }
+                  table={{
+                    columns: ["Dia", "Receita", "Período anterior"],
+                    rows: analytics.series.map((p, i) => [shortDate(p.day), formatCents(p.revenueCents), formatCents(analytics.previousSeries[i]?.revenueCents ?? 0)]),
+                  }}
+                >
+                  <TimeSeriesChart
+                    points={revenuePoints}
+                    kind="money"
+                    label="Receita"
+                    summary={`Receita líquida por dia nos últimos ${SUMMARY_DAYS} dias, total ${formatCents(analytics.current.revenueCents)}`}
+                  />
+                </ChartCard>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Receita por dia</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col items-start gap-3">
+                    <p className="text-sm text-muted-foreground">
+                      {stats.products > 0 ? "Você ainda não vendeu nada. A receita aparece aqui a cada venda concluída." : "Você ainda não tem nenhum anúncio ativo."}
+                    </p>
+                    <Button size="sm" render={<Link href={stats.products > 0 && application.storeSlug ? `/loja/${application.storeSlug}` : "/painel/vendedor/produtos/novo"} target={stats.products > 0 && application.storeSlug ? "_blank" : undefined} />}>
+                      {stats.products > 0 ? "Ver minha loja pública" : "Publicar meu primeiro anúncio"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {balancePoints.length > 0 ? (
+                <ChartCard
+                  title="Saldo da carteira"
+                  subtitle="Saldo disponível ao fim de cada dia"
+                  table={{
+                    columns: ["Dia", "Saldo"],
+                    rows: balancePoints.map((p) => [shortDate(p.day), formatCents(p.value)]),
+                  }}
+                >
+                  <TimeSeriesChart
+                    points={balancePoints}
+                    kind="money"
+                    label="Saldo"
+                    summary={`Saldo da carteira nos últimos ${balancePoints.length} dias, hoje ${formatCents(balancePoints[balancePoints.length - 1].value)}`}
+                  />
+                </ChartCard>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Saldo da carteira</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">Ainda sem movimentações na carteira.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Faturamento por anúncio</CardTitle>
-                  <span className="text-xs text-muted-foreground">
-                    Top 5 em vendas concluídas
-                  </span>
+                  <CardTitle className="text-base">Anúncios que mais faturaram</CardTitle>
+                  <span className="text-xs text-muted-foreground">Top 5 nos últimos {SUMMARY_DAYS} dias</span>
                 </CardHeader>
                 <CardContent>
-                  <TopProductsChart data={topProducts} />
+                  <BarList kind="money" rows={topProducts} emptyText="Assim que uma venda for concluída, o ranking por anúncio aparece aqui." />
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Detalhe do &quot;a receber&quot;</CardTitle>
-                  <span className="text-xs text-muted-foreground">
-                    Por etapa do pedido
-                  </span>
+                  <span className="text-xs text-muted-foreground">Por etapa do pedido</span>
                 </CardHeader>
                 <CardContent>
                   <ReceivablesBreakdown data={receivableBreakdown} totalCents={escrowCents} />
@@ -356,15 +408,13 @@ export default async function PainelVendedorPage() {
             </Card>
           </section>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <Link
               href="/painel/vendedor/produtos"
               className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/50"
             >
               <span className="font-medium">Meus anúncios</span>
-              <span className="text-sm text-muted-foreground">
-                Editar itens, preços e estoque
-              </span>
+              <span className="text-sm text-muted-foreground">Editar itens, preços e estoque</span>
             </Link>
 
             <Link
@@ -379,9 +429,15 @@ export default async function PainelVendedorPage() {
                   </span>
                 ) : null}
               </span>
-              <span className="text-sm text-muted-foreground">
-                Registrar entregas e acompanhar repasses
-              </span>
+              <span className="text-sm text-muted-foreground">Registrar entregas e acompanhar repasses</span>
+            </Link>
+
+            <Link
+              href="/painel/vendedor/analises"
+              className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/50"
+            >
+              <span className="font-medium">Análises de vendas</span>
+              <span className="text-sm text-muted-foreground">Visitas, conversão e comparação de períodos</span>
             </Link>
           </div>
 

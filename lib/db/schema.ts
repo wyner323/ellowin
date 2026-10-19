@@ -2,10 +2,12 @@ import { sql } from "drizzle-orm"
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -291,6 +293,22 @@ export const productQuestion = pgTable("product_question", {
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 }, (t) => [
   index("product_question_product_idx").on(t.productId),
+])
+
+/**
+ * Visualizações da página de um anúncio, contadas por dia (dia de Brasília): só um contador agregado, sem IP, sem
+ * cookie e sem identificar quem viu. Alimenta a taxa de conversão (visitas → pedidos) no painel do vendedor.
+ * Não conta o próprio dono nem robôs (ver lib/product-views.ts).
+ */
+export const productViewDaily = pgTable("product_view_daily", {
+  productId: integer("productId")
+    .notNull()
+    .references(() => product.id, { onDelete: "cascade" }),
+  /** Dia no fuso de Brasília (a data de calendário que o vendedor vê no painel). */
+  day: date("day").notNull(),
+  views: integer("views").notNull().default(0),
+}, (t) => [
+  primaryKey({ columns: [t.productId, t.day] }),
 ])
 
 /* ---------------------------------------------------------------------------

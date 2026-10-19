@@ -61,6 +61,7 @@ import EntrarPage from "@/app/entrar/page"
 import CadastroPage from "@/app/cadastro/page"
 import PainelVendedorLayout from "@/app/painel/vendedor/layout"
 import PainelVendedorPage from "@/app/painel/vendedor/page"
+import PainelAnalisesPage from "@/app/painel/vendedor/analises/page"
 import AdminLayout from "@/app/admin/layout"
 import CasoDisputaPage from "@/app/admin/disputas/[id]/page"
 import ConferenciaPage from "@/app/admin/conferencia/page"
@@ -358,6 +359,28 @@ describe("painel do vendedor", () => {
     as("ana")
     await expect(PainelVendedorLayout({ children: null })).rejects.toThrow("NEXT_REDIRECT:/vender")
     await expect(PainelVendedorPage()).rejects.toThrow("NEXT_REDIRECT:/vender") // cadastro de loja ainda não aprovado
+  })
+
+  it("análises: exigem login e vendedor aprovado; vendedor aprovado vê indicadores, gráficos e as vendas só dele", async () => {
+    const search = (periodo?: string) => ({ searchParams: Promise.resolve(periodo ? { periodo } : {}) })
+    as(null)
+    await expect(PainelAnalisesPage(search())).rejects.toThrow("NEXT_REDIRECT:/entrar")
+    as("comprador")
+    await expect(PainelAnalisesPage(search())).rejects.toThrow("NEXT_REDIRECT:/vender")
+
+    await addOrder({ title: "Venda das Análises", status: "concluido" })
+    as("ana")
+    const html = await render(await PainelAnalisesPage(search("7")))
+    const text = htmlToText(html)
+    expect((html.match(/<main/g) ?? []).length).toBe(1)
+    for (const frase of ["Análises de vendas", "Receita líquida", "Pedidos", "Ticket médio", "Conversão", "Receita por dia", "Funil de vendas", "Saúde da operação", "Exportar vendas (CSV)"])
+      expect(text, frase).toContain(frase)
+    expect(text).toContain("Desempenho por anúncio")
+    expect(text).not.toContain("Ana Maria da Silva")
+    expect(text).not.toMatch(/undefined|NaN|\[object Object\]/)
+    // o seletor de período marca o escolhido e leva o período para a exportação
+    expect(html).toContain('aria-current="page"')
+    expect(html).toContain("/painel/vendedor/vendas/exportar?periodo=7")
   })
 
   it("vendedor aprovado passa pelo layout e vê o painel com as vendas dele", async () => {

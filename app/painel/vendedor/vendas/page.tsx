@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
 import { redirect } from "next/navigation"
-import { CheckCircle2, Clock, Lock } from "lucide-react"
+import { CheckCircle2, Clock, Download, Lock } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
@@ -79,11 +79,23 @@ export default async function VendasPage({
 
       <main id="conteudo" className="flex-1">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-          <header className="flex flex-col gap-1">
-            <h1 className="font-display text-2xl font-bold tracking-tight">Minhas vendas</h1>
-            <p className="text-sm text-muted-foreground">
-              Entregue os pedidos no prazo: é a entrega confirmada que libera o valor para o seu saldo.
-            </p>
+          <header className="flex flex-wrap items-end justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <h1 className="font-display text-2xl font-bold tracking-tight">Minhas vendas</h1>
+              <p className="text-sm text-muted-foreground">
+                Entregue os pedidos no prazo: é a entrega confirmada que libera o valor para o seu saldo.
+              </p>
+            </div>
+            {list.allCount > 0 ? (
+              <Button
+                render={<Link href={`/painel/vendedor/vendas/exportar?periodo=todos${status ? `&status=${status}` : ""}`} prefetch={false} />}
+                variant="outline"
+                size="sm"
+              >
+                <Download className="size-3.5" aria-hidden="true" />
+                Exportar CSV{status ? ` (${PILL_LABEL[status] ?? status})` : ""}
+              </Button>
+            ) : null}
           </header>
 
           {list.allCount === 0 ? (
