@@ -34,9 +34,9 @@ export const categories: Category[] = [
   {
     slug: 'moedas',
     name: 'Moedas e gold',
-    tagline: 'Entrega automática em minutos',
+    tagline: 'Entrega automática ou combinada',
     description:
-      'Robux, V-Bucks, Diamantes, FIFA Coins e gold de MMO entregues por vendedores verificados.',
+      'Robux, V-Bucks, Diamantes, FIFA Coins e gold de MMO anunciados por vendedores com cadastro completo na Ellowin.',
     image: '/images/cat-moedas.png',
   },
   {

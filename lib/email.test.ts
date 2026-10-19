@@ -203,6 +203,16 @@ describe("emails de conta", () => {
     expect(c.html).toContain("sessões abertas foram encerradas")
   })
 
+  it("chave Pix alterada: mostra só a chave mascarada e avisa do bloqueio de 24 horas", async () => {
+    await email.sendPixKeyChangedEmail("ana@teste.dev", "la***@teste.dev")
+    const c = lastCall()
+    expect(c.to).toBe("ana@teste.dev")
+    expect(c.subject).toBe("A chave Pix da sua conta Ellowin foi alterada")
+    expect(c.html).toContain("la***@teste.dev")
+    expect(c.html).toContain("24 horas")
+    expect(c.html).not.toContain("<a href")
+  })
+
   it("conta excluída: confirma a exclusão e cita a retenção legal", async () => {
     await email.sendAccountDeletedEmail("ana@teste.dev")
     const c = lastCall()

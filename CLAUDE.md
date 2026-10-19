@@ -203,7 +203,9 @@ limit into SQL, and `uniqueSlug` (`app/actions/products.ts`) resolves the next f
 and the screen gets a generic message, so a raw database error never reaches the browser. `createProduct`/`updateProduct` reject a `categorySlug` that is not in
 `lib/catalog.ts` `categories`; `resolveDispute` rejects an `outcome` other than `comprador`/`vendedor` at runtime (the TypeScript union is not a check). The
 withdrawal ledger line carries the masked Pix key (`maskPixKey`), never the full one. Workflows run with `permissions: contents: read` (CI) or none
-(`sla-sweep.yml`), and `.github/dependabot.yml` opens weekly update PRs (actions are still pinned by tag, not SHA).
+(`sla-sweep.yml`), and `.github/dependabot.yml` opens weekly update PRs (actions are still pinned by tag, not SHA). `completeProfile` refuses an already-complete profile (`isProfileComplete`), so legal name/CPF/phone cannot be rewritten after KYC; `addFunds` reads the 24 h
+deposit total inside the transaction with the wallet locked; changing an existing Pix key emails the account owner (`sendPixKeyChangedEmail`, masked key only). Public copy must not
+claim checks the system does not do (no "verified sellers", no "documents under analysis": KYC stores only a file name; `lib/catalog.test.ts` guards the category texts).
 
 ### Wallet reconciliation
 

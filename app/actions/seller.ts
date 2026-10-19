@@ -3,8 +3,9 @@
 import { eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
-import { profile, sellerApplication } from "@/lib/db/schema"
-import { PIX_TYPE_LABEL } from "@/lib/pix"
+import { profile, sellerApplication, user } from "@/lib/db/schema"
+import { sendPixKeyChangedEmail } from "@/lib/email"
+import { maskPixKey, PIX_TYPE_LABEL } from "@/lib/pix"
 import { accountBlock, getUserId } from "@/lib/session"
 import { isValidCpf, onlyDigits } from "@/lib/validation"
 import type { ActionResult } from "@/app/actions/auth"
@@ -294,6 +295,13 @@ export async function savePayoutStep(input: {
       .update(sellerApplication)
       .set({ pixKeyChangedAt: sql`now()` })
       .where(eq(sellerApplication.userId, userId))
+
+    // Só TROCA avisa (a primeira chave não tinha dono anterior a alertar). Vai para o e-mail da conta, com a chave
+    // mascarada; falha de envio não derruba o cadastro (sendMail devolve o erro em vez de lançar).
+    if (current?.pixKey) {
+      const [owner] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1)
+      if (owner?.email) await sendPixKeyChangedEmail(owner.email, maskPixKey(input.pixKeyType, nextPixKey))
+    }
   }
 
   revalidatePath("/vender")

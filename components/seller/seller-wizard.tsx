@@ -455,7 +455,7 @@ function KycStep({
   if (done) {
     return (
       <p className="text-sm text-muted-foreground">
-        Documentos recebidos e em análise. Você já pode seguir para os dados de saque.
+        Documento recebido. Você já pode seguir para os dados de saque.
       </p>
     )
   }

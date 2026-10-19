@@ -13,6 +13,7 @@ const holder = vi.hoisted(() => ({
   pool: null as unknown as TestDb["pool"],
   userId: null as string | null,
   ip: "203.0.113.7" as string | null,
+  pixEmails: [] as [string, string][],
 }))
 
 vi.mock("@/lib/db", () => ({
@@ -40,6 +41,12 @@ vi.mock("next/headers", () => ({
 }))
 vi.mock("next/server", () => ({ after: () => {} }))
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }))
+vi.mock("@/lib/email", () => ({
+  sendPixKeyChangedEmail: async (to: string, masked: string) => {
+    holder.pixEmails.push([to, masked])
+    return { sent: true }
+  },
+}))
 
 import { advanceContactStep, saveKycStep, savePayoutStep, saveStoreStep } from "@/app/actions/seller"
 import { requestWithdrawal } from "@/app/actions/wallet"
@@ -463,6 +470,27 @@ describe("savePayoutStep", () => {
     const blocked = await requestWithdrawal("100,00")
     expect(blocked.ok).toBe(false)
     expect(blocked.error).toContain("24 horas")
+  })
+
+  it("trocar a chave Pix avisa o e-mail da conta com a chave mascarada; a primeira chave e a mesma chave não avisam", async () => {
+    await readyForPayout("ana")
+    holder.userId = "ana"
+    holder.pixEmails.length = 0
+
+    // primeira chave: ninguém a alertar
+    expect((await savePayoutStep(PIX)).ok).toBe(true)
+    expect(holder.pixEmails).toEqual([])
+    // mesma chave de novo: nada mudou
+    await savePayoutStep({ ...PIX, bankHolder: "Ana S. Souza" })
+    expect(holder.pixEmails).toEqual([])
+
+    // chave nova: aviso ao e-mail da conta, sem a chave completa
+    await savePayoutStep({ ...PIX, pixKeyType: "email", pixKey: "ladrao@teste.dev" })
+    expect(holder.pixEmails).toHaveLength(1)
+    const [to, masked] = holder.pixEmails[0]
+    expect(to).toBe("ana@teste.dev")
+    expect(masked).not.toContain("ladrao@teste.dev")
+    expect(masked).toContain("@teste.dev")
   })
 
   it("vendedor já aprovado que só troca a chave NÃO perde o nível conquistado", async () => {

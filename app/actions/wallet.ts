@@ -1,15 +1,17 @@
 "use server"
 
-import { and, eq, gt, sql } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
-import { sellerApplication, walletTransaction } from "@/lib/db/schema"
+import { sellerApplication } from "@/lib/db/schema"
 import { formatCents, parseToCents } from "@/lib/money"
 import { maskPixKey } from "@/lib/pix"
 import { hitRateLimit } from "@/lib/rate-limit"
 import { accountBlock, getUserId } from "@/lib/session"
-import { creditAvailable, debitAvailable, withTransaction } from "@/lib/wallet"
+import { creditAvailable, debitAvailable, lockWallet, withTransaction } from "@/lib/wallet"
 import type { ActionResult } from "@/app/actions/auth"
+
+class DepositLimitError extends Error {}
 
 const MAX_DEPOSIT_CENTS = 500_000 // R$ 5.000 por depósito de demonstração
 const MAX_DAILY_DEPOSIT_CENTS = 1_000_000 // R$ 10.000 acumulados a cada 24h
@@ -40,26 +42,29 @@ export async function addFunds(amount: string): Promise<ActionResult> {
   if (!(await hitRateLimit(`deposit:${userId}`, 10, 60 * 60)))
     return { ok: false, field: "amount", error: "Muitos depósitos seguidos. Tente novamente mais tarde." }
 
-  const [recent] = await db
-    .select({ total: sql<number>`coalesce(sum(${walletTransaction.amountCents}), 0)::int` })
-    .from(walletTransaction)
-    .where(
-      and(
-        eq(walletTransaction.userId, userId),
-        eq(walletTransaction.kind, "deposito"),
-        gt(walletTransaction.createdAt, sql`now() - interval '24 hours'`),
-      ),
-    )
-  if ((recent?.total ?? 0) + cents > MAX_DAILY_DEPOSIT_CENTS)
-    return {
-      ok: false,
-      field: "amount",
-      error: `O limite de depósitos é ${formatCents(MAX_DAILY_DEPOSIT_CENTS)} a cada 24 horas.`,
-    }
+  try {
+    await withTransaction(async (client) => {
+      // A soma das últimas 24h é lida DENTRO da transação, com a carteira travada: duas requisições
+      // paralelas esperam uma pela outra, em vez de ambas lerem o mesmo total e passarem do teto.
+      await lockWallet(client, userId)
+      const { rows } = await client.query<{ total: number }>(
+        `SELECT coalesce(sum("amountCents"), 0)::int AS "total" FROM "wallet_transaction"
+          WHERE "userId" = $1 AND "kind" = 'deposito' AND "createdAt" > now() - interval '24 hours'`,
+        [userId],
+      )
+      if ((rows[0]?.total ?? 0) + cents > MAX_DAILY_DEPOSIT_CENTS) throw new DepositLimitError()
 
-  await withTransaction((client) =>
-    creditAvailable(client, userId, cents, "deposito", "Depósito na carteira"),
-  )
+      await creditAvailable(client, userId, cents, "deposito", "Depósito na carteira")
+    })
+  } catch (error) {
+    if (error instanceof DepositLimitError)
+      return {
+        ok: false,
+        field: "amount",
+        error: `O limite de depósitos é ${formatCents(MAX_DAILY_DEPOSIT_CENTS)} a cada 24 horas.`,
+      }
+    throw error
+  }
 
   revalidatePath("/carteira")
   return { ok: true, message: `${formatCents(cents)} adicionados à sua carteira.` }

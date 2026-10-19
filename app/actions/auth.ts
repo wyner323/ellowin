@@ -9,7 +9,7 @@ import { isUniqueViolation } from "@/lib/db-errors"
 import { otpCode, profile, user } from "@/lib/db/schema"
 import { sendEmailOtp, sendPhoneOtpByEmail } from "@/lib/email"
 import { clearRateLimit, clientIp, hitRateLimit, isRateLimited, recordFailure } from "@/lib/rate-limit"
-import { getSession, getUserId } from "@/lib/session"
+import { getSession, getUserId, isProfileComplete } from "@/lib/session"
 import {
   isValidBirthDate,
   isValidCpf,
@@ -524,6 +524,11 @@ export async function completeProfile(input: {
 
   if (!(await hitRateLimit(`complete-profile:${userId}`, 10, 60 * 60)))
     return { ok: false, error: "Muitas tentativas. Aguarde um pouco e tente de novo." }
+
+  // Esta ação serve a quem AINDA não completou o cadastro (a tela já redireciona quem completou). Sem esta
+  // trava, uma conta com cadastro pronto, KYC e vendas trocaria CPF, nome legal e telefone quando quisesse.
+  if (await isProfileComplete(userId))
+    return { ok: false, error: "Seu cadastro já está completo. Para alterar nome ou CPF, fale com o suporte." }
 
   const [existingCpf] = await db
     .select({ userId: profile.userId })

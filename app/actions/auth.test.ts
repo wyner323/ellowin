@@ -627,7 +627,7 @@ describe("completeProfile", () => {
     expect(await profileOf("g1")).toBeUndefined()
   })
 
-  it("CPF de outra conta é recusado, mas o próprio CPF pode ser reenviado", async () => {
+  it("CPF de outra conta é recusado", async () => {
     await addBareUser("g1")
     await addBareUser("g2")
     await addProfile("g2", CPF_B)
@@ -636,8 +636,25 @@ describe("completeProfile", () => {
     expect(await completeProfile(validComplete({ cpf: CPF_B }))).toMatchObject({ ok: false, field: "cpf" })
     expect(await profileOf("g1")).toBeUndefined()
 
+  })
+
+  it("cadastro já completo não é regravado (CPF, nome legal e telefone não mudam por aqui)", async () => {
+    await addBareUser("g2")
+    await addProfile("g2", CPF_B)
+
     holder.userId = "g2"
-    expect((await completeProfile(validComplete({ cpf: CPF_B, displayName: "g2_nick" }))).ok).toBe(true)
+    const result = await completeProfile(validComplete({ cpf: cpfFromBase(100_000_007), fullName: "Outra Pessoa Silva", phone: "(11) 97777-6666" }))
+    expect(result).toEqual({ ok: false, error: "Seu cadastro já está completo. Para alterar nome ou CPF, fale com o suporte." })
+    expect(await profileOf("g2")).toMatchObject({ fullName: "Nome Completo", cpf: "11144477735", phone: "11999990000" })
+  })
+
+  it("perfil pela metade (sem CPF) ainda pode ser completado", async () => {
+    await addBareUser("g3")
+    await t.query(`INSERT INTO "profile" ("userId", "fullName") VALUES ('g3', 'Carlos Eduardo Lima')`)
+
+    holder.userId = "g3"
+    expect(await completeProfile(validComplete())).toEqual({ ok: true })
+    expect(await profileOf("g3")).toMatchObject({ cpf: "11144477735", phone: "21988887777" })
   })
 
   it("apelido de outra pessoa é recusado (sem diferenciar maiúsculas)", async () => {

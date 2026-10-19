@@ -229,6 +229,21 @@ export function sendPasswordChangedEmail(to: string) {
   )
 }
 
+/** Aviso quando a chave Pix de saque muda: é o passo clássico de quem tomou a conta, então o dono precisa saber. Só a chave MASCARADA. */
+export function sendPixKeyChangedEmail(to: string, maskedKey: string) {
+  return sendMail(
+    to,
+    "A chave Pix da sua conta Ellowin foi alterada",
+    actionTemplate({
+      title: "Chave Pix alterada",
+      intro: `A chave Pix de saque da sua conta agora é ${maskedKey}. Por segurança, saques ficam bloqueados por 24 horas depois dessa troca.`,
+      footnote:
+        "Se não foi você, redefina a senha pela opção “Esqueci minha senha” e fale com o suporte antes que o bloqueio termine.",
+    }),
+    "aviso de chave Pix alterada",
+  )
+}
+
 /** Confirmação de que a conta foi excluída (anonimizada) — a única prova que a pessoa recebe, já que o login deixa de funcionar. */
 export function sendAccountDeletedEmail(to: string) {
   return sendMail(
