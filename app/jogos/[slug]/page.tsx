@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm"
 import { ChevronRight, Sparkles } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { GameIcon } from "@/components/games/game-icon"
 import { GameSeoSection } from "@/components/games/game-seo-section"
 import { ListingFilterBar } from "@/components/marketplace/listing-filter-bar"
 import { ListingResults } from "@/components/marketplace/listing-results"
@@ -97,7 +98,10 @@ export default async function JogoPage({
               <ChevronRight className="size-3" aria-hidden="true" />
               <span className="text-foreground">{game.name}</span>
             </nav>
-            <h1 className="text-3xl font-bold text-balance">{game.name}</h1>
+            <div className="flex items-center gap-3">
+              <GameIcon name={game.name} slug={game.slug} size="lg" />
+              <h1 className="text-3xl font-bold text-balance">{game.name}</h1>
+            </div>
             {/* Números do jogo todo (não da lista filtrada), direto do banco. */}
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{gameInfo.countLabel}</Badge>

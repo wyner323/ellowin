@@ -313,6 +313,12 @@ invented figure. Legacy demo orders 1–5 are excluded from delivery averages. T
 no longer carries `listings`/`startingAt` for categories — don't re-add them. Hero cards are real listings
 only (`getRealStorefrontCards`); demo cards stay confined to the labeled "demonstração" fallback.
 
+### Game icons
+
+Every game gets its own icon, generated and not a publisher logo (no third-party trademarks to license): `GameIcon` (`components/games/game-icon.tsx`) draws the initials and a
+color derived from the slug (`lib/game-icon.ts`: `gameInitials`, stable `gameHue`). It is decorative (`aria-hidden`) and used in the `/jogos` list, the game page header and the home
+"Jogos com anúncios" strip. If real logos are ever licensed, put them behind this component instead of scattering `<Image>` tags.
+
 ### Seller listing flow: catalog-driven suggestions
 
 `lib/product-catalog.ts` holds a static list of ~190 games/categories plus a small set of generic

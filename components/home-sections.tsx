@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { GameIcon } from '@/components/games/game-icon'
 import { ProductCard } from '@/components/marketplace/product-card'
 import { categories } from '@/lib/catalog'
 import { buildHeroStats, categoryCardInfo } from '@/lib/home-stats'
@@ -175,8 +176,9 @@ export async function GameStrip() {
           <Link
             key={game.slug}
             href={`/jogos/${game.slug}`}
-            className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:text-primary hover:shadow-sm"
+            className="flex items-center gap-2 rounded-full border border-border bg-card py-1 pl-1.5 pr-3 text-xs text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:text-primary hover:shadow-sm"
           >
+            <GameIcon name={game.name} slug={game.slug} size="sm" />
             {game.name}
           </Link>
         ))}

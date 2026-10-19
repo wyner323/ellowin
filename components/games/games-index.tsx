@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { Gamepad2, Search } from "lucide-react"
+import { Search } from "lucide-react"
+import { GameIcon } from "@/components/games/game-icon"
 import { Input } from "@/components/ui/input"
 import type { Game } from "@/lib/product-catalog"
 
@@ -58,13 +59,10 @@ export function GamesIndex({
               <Link
                 key={game.slug}
                 href={`/jogos/${game.slug}`}
-                className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3.5 py-3 text-sm transition-colors hover:border-primary"
+                className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-sm transition-colors hover:border-primary"
               >
-                <span className="flex min-w-0 items-center gap-2">
-                  <Gamepad2
-                    className="size-4 shrink-0 text-muted-foreground group-hover:text-primary"
-                    aria-hidden="true"
-                  />
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <GameIcon name={game.name} slug={game.slug} />
                   <span className="line-clamp-3 leading-snug font-medium break-words">{game.name}</span>
                 </span>
                 {count > 0 ? (
