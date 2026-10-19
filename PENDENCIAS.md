@@ -57,9 +57,9 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
   ninguém consegue garantir posição. **Google Shopping (Merchant Center) não incluí de propósito:** as regras dele restringem venda de
   contas de jogo e moedas virtuais; só vale a pena depois de ler a política atual.
 
-- [ ] **Aplicar a migração 0009 (visualizações dos anúncios) no banco de produção.** Cria a tabela `product_view_daily` (um contador por anúncio por dia,
-  sem IP nem dado pessoal), que alimenta as visitas e a taxa de conversão do painel do vendedor. Enquanto não for aplicada, o site funciona normalmente:
-  as visitas só aparecem como "—" no painel e o erro de contagem vai para o Sentry. Como aplicar: no seu terminal, na pasta do projeto, `pnpm db:migrate`
+- [ ] **Aplicar as migrações 0009 (visualizações dos anúncios) e 0010 (meta do mês) no banco de produção.** Criam a tabela `product_view_daily` (um contador por anúncio por dia,
+  sem IP nem dado pessoal), que alimenta as visitas e a taxa de conversão do painel do vendedor, e a tabela `seller_goal` (a meta de receita do mês de cada vendedor). Um só `pnpm db:migrate` aplica as duas. Enquanto não for aplicada, o site funciona normalmente:
+  as visitas aparecem como "—", o cartão "Meta do mês" não aparece e o erro de contagem vai para o Sentry. Como aplicar: no seu terminal, na pasta do projeto, `pnpm db:migrate`
   (ele mostra o banco de destino e pede a confirmação digitando "sim"). Depois, as visitas começam a ser contadas a partir da próxima abertura de anúncio.
   A tabela é só de contadores; se quiser mencionar isso nos `/termos` ou na política de privacidade, é decisão sua (não é dado pessoal).
 

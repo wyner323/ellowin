@@ -62,6 +62,7 @@ import CadastroPage from "@/app/cadastro/page"
 import PainelVendedorLayout from "@/app/painel/vendedor/layout"
 import PainelVendedorPage from "@/app/painel/vendedor/page"
 import PainelAnalisesPage from "@/app/painel/vendedor/analises/page"
+import MeusProdutosPage from "@/app/painel/vendedor/produtos/page"
 import AdminLayout from "@/app/admin/layout"
 import CasoDisputaPage from "@/app/admin/disputas/[id]/page"
 import ConferenciaPage from "@/app/admin/conferencia/page"
@@ -389,7 +390,30 @@ describe("painel do vendedor", () => {
     await expect(PainelVendedorLayout({ children: "ok" })).resolves.toBe("ok")
     const t1 = await txt(PainelVendedorPage())
     expect(t1).toContain("Painel")
+    expect(t1).toContain("Meta do mês")
+    expect(t1).toContain("Definir meta")
     expect(t1).not.toContain("Ana Maria da Silva")
+  })
+
+  it("painel: estoque baixo vira ação pendente (com o item e a quantidade); estoque confortável não", async () => {
+    as("ana")
+    // o item do teste tem 3 unidades: confortável
+    expect(await txt(PainelVendedorPage())).not.toContain("estoque baixo")
+    await t.query(`UPDATE "product_variant" SET "stock" = 1 WHERE "id" = $1`, [variantId])
+    const t2 = await txt(PainelVendedorPage())
+    expect(t2).toContain("1 item com estoque baixo")
+    expect(t2).toContain("Imortal (1 un.)")
+    expect(t2).toContain("Repor estoque")
+    await t.query(`UPDATE "product_variant" SET "stock" = 0 WHERE "id" = $1`, [variantId])
+    expect(await txt(PainelVendedorPage())).toContain("Imortal (esgotado)")
+  })
+
+  it("meus anúncios: mostra as visitas dos últimos 30 dias de cada anúncio", async () => {
+    as("ana")
+    await t.query(`INSERT INTO "product_view_daily" ("productId", "day", "views") VALUES ($1, (now() AT TIME ZONE 'America/Sao_Paulo')::date, 42)`, [productId])
+    const t3 = await txt(MeusProdutosPage({ searchParams: Promise.resolve({}) }))
+    expect(t3).toContain("Visitas (30d)")
+    expect(t3).toContain("42")
   })
 })
 

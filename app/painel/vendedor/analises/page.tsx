@@ -22,7 +22,7 @@ import { db } from "@/lib/db"
 import { sellerApplication } from "@/lib/db/schema"
 import { getSellerUnansweredQuestionsCount } from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
-import { getSellerAnalytics } from "@/lib/seller-analytics"
+import { getSellerAnalytics, type ProductRow } from "@/lib/seller-analytics"
 import { getSession } from "@/lib/session"
 import { formatDurationHours } from "@/lib/time"
 
@@ -36,6 +36,15 @@ const CATEGORY_LABEL: Record<string, string> = {
   moedas: "Moedas e gold",
   "gift-cards": "Gift cards",
   boosting: "Boosting e serviços",
+}
+
+/** Preço contra a mediana de anúncios parecidos, dito em palavras (nunca só uma cor). */
+function marketText(p: ProductRow): string {
+  if (p.priceCents === null) return "—"
+  const c = p.priceComparison
+  if (!c) return p.marketPeers > 0 ? `Poucos anúncios parecidos (${p.marketPeers})` : "Sem anúncios parecidos"
+  if (c.verdict === "na_media") return `Na média (${p.marketPeers} parecidos)`
+  return `${Math.abs(Math.round(c.pct))}% ${c.verdict === "abaixo" ? "abaixo" : "acima"} da mediana`
 }
 
 export default async function AnalisesPage({ searchParams }: { searchParams: Promise<{ periodo?: string }> }) {
@@ -250,14 +259,16 @@ export default async function AnalisesPage({ searchParams }: { searchParams: Pro
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Desempenho por anúncio</CardTitle>
-                  <span className="text-xs text-muted-foreground">Visitas, pedidos e conversão no período, do que mais faturou para o que menos</span>
+                  <span className="text-xs text-muted-foreground">
+                    Visitas, pedidos e conversão no período, do que mais faturou para o que menos. O preço é comparado com a mediana de anúncios parecidos de outros vendedores (mesmo jogo e categoria), só quando há 3 ou mais.
+                  </span>
                 </CardHeader>
                 <CardContent>
                   {a.products.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Você ainda não tem anúncios.</p>
                   ) : (
                     <div className="overflow-x-auto rounded-lg border border-border">
-                      <table className="w-full min-w-[34rem] text-left text-sm tabular-nums">
+                      <table className="w-full min-w-[44rem] text-left text-sm tabular-nums">
                         <thead className="bg-muted text-xs text-muted-foreground">
                           <tr>
                             <th scope="col" className="px-3 py-2 font-medium">Anúncio</th>
@@ -265,6 +276,8 @@ export default async function AnalisesPage({ searchParams }: { searchParams: Pro
                             <th scope="col" className="px-3 py-2 text-right font-medium">Pedidos</th>
                             <th scope="col" className="px-3 py-2 text-right font-medium">Conversão</th>
                             <th scope="col" className="px-3 py-2 text-right font-medium">Receita</th>
+                            <th scope="col" className="px-3 py-2 text-right font-medium">Preço</th>
+                            <th scope="col" className="px-3 py-2 font-medium">Contra o mercado</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -280,6 +293,8 @@ export default async function AnalisesPage({ searchParams }: { searchParams: Pro
                               <td className="px-3 py-2 text-right">{p.orders}</td>
                               <td className="px-3 py-2 text-right">{p.conversion === null ? "—" : formatPercent(p.conversion * 100)}</td>
                               <td className="px-3 py-2 text-right font-medium">{formatCents(p.revenueCents)}</td>
+                              <td className="px-3 py-2 text-right">{p.priceCents === null ? "—" : formatCents(p.priceCents)}</td>
+                              <td className="px-3 py-2 text-xs text-muted-foreground">{marketText(p)}</td>
                             </tr>
                           ))}
                         </tbody>

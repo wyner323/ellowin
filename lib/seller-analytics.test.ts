@@ -9,7 +9,7 @@ import { createTestDb, type TestDb } from "@/lib/test-db"
 const holder = vi.hoisted(() => ({ pool: null as unknown as TestDb["pool"] }))
 vi.mock("@/lib/db", () => ({ pool: { query: (text: string, params?: unknown[]) => holder.pool.query(text, params) } }))
 
-import { getSellerAnalytics } from "@/lib/seller-analytics"
+import { getRecentViews, getSellerAnalytics } from "@/lib/seller-analytics"
 
 let t: TestDb
 
@@ -194,6 +194,52 @@ describe("getSellerAnalytics", () => {
     expect(row).toMatchObject({ views: 50, orders: 2 })
     expect(row.conversion).toBeCloseTo(0.04, 6)
     expect(a.products.find((p) => p.id === p3)).toBeUndefined()
+  })
+
+  it("preço contra o mercado: mediana de anúncios parecidos de OUTROS vendedores; com menos de 3 não compara", async () => {
+    await t.query(`UPDATE "product_variant" SET "priceCents" = 8000 WHERE "productId" = $1`, [p1]) // o meu: R$ 80
+    const peer = async (seller: string, slug: string, price: number, over: { game?: string; category?: string; status?: string; stock?: number } = {}) => {
+      const id = (await t.query(`INSERT INTO "product" ("sellerId", "slug", "title", "categorySlug", "game", "status") VALUES ($1, $2, 'Anúncio do concorrente', $3, $4, $5) RETURNING "id"`, [seller, slug, over.category ?? "contas", over.game ?? "Valorant", over.status ?? "ativo"])).rows[0].id as number
+      await t.query(`INSERT INTO "product_variant" ("productId", "label", "priceCents", "stock") VALUES ($1, 'v', $2, $3)`, [id, price, over.stock ?? 5])
+    }
+    // p3 (outro vendedor, Valorant/contas, R$ 10) + mais um: só 2 concorrentes → sem comparação
+    await t.query(`UPDATE "product_variant" SET "priceCents" = 10000 WHERE "productId" = $1`, [p3])
+    await peer("outro", "c2", 12_000)
+    let a = await getSellerAnalytics("s", 30)
+    let row = a.products.find((p) => p.id === p1)!
+    expect(row).toMatchObject({ priceCents: 8000, marketPeers: 2, marketMedianCents: null, priceComparison: null })
+
+    // 3º concorrente entra → mediana de {10000, 12000, 20000} = 12000; meu preço está 33,3% abaixo
+    await peer("outro", "c3", 20_000)
+    // não contam: outra categoria, outro jogo, pausado, sem estoque, e o meu próprio outro anúncio
+    await peer("outro", "c4", 1, { category: "moedas" })
+    await peer("outro", "c5", 1, { game: "Roblox" })
+    await peer("outro", "c6", 1, { status: "pausado" })
+    await peer("outro", "c7", 1, { stock: 0 })
+    a = await getSellerAnalytics("s", 30)
+    row = a.products.find((p) => p.id === p1)!
+    expect(row).toMatchObject({ marketPeers: 3, marketMedianCents: 12_000 })
+    expect(row.priceComparison?.verdict).toBe("abaixo")
+    expect(row.priceComparison?.pct).toBeCloseTo(-33.33, 1)
+    // nada de concorrente no retorno: só números agregados
+    expect(JSON.stringify(a)).not.toContain("Anúncio do concorrente")
+  })
+
+  it("visualizações recentes por anúncio; nulo se a tabela não existe", async () => {
+    await t.query(`INSERT INTO "product_view_daily" ("productId", "day", "views") VALUES
+      ($1, (now() AT TIME ZONE 'America/Sao_Paulo')::date, 5),
+      ($1, (now() AT TIME ZONE 'America/Sao_Paulo')::date - 29, 7),
+      ($1, (now() AT TIME ZONE 'America/Sao_Paulo')::date - 30, 100),
+      ($2, (now() AT TIME ZONE 'America/Sao_Paulo')::date, 3)`, [p1, p3])
+    const views = await getRecentViews("s", 30)
+    expect(views?.get(p1)).toBe(12) // hoje + há 29 dias; o de há 30 dias fica de fora
+    expect(views?.has(p3)).toBe(false) // anúncio de outro vendedor
+    await t.query(`ALTER TABLE "product_view_daily" RENAME TO "product_view_daily_off"`)
+    try {
+      expect(await getRecentViews("s", 30)).toBeNull()
+    } finally {
+      await t.query(`ALTER TABLE "product_view_daily_off" RENAME TO "product_view_daily"`)
+    }
   })
 
   it("sem a tabela de visualizações (migração pendente) o painel não quebra: sem dados de visita", async () => {

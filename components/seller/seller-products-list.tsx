@@ -56,9 +56,12 @@ export function ProductSearchForm({ query, status }: { query: string; status?: s
 export function SellerProductsList({
   products,
   query,
+  views,
 }: {
   products: SellerProduct[]
   query: string
+  /** visualizações dos últimos 30 dias por anúncio; nulo se ainda não há esse dado */
+  views?: Record<number, number> | null
 }) {
   if (products.length === 0) {
     return (
@@ -149,7 +152,7 @@ export function SellerProductsList({
                 <StarRating rating={p.rating} count={p.ratingCount} />
               </div>
 
-              <dl className="grid grid-cols-3 gap-2 border-t border-border pt-3 text-center">
+              <dl className="grid grid-cols-4 gap-2 border-t border-border pt-3 text-center">
                 <div>
                   <dt className="text-[0.7rem] text-muted-foreground">
                     {active.length === 1 ? "Item" : "Itens"}
@@ -165,6 +168,10 @@ export function SellerProductsList({
                 <div>
                   <dt className="text-[0.7rem] text-muted-foreground">Vendas</dt>
                   <dd className="text-sm font-semibold tabular-nums">{p.salesCount}</dd>
+                </div>
+                <div>
+                  <dt className="text-[0.7rem] text-muted-foreground">Visitas (30d)</dt>
+                  <dd className="text-sm font-semibold tabular-nums">{views ? (views[p.id] ?? 0).toLocaleString("pt-BR") : "—"}</dd>
                 </div>
               </dl>
 

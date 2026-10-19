@@ -84,3 +84,53 @@ export function movingAverage(values: number[], window: number): number[] {
     return slice.reduce((a, b) => a + b, 0) / slice.length
   })
 }
+
+export type GoalStatus = "alcancada" | "no_ritmo" | "abaixo" | "inicio"
+
+export type GoalProgress = {
+  percent: number
+  projectedCents: number
+  remainingCents: number
+  daysLeft: number
+  /** quanto falta vender por dia, nos dias que restam (o dia de hoje já conta como decorrido) */
+  neededPerDayCents: number | null
+  status: GoalStatus
+}
+
+/**
+ * Andamento da meta do mês. `dayOfMonth` é o dia de hoje (1–31) no calendário de Brasília e `daysInMonth` o total de
+ * dias do mês. A projeção assume o ritmo médio do mês até hoje; nos 2 primeiros dias é cedo demais para opinar ("inicio").
+ */
+export function goalProgress(opts: { revenueCents: number; goalCents: number; dayOfMonth: number; daysInMonth: number }): GoalProgress {
+  const { revenueCents, goalCents, daysInMonth } = opts
+  const dayOfMonth = Math.min(Math.max(1, opts.dayOfMonth), daysInMonth)
+  const projectedCents = Math.round((revenueCents / dayOfMonth) * daysInMonth)
+  const remainingCents = Math.max(0, goalCents - revenueCents)
+  const daysLeft = daysInMonth - dayOfMonth
+  const status: GoalStatus =
+    revenueCents >= goalCents ? "alcancada" : dayOfMonth < 3 ? "inicio" : projectedCents >= goalCents ? "no_ritmo" : "abaixo"
+  return {
+    percent: goalCents > 0 ? (revenueCents / goalCents) * 100 : 0,
+    projectedCents,
+    remainingCents,
+    daysLeft,
+    neededPerDayCents: remainingCents > 0 && daysLeft > 0 ? Math.ceil(remainingCents / daysLeft) : null,
+    status,
+  }
+}
+
+/** Menor número de anúncios parecidos (de outros vendedores) para a comparação de preço valer a pena mostrar. */
+export const MIN_PRICE_PEERS = 3
+
+export type PriceVsMarket = { pct: number; verdict: "abaixo" | "na_media" | "acima" }
+
+/**
+ * Preço do anúncio contra a mediana de anúncios parecidos (mesmo jogo e categoria, outros vendedores, à venda).
+ * Nulo quando há poucos concorrentes (uma mediana de 1 ou 2 anúncios revelaria o preço de alguém).
+ * Até 5% de diferença conta como "na média".
+ */
+export function priceVsMarket(ownCents: number | null, medianCents: number | null, peers: number): PriceVsMarket | null {
+  if (ownCents === null || medianCents === null || peers < MIN_PRICE_PEERS || medianCents <= 0) return null
+  const pct = ((ownCents - medianCents) / medianCents) * 100
+  return { pct, verdict: pct < -5 ? "abaixo" : pct > 5 ? "acima" : "na_media" }
+}

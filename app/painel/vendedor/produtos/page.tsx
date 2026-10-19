@@ -17,6 +17,7 @@ import {
   getSellerUnansweredQuestionsCount,
 } from "@/lib/marketplace"
 import { parsePage } from "@/lib/pagination"
+import { getRecentViews } from "@/lib/seller-analytics"
 import { getSession } from "@/lib/session"
 
 export const metadata: Metadata = {
@@ -37,11 +38,13 @@ export default async function MeusProdutosPage({
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
-  const [list, summary, pendingQuestions] = await Promise.all([
+  const [list, summary, pendingQuestions, recentViews] = await Promise.all([
     getSellerProductsPage(session.user.id, { q, status, page: parsePage(sp.pagina) }),
     getSellerListingSummary(session.user.id),
     getSellerUnansweredQuestionsCount(session.user.id),
+    getRecentViews(session.user.id, 30),
   ])
+  const views = recentViews ? Object.fromEntries(recentViews) : null
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -114,7 +117,7 @@ export default async function MeusProdutosPage({
                 <ProductSearchForm query={q} status={status} />
               </div>
 
-              <SellerProductsList products={list.products} query={q} />
+              <SellerProductsList products={list.products} query={q} views={views} />
               <Pagination
                 page={list.page}
                 pages={list.pages}

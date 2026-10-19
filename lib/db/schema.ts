@@ -296,6 +296,20 @@ export const productQuestion = pgTable("product_question", {
 ])
 
 /**
+ * Meta de receita do mês de um vendedor (em centavos). Tabela própria, e não uma coluna de `seller_application`,
+ * para o painel poder usá-la sem que as muitas leituras da candidatura dependam da migração.
+ */
+export const sellerGoal = pgTable("seller_goal", {
+  userId: text("userId")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  monthlyGoalCents: integer("monthlyGoalCents").notNull(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+}, (t) => [
+  check("seller_goal_positive", sql`${t.monthlyGoalCents} > 0`),
+])
+
+/**
  * Visualizações da página de um anúncio, contadas por dia (dia de Brasília): só um contador agregado, sem IP, sem
  * cookie e sem identificar quem viu. Alimenta a taxa de conversão (visitas → pedidos) no painel do vendedor.
  * Não conta o próprio dono nem robôs (ver lib/product-views.ts).

@@ -10,6 +10,7 @@ import { BarList } from "@/components/seller/analytics/bar-list"
 import { ChartCard, LegendKey } from "@/components/seller/analytics/chart-card"
 import { KpiCard } from "@/components/seller/analytics/kpi-card"
 import { TimeSeriesChart, type SeriesPoint } from "@/components/seller/analytics/time-series-chart"
+import { MonthlyGoalCard } from "@/components/seller/monthly-goal-card"
 import { ReceivablesBreakdown } from "@/components/seller/receivables-breakdown"
 import { SellerActionItems, type SellerActionItem } from "@/components/seller/seller-action-items"
 import { SellerBalanceHero } from "@/components/seller/seller-balance-hero"
@@ -30,7 +31,9 @@ import {
 } from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
 import { getMyOpenDisputes, getSellerOrderAggregates } from "@/lib/orders"
+import { getLowStock } from "@/lib/seller-alerts"
 import { getSellerAnalytics } from "@/lib/seller-analytics"
+import { getMonthProgressInputs } from "@/lib/seller-goals"
 import { getSession } from "@/lib/session"
 import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla-sweeps"
 import { formatDurationHours } from "@/lib/time"
@@ -72,6 +75,8 @@ export default async function PainelVendedorPage() {
     [profileRow],
     pendingQuestions,
     accountFlags,
+    monthProgress,
+    lowStock,
   ] = await Promise.all([
     getSellerStats(session.user.id),
     getSellerOrderAggregates(session.user.id),
@@ -87,6 +92,8 @@ export default async function PainelVendedorPage() {
       .limit(1),
     getSellerUnansweredQuestionsCount(session.user.id),
     getSellerAccountFlagSummary(session.user.id),
+    getMonthProgressInputs(session.user.id),
+    getLowStock(session.user.id),
   ])
 
   const pendingCount = aggregates.stat("aguardando_entrega")?.count ?? 0
@@ -150,6 +157,21 @@ export default async function PainelVendedorPage() {
             description: "Quanto antes você entrega, antes o valor entra em liberação.",
             href: "/painel/vendedor/vendas",
             cta: "Ver pedidos pendentes",
+          },
+        ]
+      : []),
+    ...(lowStock.length > 0
+      ? [
+          {
+            id: "estoque",
+            tone: "gold" as const,
+            title: `${lowStock.length} ${lowStock.length === 1 ? "item com estoque baixo" : "itens com estoque baixo"}`,
+            description: `${lowStock
+              .slice(0, 3)
+              .map((i) => `${i.title}, ${i.label} (${i.stock === 0 ? "esgotado" : `${i.stock} un.`})`)
+              .join("; ")}${lowStock.length > 3 ? ` e mais ${lowStock.length - 3}` : ""}. Item esgotado não vende e some das buscas.`,
+            href: "/painel/vendedor/produtos",
+            cta: "Repor estoque",
           },
         ]
       : []),
@@ -302,6 +324,8 @@ export default async function PainelVendedorPage() {
               />
             </div>
           </section>
+
+          {monthProgress.available ? <MonthlyGoalCard progress={monthProgress} /> : null}
 
           <section aria-labelledby="desempenho" className="flex flex-col gap-4">
             <h2 id="desempenho" className="sr-only">

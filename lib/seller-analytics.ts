@@ -1,5 +1,5 @@
 import { pool } from "@/lib/db"
-import { delta, ratio, topWithOthers, type AnalyticsPeriod, type Delta } from "@/lib/analytics-math"
+import { MIN_PRICE_PEERS as MIN_PEERS, delta, priceVsMarket, ratio, topWithOthers, type AnalyticsPeriod, type Delta, type PriceVsMarket } from "@/lib/analytics-math"
 
 /**
  * Métricas de venda de UM vendedor, lidas do banco em SQL (nada de carregar pedidos para somar em JS).
@@ -52,6 +52,12 @@ export type ProductRow = {
   orders: number
   views: number | null
   conversion: number | null
+  /** menor preço à venda deste anúncio (nulo se pausado ou sem estoque) */
+  priceCents: number | null
+  /** mediana de anúncios parecidos de OUTROS vendedores e quantos são; a comparação só aparece com 3 ou mais */
+  marketMedianCents: number | null
+  marketPeers: number
+  priceComparison: PriceVsMarket | null
 }
 
 export type OperationsStats = {
@@ -133,11 +139,54 @@ function toOps(row: Record<string, number | string | null> | undefined, delivery
   }
 }
 
+/**
+ * Preço de cada anúncio ativo do vendedor contra a mediana dos anúncios parecidos (mesmo jogo e mesma categoria, de
+ * OUTROS vendedores, ativos e com estoque). Só sai a mediana e a contagem: nunca o preço, o título ou o dono de um
+ * concorrente.
+ */
+async function getPriceBenchmarks(sellerId: string): Promise<Map<number, { price: number; median: number | null; peers: number }>> {
+  const min = (alias: string) =>
+    `(SELECT min(v."priceCents") FROM "product_variant" v WHERE v."productId" = ${alias}."id" AND v."active" = true AND v."stock" > 0)`
+  const { rows } = await pool.query<{ id: number; price: number; median: number | null; peers: number }>(
+    `WITH mine AS (
+       SELECT p."id", p."categorySlug", lower(trim(p."game")) AS g, ${min("p")} AS price
+         FROM "product" p WHERE p."sellerId" = $1 AND p."status" = 'ativo' AND nullif(trim(p."game"), '') IS NOT NULL
+     ),
+     peers AS (
+       SELECT p."categorySlug", lower(trim(p."game")) AS g, ${min("p")} AS price
+         FROM "product" p WHERE p."sellerId" <> $1 AND p."status" = 'ativo' AND nullif(trim(p."game"), '') IS NOT NULL
+     )
+     SELECT mine."id", mine.price, count(peers.price)::int AS peers,
+            percentile_cont(0.5) WITHIN GROUP (ORDER BY peers.price) AS median
+       FROM mine LEFT JOIN peers ON peers.g = mine.g AND peers."categorySlug" = mine."categorySlug" AND peers.price IS NOT NULL
+      WHERE mine.price IS NOT NULL
+      GROUP BY mine."id", mine.price`,
+    [sellerId],
+  )
+  return new Map(rows.map((r) => [Number(r.id), { price: Number(r.price), median: r.median === null ? null : Math.round(Number(r.median)), peers: Number(r.peers) }]))
+}
+
+/** Visualizações dos últimos `days` dias por anúncio do vendedor; nulo se a tabela ainda não existe. */
+export async function getRecentViews(sellerId: string, days = 30): Promise<Map<number, number> | null> {
+  try {
+    const { rows } = await pool.query<{ id: number; views: number }>(
+      `SELECT v."productId" AS id, sum(v."views")::int AS views
+         FROM "product_view_daily" v JOIN "product" p ON p."id" = v."productId"
+        WHERE p."sellerId" = $1 AND v."day" >= ${TODAY} - ($2::int - 1)
+        GROUP BY 1`,
+      [sellerId, days],
+    )
+    return new Map(rows.map((r) => [Number(r.id), Number(r.views)]))
+  } catch {
+    return null
+  }
+}
+
 export async function getSellerAnalytics(sellerId: string, days: AnalyticsPeriod): Promise<SellerAnalytics> {
   const winStart = `${TODAY} - ($2::int - 1)` // primeiro dia da janela atual
   const prevStart = `${TODAY} - ($2::int * 2 - 1)` // primeiro dia da janela anterior
 
-  const [seriesRes, opsRes, deliveryRes, gameRes, categoryRes, productRes, buyersRes, releaseRes] = await Promise.all([
+  const [seriesRes, opsRes, deliveryRes, gameRes, categoryRes, productRes, buyersRes, releaseRes, benchmarks] = await Promise.all([
     pool.query<SeriesRow>(
       `WITH days AS (
          SELECT d::date AS day FROM generate_series(${prevStart}, ${TODAY}, interval '1 day') d
@@ -234,6 +283,7 @@ export async function getSellerAnalytics(sellerId: string, days: AnalyticsPeriod
         GROUP BY 1 ORDER BY 1`,
       [sellerId],
     ),
+    getPriceBenchmarks(sellerId),
   ])
 
   // ---- visualizações (opcionais: a tabela pode ainda não existir) ----
@@ -284,6 +334,7 @@ export async function getSellerAnalytics(sellerId: string, days: AnalyticsPeriod
 
   const products: ProductRow[] = productRes.rows.map((r) => {
     const views = viewsByProduct ? (viewsByProduct.get(Number(r.id)) ?? 0) : null
+    const bench = benchmarks.get(Number(r.id))
     return {
       id: Number(r.id),
       title: r.title,
@@ -294,6 +345,10 @@ export async function getSellerAnalytics(sellerId: string, days: AnalyticsPeriod
       orders: Number(r.orders),
       views,
       conversion: views !== null ? ratio(Number(r.orders), views) : null,
+      priceCents: bench?.price ?? null,
+      marketMedianCents: bench && bench.peers >= MIN_PEERS ? bench.median : null,
+      marketPeers: bench?.peers ?? 0,
+      priceComparison: bench ? priceVsMarket(bench.price, bench.median, bench.peers) : null,
     }
   })
 
