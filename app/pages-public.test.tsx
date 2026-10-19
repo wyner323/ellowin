@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { createTestDb, type TestDb } from "@/lib/test-db"
 import { htmlToText, renderHtml } from "@/lib/test-render"
+import { formatCents } from "@/lib/money"
 
 /**
  * As telas públicas (home, anúncio, loja, busca, categoria, jogo) renderizadas de
@@ -51,7 +52,8 @@ import ProductPage, { generateMetadata as productMetadata } from "@/app/produtos
 import LojaPage from "@/app/loja/[slug]/page"
 import BuscaPage, { metadata as buscaMetadata } from "@/app/busca/page"
 import CatalogPage from "@/app/catalogo/[slug]/page"
-import JogoPage from "@/app/jogos/[slug]/page"
+import JogoPage, { generateMetadata as jogoMetadata } from "@/app/jogos/[slug]/page"
+import sitemap from "@/app/sitemap"
 import JogosPage from "@/app/jogos/page"
 
 let t: TestDb
@@ -130,6 +132,13 @@ describe("home", () => {
     expect(htmlToText(html)).toContain("Anúncios em destaque")
   })
 
+  it("declara a organização e a caixa de busca do site em dados estruturados", async () => {
+    const html = await page(HomePage())
+    expect(html).toContain("application/ld+json")
+    expect(html).toContain("SearchAction")
+    expect(html).toContain("busca?q={search_term_string}")
+  })
+
   it("com anúncios reais mostra título, preço 'a partir de' e o jogo na faixa", async () => {
     await addListing({ title: "Conta Valorant Imortal", price: 25_000 })
     await addListing({ title: "Gift Card Steam", category: "gift-cards", game: "Steam", price: 9_000 })
@@ -203,12 +212,22 @@ describe("página do anúncio", () => {
     expect(meta.robots).toEqual({ index: false, follow: true })
   })
 
+  it("anúncio ativo leva dados estruturados de produto (uma oferta por variante) e a trilha de navegação", async () => {
+    await addListing({ slug: "estruturado", title: "Conta Estruturada", game: "Valorant", price: 12_000 })
+    const html = await page(ProductPage(params({ slug: "estruturado" })))
+    expect(html).toContain('"@type":"Product"')
+    expect(html).toContain('"@type":"AggregateOffer"')
+    expect(html).toContain('"@type":"Offer"')
+    expect(html).toContain('"@type":"BreadcrumbList"')
+    expect(html).toContain("https://ellowin.com.br/jogos/valorant")
+  })
+
   it("anúncio ativo é indexável (sem robots) e tem canônico", async () => {
     await addListing({ slug: "ativo", title: "Conta Ativa" })
     const meta = await productMetadata(params({ slug: "ativo" }))
     expect(meta.robots).toBeUndefined()
     expect(meta.alternates).toEqual({ canonical: "/produtos/ativo" })
-    expect(meta.title).toBe("Conta Ativa — Ellowin")
+    expect(meta.title).toBe(`Conta Ativa por ${formatCents(25_000)} | Ellowin`)
   })
 
   it("avaliações e perguntas aparecem com nomes públicos", async () => {
@@ -383,6 +402,27 @@ describe("categoria", () => {
 describe("jogos", () => {
   const jogo = (slug: string, q: Record<string, string> = {}) =>
     page(JogoPage({ params: Promise.resolve({ slug }), searchParams: Promise.resolve(q) }))
+
+  it("SEO: jogo sem anúncio e sem texto próprio sai do índice e do sitemap; com anúncio ou texto próprio entra", async () => {
+    const meta = (slug: string) => jogoMetadata({ params: Promise.resolve({ slug }) })
+    // aion: está no catálogo, não tem texto próprio e ninguém vende
+    expect((await meta("aion")).robots).toEqual({ index: false, follow: true })
+    // valorant tem texto próprio (lib/game-seo.ts), mesmo sem anúncio
+    expect((await meta("valorant")).robots).toBeUndefined()
+    // um jogo sem texto próprio passa a ser indexável quando alguém anuncia
+    await addListing({ title: "Conta Aion", game: "Aion" })
+    expect((await meta("aion")).robots).toBeUndefined()
+
+    const urls = (await sitemap()).map((e) => e.url)
+    expect(urls).toContain("https://ellowin.com.br/jogos/valorant")
+    expect(urls).toContain("https://ellowin.com.br/jogos/aion")
+    expect(urls).not.toContain("https://ellowin.com.br/jogos/aika")
+  })
+
+  it("SEO: o título da página do jogo diz o que há ali", async () => {
+    const meta = await jogoMetadata({ params: Promise.resolve({ slug: "valorant" }) })
+    expect(meta.title).toBe("Valorant: contas, moedas e serviços | Ellowin")
+  })
 
   it("jogo fora do catálogo: 404", async () => {
     await expect(jogo("jogo-que-nao-existe")).rejects.toThrow("NEXT_NOT_FOUND")

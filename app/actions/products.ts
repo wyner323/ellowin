@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { product, productImage, productVariant, sellerApplication } from "@/lib/db/schema"
 import { isOwnBlobUrl } from "@/lib/blob-urls"
+import { pingIndexNow } from "@/lib/indexnow"
 import {
   DEFAULT_MANUAL_DELIVERY_TIME,
   INSTANT_DELIVERY_TIME,
@@ -310,6 +311,8 @@ export async function createProduct(input: {
   if (storeSlug) revalidatePath(`/loja/${storeSlug}`)
   if (input.game.trim()) revalidatePath(`/jogos/${slugifyGame(input.game.trim())}`)
 
+  pingIndexNow([`/produtos/${slug}`, `/catalogo/${input.categorySlug}`, ...(input.game.trim() ? [`/jogos/${slugifyGame(input.game.trim())}`] : [])])
+
   return { ok: true, message: "Anúncio publicado.", slug }
 }
 
@@ -485,6 +488,8 @@ export async function updateProduct(input: {
   if (storeSlug) revalidatePath(`/loja/${storeSlug}`)
   if (input.game.trim()) revalidatePath(`/jogos/${slugifyGame(input.game.trim())}`)
 
+  pingIndexNow([`/produtos/${owned.slug}`])
+
   return { ok: true, message: "Anúncio atualizado." }
 }
 
@@ -525,6 +530,9 @@ export async function toggleProductStatus(productId: number): Promise<ActionResu
   revalidatePath(`/catalogo/${owned.categorySlug}`)
   if (storeSlug) revalidatePath(`/loja/${storeSlug}`)
   if (owned.game) revalidatePath(`/jogos/${slugifyGame(owned.game)}`)
+
+  // Pausar também vale: o buscador relê a página e vê o noindex.
+  pingIndexNow([`/produtos/${owned.slug}`])
 
   return {
     ok: true,

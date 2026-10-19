@@ -402,6 +402,15 @@ no direct channel yet and points to opening a dispute. Don't add copy that promi
 guarantee window the operation or the order rules don't have (`autoReleaseAt` is set by `markDelivered` and counts 7 days from the
 **delivery**; it is NULL while the order awaits delivery. Orders delivered before 2026-10-17 keep the old date, 7 days from the purchase).
 
+### SEO (ranking on Google)
+
+What the code does for search (`lib/seo.ts`, `lib/product-jsonld.ts`, `lib/indexnow.ts`): product pages get a title with the price (`productSeo`: "Conta X por R$ 79,00 | Ellowin"), a description
+with the payment-protection sentence, schema.org Product JSON-LD (one `Offer` per variant, public store name as seller, game as brand, SKU `ellowin-<id>`) and a BreadcrumbList; game and
+category pages get the breadcrumb; the home declares Organization + WebSite with a `SearchAction`. A game page with no listing and no own text (`lib/game-seo.ts`) is `noindex` and left out of
+`/sitemap.xml` (it becomes indexable by itself when someone lists a game); paused listings are `noindex`. `pingIndexNow()` tells Bing/Yandex right after a listing is published, edited or
+paused (production only; the public key is served at `/indexnow-key.txt`). **Google does not use IndexNow**: it needs the sitemap and Search Console (owner steps in `PENDENCIAS.md`).
+Copy for the search result must be true for the system, like everywhere else (`lib/seo.test.ts` bans "garantia", "em minutos", "24/7", "verificado").
+
 ### Security headers
 
 `proxy.ts` (Next 16's renamed `middleware.ts`) sets a per-request CSP nonce and applies it to all

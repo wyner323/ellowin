@@ -5,7 +5,12 @@ type JsonLdProduct = {
   rating: number | null
   ratingCount: number
   status: string
-  variants: { priceCents: number; stock: number }[]
+  variants: { label?: string; priceCents: number; stock: number }[]
+  /** Opcionais: enriquecem o resultado do Google quando existem. */
+  id?: number
+  game?: string | null
+  categoryName?: string
+  sellerName?: string
 }
 
 /** Dados estruturados (schema.org/Product) para o Google mostrar preço e nota no resultado. */
@@ -23,6 +28,17 @@ export function buildProductJsonLd(item: JsonLdProduct, url: string, fallbackIma
           offerCount: prices.length,
           availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
           url,
+          // Uma oferta por variante: o Google mostra cada opção com o próprio preço.
+          offers: item.variants.map((v) => ({
+            "@type": "Offer",
+            ...(v.label ? { name: v.label } : {}),
+            price: (v.priceCents / 100).toFixed(2),
+            priceCurrency: "BRL",
+            availability:
+              item.status === "ativo" && v.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+            url,
+            ...(item.sellerName ? { seller: { "@type": "Organization", name: item.sellerName } } : {}),
+          })),
         }
       : undefined
 
@@ -30,6 +46,9 @@ export function buildProductJsonLd(item: JsonLdProduct, url: string, fallbackIma
     "@context": "https://schema.org",
     "@type": "Product",
     name: item.title,
+    ...(item.id !== undefined ? { sku: `ellowin-${item.id}` } : {}),
+    ...(item.game ? { brand: { "@type": "Brand", name: item.game } } : {}),
+    ...(item.categoryName ? { category: item.categoryName } : {}),
     description: item.description.slice(0, 300),
     image: item.images.length > 0 ? item.images : [fallbackImage],
     url,

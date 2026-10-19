@@ -40,6 +40,23 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
   houver um e-mail do domínio; (b) guardar a chave secreta em local seguro (o Google não a mostra de novo; se perder, crie outra
   no mesmo cliente); (c) trocar o `BETTER_AUTH_SECRET` (item acima), que derruba as sessões atuais.
 
+- [ ] **Google Search Console (o que faz os anúncios aparecerem no Google).** O código já entrega sitemap, dados estruturados e títulos
+  com preço; falta o Google saber que o site existe. O Google **não** aceita aviso instantâneo como o Bing (o IndexNow que o site já usa),
+  então o caminho é este, uma vez só:
+  1. Acesse https://search.google.com/search-console → **Adicionar propriedade** → "Domínio" → `ellowin.com.br` e confirme pelo DNS
+     (registro TXT no painel de onde o domínio está registrado).
+  2. Em **Sitemaps**, envie `https://ellowin.com.br/sitemap.xml`. Ele lista só o que vale indexar (anúncios ativos, categorias e jogos com
+     anúncio ou texto próprio) e se atualiza sozinho a cada visita.
+  3. Em **Inspeção de URL**, cole o endereço de um anúncio e clique em **Solicitar indexação** (vale para alguns por dia; use nos mais
+     importantes: a home, `/jogos`, as 4 categorias).
+  4. Depois de alguns dias, em **Aprimoramentos → Produtos** o Google mostra se os dados estruturados dos anúncios estão válidos; se
+     aparecer erro, mande para o Claude ajustar.
+  5. Opcional: conta no **Bing Webmaster Tools** (importar do Search Console em 1 clique). O IndexNow já avisa o Bing a cada anúncio
+     publicado, mas o painel mostra se está funcionando.
+  Quanto tempo leva: o Google costuma indexar páginas novas em dias a semanas e só sobe no ranking com o tempo, links e avaliações;
+  ninguém consegue garantir posição. **Google Shopping (Merchant Center) não incluí de propósito:** as regras dele restringem venda de
+  contas de jogo e moedas virtuais; só vale a pena depois de ler a política atual.
+
 ## 2. Dados de demonstração no banco de produção
 
 - [ ] **Corrigir as vendas inflamadas dos anúncios de exemplo 1 a 6.** O Claude foi impedido de escrever no banco de

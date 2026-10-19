@@ -29,6 +29,7 @@ import { getCategory } from "@/lib/catalog"
 import { getProductBySlug, getProductQuestions, getRelatedListings } from "@/lib/marketplace"
 import { findGameBySlug, slugifyGame } from "@/lib/product-catalog"
 import { buildProductJsonLd, serializeJsonLd } from "@/lib/product-jsonld"
+import { breadcrumbJsonLd, productSeo } from "@/lib/seo"
 import { getSession } from "@/lib/session"
 import { SITE_URL } from "@/lib/site"
 import { getWalletSummary } from "@/lib/wallet"
@@ -42,8 +43,7 @@ export async function generateMetadata({
   const item = await getProductBySlug(slug)
   if (!item) return { title: "Anúncio não encontrado — Ellowin" }
 
-  const title = `${item.title} — Ellowin`
-  const description = item.description.slice(0, 155)
+  const { title, description } = productSeo(item)
   const image = item.images[0] ?? getCategory(item.categorySlug)?.image
 
   return {
@@ -105,11 +105,26 @@ export default async function ProductPage({
   const nonce = (await headers()).get("x-nonce") ?? undefined
   const productUrl = `${SITE_URL}/produtos/${item.slug}`
   const fallbackImage = `${SITE_URL}${category?.image ?? "/icon-32x32.png"}`
-  const jsonLd = serializeJsonLd(buildProductJsonLd(item, productUrl, fallbackImage))
+  const jsonLd = serializeJsonLd(
+    buildProductJsonLd(
+      { ...item, categoryName: category?.name, sellerName: item.seller.name },
+      productUrl,
+      fallbackImage,
+    ),
+  )
+  const breadcrumbLd = serializeJsonLd(
+    breadcrumbJsonLd([
+      { name: "Início", path: "/" },
+      { name: category?.name ?? item.categorySlug, path: `/catalogo/${item.categorySlug}` },
+      ...(item.game && gameSlug && findGameBySlug(gameSlug) ? [{ name: item.game, path: `/jogos/${gameSlug}` }] : []),
+      { name: item.title, path: `/produtos/${item.slug}` },
+    ]),
+  )
 
   return (
     <div className="flex min-h-screen flex-col">
       <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: jsonLd }} />
+      <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: breadcrumbLd }} />
       <SiteHeader />
 
       <main id="conteudo" className="flex-1">

@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ChevronRight } from 'lucide-react'
@@ -16,6 +17,8 @@ import { getCategoryStats } from '@/lib/market-stats'
 import { searchListings } from '@/lib/marketplace'
 import { parsePage } from '@/lib/pagination'
 import { formatCents } from '@/lib/money'
+import { serializeJsonLd } from '@/lib/product-jsonld'
+import { breadcrumbJsonLd } from '@/lib/seo'
 
 export async function generateMetadata({
   params,
@@ -58,8 +61,17 @@ export default async function CatalogPage({
   const isEmpty =
     result.realTotal === 0 && result.demoTotal === 0 && activeFilterCount(filters) === 0
 
+  const nonce = (await headers()).get('x-nonce') ?? undefined
+  const breadcrumbLd = serializeJsonLd(
+    breadcrumbJsonLd([
+      { name: 'Início', path: '/' },
+      { name: category.name, path: `/catalogo/${slug}` },
+    ]),
+  )
+
   return (
     <div className="flex min-h-screen flex-col">
+      <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: breadcrumbLd }} />
       <SiteHeader />
       <main id="conteudo" className="flex-1">
         <section className="border-b border-border bg-accent/40">

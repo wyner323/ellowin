@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { eq } from "drizzle-orm"
@@ -17,10 +18,12 @@ import { attributeFieldsForSlug } from "@/lib/game-attributes"
 import { activeFilterCount, parseListingFilters } from "@/lib/listing-filters"
 import { categoryCardInfo, sellerCountLabel } from "@/lib/home-stats"
 import { getGameStats } from "@/lib/market-stats"
-import { searchListings } from "@/lib/marketplace"
+import { getGameListingCounts, searchListings } from "@/lib/marketplace"
 import { formatCents } from "@/lib/money"
 import { parsePage } from "@/lib/pagination"
 import { getGameSeo } from "@/lib/game-seo"
+import { serializeJsonLd } from "@/lib/product-jsonld"
+import { breadcrumbJsonLd } from "@/lib/seo"
 import { findGameBySlug } from "@/lib/product-catalog"
 import { getSession } from "@/lib/session"
 
@@ -32,12 +35,15 @@ export async function generateMetadata({
   const { slug } = await params
   const game = findGameBySlug(slug)
   if (!game) return { title: "Jogo não encontrado — Ellowin" }
+  // Página sem nenhum anúncio e sem texto próprio é só uma lista vazia: fora do índice (e do sitemap) até ter conteúdo.
+  const indexable = getGameSeo(slug) !== null || ((await getGameListingCounts())[slug] ?? 0) > 0
   return {
-    title: `${game.name} — Ellowin`,
+    title: `${game.name}: contas, moedas e serviços | Ellowin`,
     description:
       getGameSeo(slug)?.metaDescription ??
-      `Contas, moedas, itens e serviços de ${game.name} na Ellowin.`,
+      `Contas, moedas, itens e serviços de ${game.name} na Ellowin, com pagamento protegido.`,
     alternates: { canonical: `/jogos/${slug}` },
+    ...(indexable ? {} : { robots: { index: false, follow: true } }),
   }
 }
 
@@ -78,8 +84,18 @@ export default async function JogoPage({
     }
   }
 
+  const nonce = (await headers()).get("x-nonce") ?? undefined
+  const breadcrumbLd = serializeJsonLd(
+    breadcrumbJsonLd([
+      { name: "Início", path: "/" },
+      { name: "Jogos", path: "/jogos" },
+      { name: game.name, path: `/jogos/${slug}` },
+    ]),
+  )
+
   return (
     <div className="flex min-h-screen flex-col">
+      <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: breadcrumbLd }} />
       <SiteHeader />
       <main id="conteudo" className="flex-1">
         <section className="border-b border-border bg-accent/40">

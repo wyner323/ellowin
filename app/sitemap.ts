@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm"
 import { categories } from "@/lib/catalog"
 import { db } from "@/lib/db"
 import { product } from "@/lib/db/schema"
+import { getGameSeo } from "@/lib/game-seo"
+import { getGameListingCounts } from "@/lib/marketplace"
 import { GAMES } from "@/lib/product-catalog"
 import { SITE_URL } from "@/lib/site"
 
@@ -39,10 +41,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }))
 
-  const gamePages: MetadataRoute.Sitemap = GAMES.map((g) => ({
+  // Só jogos com anúncio à venda ou com texto próprio: o resto é lista vazia (a página também sai com noindex).
+  const counts = await getGameListingCounts()
+  const gamePages: MetadataRoute.Sitemap = GAMES.filter((g) => (counts[g.slug] ?? 0) > 0 || getGameSeo(g.slug) !== null).map((g) => ({
     url: `${SITE_URL}/jogos/${g.slug}`,
     changeFrequency: "weekly",
-    priority: 0.5,
+    priority: (counts[g.slug] ?? 0) > 0 ? 0.6 : 0.4,
   }))
 
   const productPages: MetadataRoute.Sitemap = activeProducts.map((p) => ({

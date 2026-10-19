@@ -44,6 +44,21 @@ describe("buildProductJsonLd", () => {
     ).not.toHaveProperty("aggregateRating")
   })
 
+  it("lista uma oferta por variante, com vendedor público, marca do jogo, categoria e SKU", () => {
+    const ld = buildProductJsonLd(
+      { ...base, id: 42, game: "Valorant", categoryName: "Contas de jogos", sellerName: "Loja da Ana", variants: [{ label: "Imortal", priceCents: 10000, stock: 1 }, { label: "Radiante", priceCents: 150000, stock: 0 }] },
+      "https://ellowin.com.br/produtos/x",
+      "/f.png",
+    )
+    expect(ld).toMatchObject({ sku: "ellowin-42", brand: { name: "Valorant" }, category: "Contas de jogos" })
+    const offers = (ld.offers as { offers: { name: string; price: string; availability: string; seller: { name: string } }[] }).offers
+    expect(offers.map((o) => [o.name, o.price, o.availability.split("/").pop()])).toEqual([
+      ["Imortal", "100.00", "InStock"],
+      ["Radiante", "1500.00", "OutOfStock"],
+    ])
+    expect(offers[0].seller.name).toBe("Loja da Ana")
+  })
+
   it("usa a imagem de reserva quando o anúncio não tem fotos", () => {
     expect(buildProductJsonLd({ ...base, images: [] }, "u", "/f.png").image).toEqual(["/f.png"])
   })
