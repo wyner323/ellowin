@@ -9,6 +9,7 @@ import { FilterPills } from "@/components/filter-pills"
 import { Pagination } from "@/components/pagination"
 import { ProductSearchForm, SellerProductsList } from "@/components/seller/seller-products-list"
 import { SellerTabs } from "@/components/seller/seller-tabs"
+import { VacationCard } from "@/components/seller/vacation-card"
 import { StatTiles } from "@/components/stat-tiles"
 import { Button } from "@/components/ui/button"
 import {
@@ -89,6 +90,8 @@ export default async function MeusProdutosPage({
             </div>
           ) : (
             <>
+              <VacationCard active={summary.active} onVacation={summary.onVacation} />
+
               <StatTiles
                 tiles={[
                   { icon: Store, label: summary.active === 1 ? "anúncio ativo" : "anúncios ativos", value: String(summary.active) },

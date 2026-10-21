@@ -6,7 +6,9 @@ import { ProductStatusToggle } from "@/components/seller/product-status-toggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getCategory } from "@/lib/catalog"
+import { listingQuality, QUALITY_LEVEL_LABEL, type QualityLevel } from "@/lib/listing-quality"
 import { formatCents } from "@/lib/money"
+import { statusLabel } from "@/lib/store-vacation"
 import { cn } from "@/lib/utils"
 
 type SellerProduct = {
@@ -20,7 +22,16 @@ type SellerProduct = {
   rating: number | null
   ratingCount: number
   salesCount: number
+  description: string
+  attributes: Record<string, string>
+  imageCount: number
   variants: { active: boolean; stock: number; priceCents: number }[]
+}
+
+const QUALITY_TONE: Record<QualityLevel, string> = {
+  completo: "bg-success",
+  bom: "bg-gold",
+  incompleto: "bg-destructive",
 }
 
 /** Campo de busca: formulário GET (?q=), o servidor filtra e pagina — sem JS no cliente. */
@@ -84,6 +95,14 @@ export function SellerProductsList({
         const isActive = p.status === "ativo"
         const noStock = isActive && stock === 0
         const categoryName = getCategory(p.categorySlug)?.name
+        const quality = listingQuality({
+          title: p.title,
+          description: p.description,
+          game: p.game,
+          categorySlug: p.categorySlug,
+          attributes: p.attributes,
+          imageCount: p.imageCount,
+        })
 
         return (
           <li
@@ -117,7 +136,7 @@ export function SellerProductsList({
                       : "bg-background/85 text-muted-foreground",
                   )}
                 >
-                  {isActive ? "Ativo" : "Pausado"}
+                  {statusLabel(p.status)}
                 </span>
                 {noStock ? (
                   <span className="rounded-full bg-gold px-2.5 py-0.5 text-[0.7rem] font-medium text-gold-foreground">
@@ -174,6 +193,24 @@ export function SellerProductsList({
                   <dd className="text-sm font-semibold tabular-nums">{views ? (views[p.id] ?? 0).toLocaleString("pt-BR") : "—"}</dd>
                 </div>
               </dl>
+
+              <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+                <div className="flex items-baseline justify-between gap-2 text-xs">
+                  <span className="font-medium">{QUALITY_LEVEL_LABEL[quality.level]}</span>
+                  <span className="text-muted-foreground tabular-nums">{quality.score}/100</span>
+                </div>
+                <div
+                  className="h-1.5 w-full rounded-full bg-muted"
+                  role="progressbar"
+                  aria-label={`Qualidade do anúncio: ${quality.score} de 100`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={quality.score}
+                >
+                  <div className={cn("h-1.5 rounded-full", QUALITY_TONE[quality.level])} style={{ width: `${quality.score}%` }} />
+                </div>
+                {quality.tips[0] ? <p className="text-xs leading-snug text-muted-foreground">{quality.tips[0].text}</p> : null}
+              </div>
 
               <div className="mt-auto flex items-center justify-between gap-2 pt-1">
                 <Button

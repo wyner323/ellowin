@@ -415,6 +415,24 @@ describe("painel do vendedor", () => {
     expect(t3).toContain("Visitas (30d)")
     expect(t3).toContain("42")
   })
+
+  it("meus anúncios: nota de qualidade com a dica principal e convite para o modo férias", async () => {
+    as("ana")
+    const page = await txt(MeusProdutosPage({ searchParams: Promise.resolve({}) }))
+    expect(page).toMatch(/Anúncio (completo|bom|incompleto)/)
+    expect(page).toMatch(/\d+\/100/)
+    expect(page).toContain("Modo férias")
+    expect(page).not.toContain("Sua loja está em férias")
+  })
+
+  it("meus anúncios: com anúncios em férias mostra o aviso para voltar a vender e o rótulo 'Em férias'", async () => {
+    as("ana")
+    await t.query(`UPDATE "product" SET "status" = 'ferias' WHERE "id" = $1`, [productId])
+    const page = await txt(MeusProdutosPage({ searchParams: Promise.resolve({}) }))
+    expect(page).toContain("Sua loja está em férias")
+    expect(page).toContain("Voltar a vender")
+    expect(page).toContain("Em férias")
+  })
 })
 
 /* ---------------------------------------------------------------------------

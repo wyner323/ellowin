@@ -20,6 +20,7 @@ import { computeSellerBadges } from "@/lib/badges"
 import { positivePercent } from "@/lib/card-info"
 import { attributeFieldsForSlug, describeAttributes } from "@/lib/game-attributes"
 import { slugifyGame } from "@/lib/product-catalog"
+import { VACATION_STATUS } from "@/lib/store-vacation"
 import {
   LISTING_PAGE_SIZE,
   deliveryRuleFor,
@@ -659,7 +660,8 @@ export async function getSellerProductsPage(
 ) {
   const term = q?.trim().slice(0, 100)
   const conditions: SQL[] = [eq(product.sellerId, sellerId)]
-  if (status) conditions.push(eq(product.status, status))
+  if (status === "ativo") conditions.push(eq(product.status, "ativo"))
+  else if (status === "pausado") conditions.push(ne(product.status, "ativo")) // inclui os em férias
   if (term) conditions.push(ilike(product.title, `%${escapeLike(term)}%`))
   const where = and(...conditions)
 
@@ -699,7 +701,9 @@ export async function getSellerListingSummary(sellerId: string) {
     .select({
       total: sql<number>`count(*)::int`,
       active: sql<number>`(count(*) filter (where ${product.status} = 'ativo'))::int`,
-      paused: sql<number>`(count(*) filter (where ${product.status} = 'pausado'))::int`,
+      // Pausado = qualquer status que não seja "ativo" (inclui "ferias", do modo férias).
+      paused: sql<number>`(count(*) filter (where ${product.status} <> 'ativo'))::int`,
+      onVacation: sql<number>`(count(*) filter (where ${product.status} = ${VACATION_STATUS}))::int`,
       // `"product"."id"` por texto, não `${product.id}`: numa consulta de uma tabela só o Drizzle
       // renderiza a coluna sem qualificador, e dentro da subquery `"id"` vira o id da própria variante.
       outOfStock: sql<number>`(count(*) filter (
@@ -717,6 +721,7 @@ export async function getSellerListingSummary(sellerId: string) {
     total: row?.total ?? 0,
     active: row?.active ?? 0,
     paused: row?.paused ?? 0,
+    onVacation: row?.onVacation ?? 0,
     outOfStock: row?.outOfStock ?? 0,
   }
 }
@@ -744,6 +749,7 @@ async function withVariantsAndCover(rows: (typeof product.$inferSelect)[]) {
       p.ratingCount > 0 ? Math.round((p.ratingSum / p.ratingCount) * 10) / 10 : null,
     variants: variants.filter((v) => v.productId === p.id),
     coverUrl: imageRows.find((i) => i.productId === p.id)?.url ?? null,
+    imageCount: imageRows.filter((i) => i.productId === p.id).length,
   }))
 }
 

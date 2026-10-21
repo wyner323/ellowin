@@ -708,8 +708,34 @@ describe("getSellerListingSummary", () => {
     await addVariant(desativado, { stock: 5, active: false }) // item desativado não conta como estoque
     await addListing({ seller: "ana", status: "pausado", stock: 0 }) // pausado nunca conta como sem estoque
     await addListing({ seller: "bia" })
-    expect(await getSellerListingSummary("ana")).toEqual({ total: 5, active: 4, paused: 1, outOfStock: 3 })
-    expect(await getSellerListingSummary("cadu")).toEqual({ total: 0, active: 0, paused: 0, outOfStock: 0 })
+    expect(await getSellerListingSummary("ana")).toEqual({ total: 5, active: 4, paused: 1, onVacation: 0, outOfStock: 3 })
+    expect(await getSellerListingSummary("cadu")).toEqual({ total: 0, active: 0, paused: 0, onVacation: 0, outOfStock: 0 })
+  })
+
+  it("anúncio em férias conta como pausado (e como em férias), nunca como ativo nem sem estoque", async () => {
+    await addListing({ seller: "ana" })
+    await addListing({ seller: "ana", status: "pausado" })
+    await addListing({ seller: "ana", status: "ferias", stock: 0 })
+    await addListing({ seller: "ana", status: "ferias" })
+    expect(await getSellerListingSummary("ana")).toEqual({ total: 4, active: 1, paused: 3, onVacation: 2, outOfStock: 0 })
+  })
+
+  it("o filtro 'pausado' da lista também mostra os em férias", async () => {
+    await addProduct({ title: "Ativo" })
+    await addProduct({ title: "Pausado a mão", status: "pausado" })
+    await addProduct({ title: "Em férias", status: "ferias" })
+    const paused = await getSellerProductsPage("ana", { status: "pausado", page: 1 })
+    expect(paused.products.map((p) => p.title).sort()).toEqual(["Em férias", "Pausado a mão"])
+    expect((await getSellerProductsPage("ana", { status: "ativo", page: 1 })).products.map((p) => p.title)).toEqual(["Ativo"])
+  })
+
+  it("a lista traz a contagem de fotos de cada anúncio", async () => {
+    const a = await addProduct({ title: "Com fotos" })
+    await addImage(a, "https://blob/1.webp", 1)
+    await addImage(a, "https://blob/2.webp", 2)
+    await addProduct({ title: "Sem fotos" })
+    const byTitle = Object.fromEntries((await getSellerProductsPage("ana", { page: 1 })).products.map((p) => [p.title, p.imageCount]))
+    expect(byTitle).toEqual({ "Com fotos": 2, "Sem fotos": 0 })
   })
 })
 
