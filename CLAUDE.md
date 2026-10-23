@@ -60,8 +60,10 @@ the platform and only released to the seller after delivery is confirmed.
   settings from a `pnpm` key in `package.json` at all (confirmed directly: a `pnpm.overrides`
   block once broke the Vercel build silently, and later a `pnpm.onlyBuiltDependencies` addition
   was silently ignored too) — that config now lives in `pnpm-workspace.yaml` instead
-  (`allowBuilds:` there gates native postinstall scripts, e.g. `esbuild`). Don't add a `pnpm` key
-  to `package.json` expecting it to do anything.
+  (`allowBuilds:` there gates native postinstall scripts, e.g. `esbuild`; `overrides:` there lifts a transitive dependency a parent pinned to a version `pnpm audit` flags, currently `vite` and `zod`,
+  written as `"pkg@<fixed": "^latest"` so it stops applying by itself once the parent catches up). Don't add a `pnpm` key
+  to `package.json` expecting it to do anything. When CI's audit step turns red with nothing changed on our side, a new advisory was published: look at `pnpm audit --prod` (Next.js advisories are the ones to move on first, the site runs
+  its image optimizer and Server Actions publicly), bump with Dependabot's PR or `pnpm up <pkg> --depth Infinity`, and use an override only for what a parent pins.
 
 ### Database changes
 
