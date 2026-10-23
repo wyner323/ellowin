@@ -1,3 +1,9 @@
+# Só sobem uma dependência de uma dependência que um pai fixou numa versão com falha conhecida
+# (pnpm audit): o override deixa de valer sozinho quando a versão resolvida já é a corrigida.
+overrides:
+  "vite@<8.3.3": "^8.3.5"
+  "zod@<4.6.6": "^4.6.7"
+
 allowBuilds:
   esbuild: true
   msw: false
