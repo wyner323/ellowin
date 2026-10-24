@@ -3,6 +3,7 @@
 overrides:
   "vite@<8.3.3": "^8.3.5"
   "zod@<4.6.6": "^4.6.7"
+  "undici@>=6.23.0 <6.29.1": "^6.29.1"
 
 allowBuilds:
   esbuild: true
