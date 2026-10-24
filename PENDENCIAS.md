@@ -63,6 +63,15 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
   (ele mostra o banco de destino e pede a confirmação digitando "sim"). Depois, as visitas começam a ser contadas a partir da próxima abertura de anúncio.
   A tabela é só de contadores; se quiser mencionar isso nos `/termos` ou na política de privacidade, é decisão sua (não é dado pessoal).
 
+- [ ] **Ligar a entrega automática (estoque de itens cifrados).** O código já está no ar, mas a opção "Automática" só aparece para o vendedor quando as duas coisas abaixo existem; sem elas o site segue
+  como hoje, com entrega manual. Ordem:
+  1. Definir `DELIVERY_ENCRYPTION_KEY` na Vercel (item de segurança acima) e rodar `node scripts/encrypt-delivery-payloads.mjs` para cifrar os dados de entrega antigos. **Guarde uma cópia da chave fora da Vercel:**
+     se ela se perder, os itens cadastrados no estoque não podem mais ser lidos.
+  2. `pnpm db:migrate` (a migração 0011 cria a tabela do estoque e **converte os anúncios "automáticos" antigos para entrega manual com prazo de 24 horas**: eles só tinham o rótulo, o vendedor entregava à mão e o pedido
+     nascia sem prazo, então nunca era reembolsado por atraso). Se quiser saber quantos serão convertidos antes, peça que eu conte (só leitura).
+  Depois disso, vendedores aprovados de **gift cards e contas** podem escolher "Automática" no anúncio e cadastrar os itens em Meus anúncios → Estoque. Qualquer vendedor aprovado pode usar (sem trava de vendas);
+  vale acompanhar a taxa de disputa dos vendedores automáticos. Desenho completo: `docs/entrega-automatica.md`.
+
 ## 2. Dados de demonstração no banco de produção
 
 - [ ] **Corrigir as vendas inflamadas dos anúncios de exemplo 1 a 6.** O Claude foi impedido de escrever no banco de

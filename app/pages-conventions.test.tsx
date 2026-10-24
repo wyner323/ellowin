@@ -87,6 +87,7 @@ import PainelPerguntasPage from "@/app/painel/vendedor/perguntas/page"
 import PainelProdutosPage from "@/app/painel/vendedor/produtos/page"
 import PainelProdutoPage from "@/app/painel/vendedor/produtos/[id]/page"
 import PainelNovoProdutoPage from "@/app/painel/vendedor/produtos/novo/page"
+import PainelEstoquePage from "@/app/painel/vendedor/produtos/[id]/estoque/page"
 import PainelVendasPage from "@/app/painel/vendedor/vendas/page"
 import AdminLayout from "@/app/admin/layout"
 import AdminDisputasPage from "@/app/admin/disputas/page"
@@ -197,6 +198,7 @@ const screens: Screen[] = [
   { name: "painel: meus anúncios", as: "ana", render: () => PainelProdutosPage(sp({})) },
   { name: "painel: editar anúncio", as: "ana", render: () => PainelProdutoPage(params({ id: String(ids.product) })) },
   { name: "painel: novo anúncio", as: "ana", render: () => PainelNovoProdutoPage(sp({})) },
+  { name: "painel: estoque do anúncio", as: "ana", render: () => PainelEstoquePage(params({ id: String(ids.product) })) },
   { name: "painel: vendas", as: "ana", render: () => PainelVendasPage(sp({})) },
   // moderação (dentro do layout, que traz o <main>)
   { name: "moderação: fila de disputas", as: "adm", admin: true, render: () => AdminDisputasPage(sp({})) },

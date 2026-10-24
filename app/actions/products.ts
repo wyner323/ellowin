@@ -19,7 +19,12 @@ import { parseToCents } from "@/lib/money"
 import { slugifyGame } from "@/lib/product-catalog"
 import { getCategory } from "@/lib/catalog"
 import { accountBlock, getUserId } from "@/lib/session"
+import { allowsAutoDelivery } from "@/lib/delivery-stock-lines"
+import { autoDeliveryAvailable, availableStockInProduct } from "@/lib/delivery-stock"
 import type { ActionResult } from "@/app/actions/auth"
+
+const AUTO_CATEGORY_ERROR = "A entrega automática só está disponível para gift cards e contas."
+const AUTO_UNAVAILABLE_ERROR = "A entrega automática ainda não está disponível. Use a entrega manual por enquanto."
 
 const MAX_IMAGES = 5
 
@@ -271,6 +276,12 @@ export async function createProduct(input: {
   const { error, parsed } = validateVariants(input.variants)
   if (error || !parsed) return { ok: false, field: "variants", error: error ?? undefined }
 
+  const automatic = input.deliveryType === "automatica"
+  if (automatic) {
+    if (!allowsAutoDelivery(input.categorySlug)) return { ok: false, field: "deliveryType", error: AUTO_CATEGORY_ERROR }
+    if (!(await autoDeliveryAvailable())) return { ok: false, field: "deliveryType", error: AUTO_UNAVAILABLE_ERROR }
+  }
+
   const slug = await uniqueSlug(slugify(title))
   const delivery = normalizeDelivery(input.deliveryType, input.deliveryTime)
   const accountOrigin = normalizeAccountOrigin(input.categorySlug, input.accountOrigin)
@@ -296,7 +307,8 @@ export async function createProduct(input: {
       productId: created.id,
       label: v.label,
       priceCents: v.priceCents,
-      stock: v.stock,
+      // Anúncio automático: o estoque é o número de itens cadastrados (começa em zero), nunca o que o formulário diz.
+      stock: automatic ? 0 : v.stock,
       deliveryNote: v.deliveryNote,
       sortOrder: i,
     })),
@@ -313,7 +325,11 @@ export async function createProduct(input: {
 
   pingIndexNow([`/produtos/${slug}`, `/catalogo/${input.categorySlug}`, ...(input.game.trim() ? [`/jogos/${slugifyGame(input.game.trim())}`] : [])])
 
-  return { ok: true, message: "Anúncio publicado.", slug }
+  return {
+    ok: true,
+    message: automatic ? "Anúncio publicado. Cadastre os itens do estoque para ele entrar à venda." : "Anúncio publicado.",
+    slug,
+  }
 }
 
 export async function updateProduct(input: {
@@ -337,6 +353,7 @@ export async function updateProduct(input: {
       slug: product.slug,
       categorySlug: product.categorySlug,
       deliveryTime: product.deliveryTime,
+      deliveryType: product.deliveryType,
     })
     .from(product)
     .where(and(eq(product.id, input.productId), eq(product.sellerId, userId)))
@@ -382,6 +399,22 @@ export async function updateProduct(input: {
   const { error, parsed } = validateVariants(input.variants)
   if (error || !parsed) return { ok: false, field: "variants", error: error ?? undefined }
 
+  // Entrega automática (docs/entrega-automatica.md): só nas categorias que aceitam, só ligada com a chave e a tabela
+  // presentes, e o estoque dos itens é derivado dos itens cadastrados, nunca do formulário.
+  const wasAutomatic = owned.deliveryType === "automatica"
+  const automatic = input.deliveryType === "automatica"
+  if (automatic) {
+    if (!allowsAutoDelivery(input.categorySlug)) return { ok: false, field: "deliveryType", error: AUTO_CATEGORY_ERROR }
+    if (!wasAutomatic && !(await autoDeliveryAvailable())) return { ok: false, field: "deliveryType", error: AUTO_UNAVAILABLE_ERROR }
+  }
+  if (wasAutomatic && !automatic && (await availableStockInProduct(owned.id)) > 0) {
+    return {
+      ok: false,
+      field: "deliveryType",
+      error: "Apague os itens do estoque (aba Estoque do anúncio) antes de mudar para entrega manual.",
+    }
+  }
+
   const delivery = normalizeDelivery(input.deliveryType, input.deliveryTime)
   const accountOrigin = normalizeAccountOrigin(input.categorySlug, input.accountOrigin)
 
@@ -411,7 +444,7 @@ export async function updateProduct(input: {
         .set({
           label: data.label,
           priceCents: data.priceCents,
-          stock: data.stock,
+          ...(automatic ? {} : { stock: data.stock }),
           deliveryNote: data.deliveryNote,
           sortOrder: i,
           active: true,
@@ -429,13 +462,18 @@ export async function updateProduct(input: {
         productId: owned.id,
         label: data.label,
         priceCents: data.priceCents,
-        stock: data.stock,
+        stock: automatic ? 0 : data.stock,
         deliveryNote: data.deliveryNote,
         sortOrder: i,
       })
       .returning({ id: productVariant.id })
 
     keptIds.push(inserted.id)
+  }
+
+  // Passou de manual para automático: o estoque manual deixa de valer (ainda não há itens cadastrados).
+  if (automatic && !wasAutomatic) {
+    await db.update(productVariant).set({ stock: 0 }).where(eq(productVariant.productId, owned.id))
   }
 
   // Variantes removidas na edição são desativadas, não apagadas: pedidos

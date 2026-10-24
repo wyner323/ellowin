@@ -24,6 +24,8 @@ const SENSITIVE_KEYS = [
   "senha",
   "pixkey",
   "deliverypayload",
+  // Estoque de entrega automática: o conteúdo dos itens (códigos, logins) nunca sai do processo.
+  "payload",
   "token",
   "secret",
   "authorization",

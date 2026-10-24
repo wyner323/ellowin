@@ -1,7 +1,9 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { createTestDb, type TestDb } from "@/lib/test-db"
 import { htmlToText, renderHtml } from "@/lib/test-render"
-import { encryptField } from "@/lib/secret-box"
+import { encryptField, hashField } from "@/lib/secret-box"
+import { maskStockItem } from "@/lib/delivery-stock-lines"
+import PainelEstoquePage from "@/app/painel/vendedor/produtos/[id]/estoque/page"
 import { creditAvailable, withTransaction } from "@/lib/wallet"
 
 /**
@@ -414,6 +416,58 @@ describe("painel do vendedor", () => {
     const t3 = await txt(MeusProdutosPage({ searchParams: Promise.resolve({}) }))
     expect(t3).toContain("Visitas (30d)")
     expect(t3).toContain("42")
+  })
+
+  describe("estoque de entrega automática", () => {
+    const addItem = async (payload: string) => {
+      await t.query(
+        `INSERT INTO "delivery_stock_item" ("variantId", "sellerId", "payload", "payloadHash", "mask") VALUES ($1, 'ana', $2, $3, $4)`,
+        [variantId, encryptField(payload, `stock:${variantId}`), hashField(payload, `stock:${variantId}`), maskStockItem(payload)],
+      )
+    }
+
+    it("exige login e só abre para o dono", async () => {
+      as(null)
+      await expect(PainelEstoquePage(props({ id: String(productId) }))).rejects.toThrow()
+      as("outro")
+      await expect(PainelEstoquePage(props({ id: String(productId) }))).rejects.toThrow()
+    })
+
+    it("anúncio manual explica que não tem estoque de itens", async () => {
+      as("ana")
+      const page = await txt(PainelEstoquePage(props({ id: String(productId) })))
+      expect(page).toContain("entrega manual")
+      expect(page).not.toContain("Cadastrar itens")
+    })
+
+    it("anúncio automático mostra contagem e só a máscara dos itens, nunca o conteúdo", async () => {
+      as("ana")
+      await t.query(`UPDATE "product" SET "deliveryType" = 'automatica', "categorySlug" = 'gift-cards' WHERE "id" = $1`, [productId])
+      await addItem("GIFT-AAAA-1111-ZZ")
+      await addItem("GIFT-BBBB-2222-YY")
+      const page = await txt(PainelEstoquePage(props({ id: String(productId) })))
+      expect(page).toContain("Cadastrar itens")
+      expect(page).toContain("GI••••ZZ")
+      expect(page).toContain("GI••••YY")
+      expect(page).not.toContain("GIFT-AAAA-1111-ZZ")
+      expect(page).not.toContain("enc:v1:")
+      expect(page).toMatch(/2\s+disponíveis/)
+    })
+
+    it("sem a chave de cifra avisa que o cadastro está desligado", async () => {
+      as("ana")
+      await t.query(`UPDATE "product" SET "deliveryType" = 'automatica', "categorySlug" = 'gift-cards' WHERE "id" = $1`, [productId])
+      delete process.env.DELIVERY_ENCRYPTION_KEY
+      const page = await txt(PainelEstoquePage(props({ id: String(productId) })))
+      expect(page).toContain("armazenamento seguro")
+    })
+
+    it("o cartão do anúncio automático em Meus anúncios traz o atalho para o estoque", async () => {
+      as("ana")
+      await t.query(`UPDATE "product" SET "deliveryType" = 'automatica', "categorySlug" = 'gift-cards' WHERE "id" = $1`, [productId])
+      const page = await render(MeusProdutosPage({ searchParams: Promise.resolve({}) }))
+      expect(page).toContain(`/painel/vendedor/produtos/${productId}/estoque`)
+    })
   })
 
   it("meus anúncios: nota de qualidade com a dica principal e convite para o modo férias", async () => {

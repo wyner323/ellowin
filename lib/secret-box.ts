@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto"
+import { createCipheriv, createDecipheriv, createHmac, randomBytes } from "node:crypto"
 import * as Sentry from "@sentry/nextjs"
 
 /**
@@ -30,6 +30,21 @@ function key(): Buffer | null {
 
 export function isEncrypted(value: string) {
   return value.startsWith(PREFIX)
+}
+
+/** A chave de entrega está configurada? O estoque de entrega automática só existe com ela (nunca em texto puro). */
+export function hasEncryptionKey() {
+  return key() !== null
+}
+
+/**
+ * Impressão digital do valor (HMAC-SHA256 com a chave de entrega, mais o contexto): serve para barrar item repetido no
+ * estoque sem guardar nada legível e sem permitir testar palpites contra o banco. Exige a chave.
+ */
+export function hashField(plain: string, context: string): string {
+  const k = key()
+  if (!k) throw new Error("DELIVERY_ENCRYPTION_KEY não está configurada")
+  return createHmac("sha256", k).update(context).update("\0").update(plain).digest("hex")
 }
 
 let warnedPlaintext = false

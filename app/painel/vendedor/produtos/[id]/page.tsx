@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/site-footer"
 import { ProductForm } from "@/components/seller/product-form"
 import { SellerTabs } from "@/components/seller/seller-tabs"
 import { Button } from "@/components/ui/button"
+import { autoDeliveryAvailable } from "@/lib/delivery-stock"
 import { getProductForSeller, getSellerUnansweredQuestionsCount } from "@/lib/marketplace"
 import { getSession } from "@/lib/session"
 
@@ -26,9 +27,10 @@ export default async function EditarProdutoPage({
   const session = await getSession()
   if (!session?.user) redirect("/entrar")
 
-  const [product, pendingQuestions] = await Promise.all([
+  const [product, pendingQuestions, autoDelivery] = await Promise.all([
     getProductForSeller(session.user.id, productId),
     getSellerUnansweredQuestionsCount(session.user.id),
+    autoDeliveryAvailable(),
   ])
   if (!product) notFound()
 
@@ -58,7 +60,7 @@ export default async function EditarProdutoPage({
             </p>
           </header>
 
-          <ProductForm product={product} />
+          <ProductForm product={product} autoDelivery={autoDelivery} />
         </div>
       </main>
 

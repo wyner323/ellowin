@@ -34,6 +34,8 @@ export type OrderContext = {
   outcome?: "comprador" | "vendedor"
   /** Quem cancelou, só em order_cancelled. */
   cancelledBy?: "comprador" | "vendedor"
+  /** Só em order_created: o item já foi entregue na compra (entrega automática). */
+  automatic?: boolean
 }
 
 export type Message = {
@@ -56,6 +58,27 @@ export function composeOrderMessages(kind: OrderNotifyKind, c: OrderContext): Me
 
   switch (kind) {
     case "order_created":
+      // Entrega automática: o item foi entregue na própria compra, então ninguém precisa "entregar" nem esperar.
+      if (c.automatic) {
+        return [
+          {
+            recipient: "seller",
+            subject: `Nova venda: ${c.productTitle}`,
+            title: "Você tem uma venda nova",
+            intro: `${c.buyerName} comprou ${order(c)}. A entrega já foi feita automaticamente com um item do seu estoque. O valor (${net} para você, já descontada a taxa) está em custódia e é liberado depois que ele confirmar o recebimento.`,
+            buttonLabel: "Ver o pedido",
+            path,
+          },
+          {
+            recipient: "buyer",
+            subject: `Compra realizada: ${c.productTitle}`,
+            title: "Seu pedido já foi entregue",
+            intro: `Você comprou ${order(c)} por ${money} e os dados já estão dentro do pedido no site (por segurança, não vão por email). O valor fica em custódia e só chega ao vendedor depois que você confirmar o recebimento. Confira se está tudo certo e confirme; se algo estiver errado, abra uma disputa antes de confirmar.`,
+            buttonLabel: "Abrir o pedido",
+            path,
+          },
+        ]
+      }
       return [
         {
           recipient: "seller",

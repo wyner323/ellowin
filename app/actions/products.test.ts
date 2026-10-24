@@ -223,8 +223,14 @@ describe("createProduct: o que é gravado", () => {
 
 describe("createProduct: entrega", () => {
   it("entrega automática sempre vira 'imediata', mesmo que o cliente mande outro prazo", async () => {
-    const { id } = await create({ deliveryType: "automatica", deliveryTime: "Até 72 horas" })
-    expect(await productRow(id)).toMatchObject({ deliveryType: "automatica", deliveryTime: INSTANT_DELIVERY_TIME })
+    // A opção só liga com a chave de cifra do estoque (e só em gift card/conta): ver app/actions/auto-delivery.test.ts.
+    vi.stubEnv("DELIVERY_ENCRYPTION_KEY", Buffer.alloc(32, 7).toString("base64"))
+    try {
+      const { id } = await create({ deliveryType: "automatica", deliveryTime: "Até 72 horas", categorySlug: "gift-cards" })
+      expect(await productRow(id)).toMatchObject({ deliveryType: "automatica", deliveryTime: INSTANT_DELIVERY_TIME })
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it("tipo de entrega desconhecido cai em manual", async () => {

@@ -11,6 +11,7 @@ import {
   MAX_CHAT_MESSAGES_PER_HOUR,
   MAX_CHAT_MESSAGES_PER_THREAD,
 } from "@/lib/chat-limits"
+import { claimStockItem, stockTableExistsIn, syncStock } from "@/lib/delivery-stock"
 import { getOrderMessages } from "@/lib/orders"
 import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, formatCents, splitOrderAmount } from "@/lib/money"
@@ -77,7 +78,7 @@ export async function purchase(
     }
 
   try {
-    const orderId = await withTransaction(async (client) => {
+    const { orderId, automatic } = await withTransaction(async (client) => {
       const { rows } = await client.query<{
         id: number
         productId: number
@@ -156,15 +157,51 @@ export async function purchase(
         [variant.id],
       )
 
-      return newOrderId
+      // Entrega automática (docs/entrega-automatica.md): o item do estoque é reservado e entregue AQUI, na mesma
+      // transação que moveu o dinheiro para a custódia. Sem item disponível a compra inteira desfaz, mesmo que o
+      // campo `stock` diga que há: vender o que não se pode entregar fica impossível.
+      // Enquanto a migração 0011 não foi aplicada (sem a tabela do estoque) um anúncio "automático" antigo segue o fluxo
+      // de antes (aguardando entrega, o vendedor entrega à mão) em vez de parar de vender; a migração converte esses anúncios.
+      const automatic = variant.deliveryType === "automatica" && (await stockTableExistsIn(client))
+      if (automatic) {
+        const plain = await claimStockItem(client, variant.id, newOrderId)
+        if (plain === null) throw new PurchaseError("Item esgotado.")
+        const deliveredAt = new Date()
+        await client.query(
+          `UPDATE "order"
+              SET "status" = 'entregue', "deliveryPayload" = $2, "deliveredAt" = $3, "autoReleaseAt" = $4
+            WHERE "id" = $1 AND "status" = 'aguardando_entrega'`,
+          [
+            newOrderId,
+            encryptField(plain, `order:${newOrderId}`),
+            deliveredAt,
+            new Date(deliveredAt.getTime() + AUTO_RELEASE_DAYS * 24 * 60 * 60 * 1000),
+          ],
+        )
+        await client.query(
+          `INSERT INTO "order_message" ("orderId", "authorRole", "body") VALUES ($1, 'system', $2)`,
+          [newOrderId, "Entrega automática: os dados foram entregues no momento da compra."],
+        )
+        await syncStock(client, variant.id)
+      }
+
+      return { orderId: newOrderId, automatic }
     })
 
-    notifyOrder("order_created", orderId)
+    // Um único aviso para entrega automática (o texto já diz que foi entregue): não manda também "pedido entregue".
+    notifyOrder("order_created", orderId, { automatic })
 
     revalidatePath("/pedidos")
     revalidatePath("/carteira")
+    if (automatic) revalidatePath("/painel/vendedor/vendas")
 
-    return { ok: true, message: "Compra realizada. O valor ficou em custódia.", orderId }
+    return {
+      ok: true,
+      message: automatic
+        ? "Compra realizada. Os dados da entrega já estão no pedido e o valor ficou em custódia."
+        : "Compra realizada. O valor ficou em custódia.",
+      orderId,
+    }
   } catch (error) {
     // Só as recusas esperadas chegam ao comprador com o texto original; erro do banco ou da carteira
     // (nome de tabela, constraint) vai para o Sentry e a tela recebe uma mensagem genérica.

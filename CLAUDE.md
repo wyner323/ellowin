@@ -24,7 +24,7 @@ the platform and only released to the seller after delivery is confirmed.
   need a database use `lib/test-db.ts`: an in-memory Postgres (PGlite, WASM) that applies the real
   `drizzle/*.sql` migrations (UTC time zone, like Neon), no network. A test file swaps the app's
   `@/lib/db` for it with `vi.mock` (see `lib/wallet.test.ts` / `lib/sla-sweeps.test.ts`). These cover
-  the escrow primitives, double-settlement guards, the 10 reconciliation checks, the three SLA sweeps
+  the escrow primitives, double-settlement guards, the 12 reconciliation checks, the three SLA sweeps
   and the server actions for orders, disputes, the wallet, listings, account/login, "Minha conta" + LGPD
   deletion, seller onboarding, reports and admin/roles (`app/actions/{orders,disputes,wallet,products,auth,account,seller,reports,admin}.test.ts`:
   real `lib/session.ts`/`lib/roles.ts` over a faked `@/lib/auth` session, with `next/cache`, `next/headers`,
@@ -235,10 +235,27 @@ Monthly goal: `seller_goal` table (migration 0010, one row per seller; deliberat
 Listing quality: `listingQuality()` (`lib/listing-quality.ts`, pure) scores a published listing 0–100 (photos 30, description 30, title 20, game 10, game-specific details 10) and returns the tips for what is missing; "Meus anúncios" shows it per card. It is guidance for the seller only: nothing in search or the storefront uses it, so never describe it as a ranking. Vacation mode: `setStoreVacation` (`app/actions/vacation.ts`, 10/h, approved sellers; coming back needs a confirmed email) moves ALL active listings to `product.status = "ferias"` (`VACATION_STATUS`, `lib/store-vacation.ts`) and back to "ativo" only the ones in "ferias", so listings the seller paused by hand stay paused. No migration: `status` is free text and every public reader requires `= 'ativo'`, so "ferias" is hidden like "pausado"; in the seller panel "paused" means `status <> 'ativo'` (summary count and the `?status=pausado` filter). A NEW public reader must keep filtering by `= 'ativo'`, never by `<> 'pausado'`. The SLA sweeps still run on the panel/orders pages on purpose: the GitHub cron has been red (CRON_SECRET), so they are the only thing guaranteeing release/refund by deadline; do not move them out of page load until the cron is proven green.
 `/painel/vendedor/vendas/exportar` (GET, seller only, 10/h) returns a spreadsheet CSV (`lib/csv.ts`: `;` separator, comma decimals, BOM, formula-injection neutralized, public buyer names only, max 5000 rows).
 
+### Automatic delivery (stock of encrypted items)
+
+Design and decisions in `docs/entrega-automatica.md`. A listing with `deliveryType = "automatica"` (only categories `gift-cards` and `contas`, `allowsAutoDelivery` in `lib/delivery-stock-lines.ts`; any approved
+seller, no sales gate) sells items from `delivery_stock_item` (migration 0011): one code/key/login per row, `payload` encrypted with `stock:<variantId>` as AAD, `payloadHash` an HMAC (`hashField`, needs the key) that
+refuses the same item twice, even after it was sold, and `mask` the only thing the panel ever shows. `purchase` (`app/actions/orders.ts`) claims the oldest available item INSIDE the same transaction that moves the money
+(`claimStockItem`, `FOR UPDATE SKIP LOCKED`), moves the content to `order.deliveryPayload` re-encrypted for `order:<id>` (the stock row's `payload` becomes NULL: the secret never lives in two places; a CHECK ties
+`payload IS NULL` to `orderId IS NOT NULL`) and writes the order already as `entregue` with the usual `autoReleaseAt`. No item to claim → `PurchaseError("Item esgotado.")`, whatever `stock` says: selling what cannot be
+delivered is impossible by construction. A sold item NEVER returns to stock (the code was shown); cancel/late-refund only apply to `aguardando_entrega`, which an automatic order never is.
+`product_variant.stock` of an automatic listing is DERIVED (= available items, `syncStock`): `createProduct` starts it at 0, `updateProduct` never writes the form's stock for an automatic listing, and going back to manual is refused
+while available items exist. Seller side: `app/actions/delivery-stock.ts` (`addStock`/`removeStock`, 30 adds/h, ≤ 500 lines per send, ≤ 10,000 available per variant), page `/painel/vendedor/produtos/[id]/estoque`
+(`components/seller/stock-manager.tsx`). **The option is OFF until `autoDeliveryAvailable()`** (key configured AND table exists): without them the form hides "Automática", `createProduct`/`updateProduct` refuse it and `addStock`
+refuses to store anything (never plaintext codes). Readers of the new table tolerate the missing migration (`isMissingStockTable`, `to_regclass`), the same way the seller analytics do. Anonymizing an account deletes its still-available
+items (`purgeAvailableStock`). The order_created email for an automatic order says "já foi entregue" (one email; `notifyOrder(..., { automatic })`). Sentry scrubbing redacts any `payload` key.
+A migration 0011 data step turns pre-existing "automatic" listings into manual ones with the 24 h deadline (they were only a label and their orders had no deadline, so late delivery was never refunded). Until that migration runs
+(`stockTableExistsIn` false), `purchase` treats an old "automatic" listing like before (awaiting delivery, seller delivers by hand) instead of refusing the sale.
+
 ### Wallet reconciliation
 
-`lib/reconcile.ts` (read-only, 10 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =
-deposits − withdrawals − fees, no negatives) runs at the end of every `/api/cron/sla` call and on `/admin/conferencia` (admin only). If
+`lib/reconcile.ts` (read-only, 12 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =
+deposits − withdrawals − fees, no negatives, and the two stock checks: a sold stock item points at a delivered order of the same variant; an automatic variant's `stock` equals its available items; those two are skipped when
+the 0011 table does not exist yet) runs at the end of every `/api/cron/sla` call and on `/admin/conferencia` (admin only). If
 anything fails, `lib/reconcile-alert.ts` logs it and emails the admins at most once a day per set of problems. Orders 1–5 are legacy
 demo seed (seller credited with no buyer debit) and are accounted for by `LEGACY_SEED_ORDER_IDS`; any new inconsistency is real.
 When you add a new wallet `kind` or a new way money moves, update the checks.
@@ -359,7 +376,7 @@ listing counts from `lib/marketplace.ts`.
 ### Delivery time is a closed set, not free text
 
 `lib/delivery.ts` defines the fixed delivery windows (`DELIVERY_TIME_OPTIONS`) and the sentinel
-`INSTANT_DELIVERY_TIME` for automatic delivery. `app/actions/products.ts` re-normalizes
+`INSTANT_DELIVERY_TIME` for automatic delivery (which is real now: see "Automatic delivery" above). `app/actions/products.ts` re-normalizes
 `deliveryType`/`deliveryTime` server-side on every write (`normalizeDelivery`) — never trust a
 client-sent `deliveryTime` for an "automatica" product, it must always collapse to
 `INSTANT_DELIVERY_TIME`. This exists specifically so a future auto-refund-on-late-delivery sweep

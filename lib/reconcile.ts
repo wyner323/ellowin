@@ -18,7 +18,8 @@ export type ReconciliationReport = {
   findings: Finding[]
 }
 
-type Check = { key: string; description: string; sql: string; params?: unknown[] }
+/** `optionalTable`: lê uma tabela de migração recente; se ela ainda não existe (42P01), a verificação é pulada em vez de falhar. */
+type Check = { key: string; description: string; sql: string; params?: unknown[]; optionalTable?: boolean }
 
 /**
  * Pedidos de demonstração (dados semeados em 2026-07/08, antes do escrow existir)
@@ -134,13 +135,44 @@ const CHECKS: Check[] = [
     description: "Carteira com saldo ou custódia negativos",
     sql: `SELECT "userId", "availableCents", "heldCents" FROM "wallet" WHERE "availableCents" < 0 OR "heldCents" < 0 LIMIT 20`,
   },
+  {
+    // Entrega automática: um item vendido tem de apontar para um pedido que existe, já entregue e do mesmo item do anúncio.
+    key: "estoque_vendido_sem_pedido_valido",
+    description: "Item de entrega automática marcado como vendido sem um pedido entregue do mesmo item do anúncio",
+    optionalTable: true,
+    sql: `SELECT i."id" AS "itemDoEstoque", i."orderId" AS "pedido", o."status"
+            FROM "delivery_stock_item" i LEFT JOIN "order" o ON o."id" = i."orderId"
+           WHERE i."orderId" IS NOT NULL
+             AND (o."id" IS NULL OR o."status" = 'aguardando_entrega' OR o."variantId" <> i."variantId")
+           LIMIT 20`,
+  },
+  {
+    // Entrega automática: o estoque do item do anúncio é derivado; se divergir dos itens disponíveis, a vitrine mente.
+    key: "estoque_automatico_divergente",
+    description: "Item de anúncio de entrega automática com estoque diferente do número de itens disponíveis",
+    optionalTable: true,
+    sql: `SELECT v."id" AS "itemDoAnuncio", v."stock" AS "estoque", d.n AS "disponiveis"
+            FROM "product_variant" v
+            JOIN "product" p ON p."id" = v."productId"
+            CROSS JOIN LATERAL (
+              SELECT count(*)::int AS n FROM "delivery_stock_item" i WHERE i."variantId" = v."id" AND i."orderId" IS NULL
+            ) d
+           WHERE p."deliveryType" = 'automatica' AND v."stock" <> d.n
+           LIMIT 20`,
+  },
 ]
 
 export async function runWalletReconciliation(): Promise<ReconciliationReport> {
   const findings: Finding[] = []
 
   for (const check of CHECKS) {
-    const { rows } = await pool.query(check.sql, check.params)
+    let rows: Record<string, unknown>[]
+    try {
+      rows = (await pool.query(check.sql, check.params)).rows
+    } catch (error) {
+      if (check.optionalTable && (error as { code?: string }).code === "42P01") continue
+      throw error
+    }
     if (rows.length > 0) findings.push({ check: check.key, description: check.description, rows })
   }
 

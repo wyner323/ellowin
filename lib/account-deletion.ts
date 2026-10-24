@@ -1,5 +1,6 @@
 import { and, eq, inArray, or, sql } from "drizzle-orm"
 import { db, pool } from "@/lib/db"
+import { purgeAvailableStock } from "@/lib/delivery-stock"
 import { order, product, user, wallet } from "@/lib/db/schema"
 
 /**
@@ -105,6 +106,9 @@ export async function anonymizeAccount(userId: string): Promise<void> {
       `UPDATE "profile" SET "phone" = NULL, "phoneVerified" = false, "updatedAt" = now() WHERE "userId" = $1`,
       [userId],
     )
+
+    // Itens de entrega automática ainda não vendidos são segredos do vendedor, sem prazo de retenção: apagam junto.
+    await purgeAvailableStock(client, userId)
 
     // Login fica impossível: sem sessão e sem credencial (senha) ou vínculo social.
     await client.query(`DELETE FROM "session" WHERE "userId" = $1`, [userId])

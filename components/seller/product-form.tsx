@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   AlignLeft,
@@ -32,6 +33,7 @@ import {
   INSTANT_DELIVERY_TIME,
 } from "@/lib/delivery"
 import { ACCOUNT_ORIGIN_OPTIONS } from "@/lib/account-origin"
+import { allowsAutoDelivery } from "@/lib/delivery-stock-lines"
 import { attributeFieldsFor } from "@/lib/game-attributes"
 import {
   MAX_DESCRIPTION,
@@ -64,8 +66,11 @@ const EMPTY_ROW: Row = { label: "", price: "", stock: "1", deliveryNote: "" }
 export function ProductForm({
   product,
   defaultGame,
+  autoDelivery = false,
 }: {
   defaultGame?: string
+  /** a entrega automática pode ser ligada agora (chave de cifra e tabela do estoque presentes) */
+  autoDelivery?: boolean
   product?: {
     id: number
     title: string
@@ -129,10 +134,26 @@ export function ProductForm({
     setCategorySlug(selection.categorySlug)
     setGame(selection.game)
     setTitle(selection.title)
-    setDeliveryType(selection.deliveryType)
-    setDeliveryTime(selection.deliveryTime)
+    // A sugestão pode trazer entrega automática; só vale se a plataforma pode entregar (senão o anúncio nasce manual).
+    const suggestsAuto = selection.deliveryType === "automatica"
+    const keepAuto = suggestsAuto && autoDelivery && allowsAutoDelivery(selection.categorySlug)
+    setDeliveryType(keepAuto || !suggestsAuto ? selection.deliveryType : "manual")
+    setDeliveryTime(keepAuto || !suggestsAuto ? selection.deliveryTime : DEFAULT_MANUAL_DELIVERY_TIME)
     setRows(selection.variants.map((label) => ({ label, price: "", stock: "1", deliveryNote: "" })))
     setPickerResolved(true)
+  }
+
+  // Automática: só em gift cards e contas, e só quando a plataforma pode guardar o estoque (um anúncio que já é
+  // automático continua mostrando a opção, para o vendedor poder voltar para manual).
+  const wasAutomatic = product?.deliveryType === "automatica"
+  const categoryAllowsAuto = allowsAutoDelivery(categorySlug)
+  const autoOffered = (autoDelivery || wasAutomatic) && categoryAllowsAuto
+  const automatic = deliveryType === "automatica"
+
+  function changeCategory(value: string) {
+    setCategorySlug(value)
+    // Trocar para uma categoria que não aceita entrega automática volta o anúncio para manual.
+    if (deliveryType === "automatica" && !allowsAutoDelivery(value)) changeDeliveryType("manual")
   }
 
   function changeDeliveryType(value: string) {
@@ -216,12 +237,16 @@ export function ProductForm({
       description: "Você entrega os dados no chat do pedido, dentro do prazo que escolher.",
       icon: Handshake,
     },
-    {
-      value: "automatica",
-      label: "Automática",
-      description: "Entrega imediata, sem prazo — o comprador recebe assim que paga.",
-      icon: Zap,
-    },
+    ...(autoOffered
+      ? [
+          {
+            value: "automatica",
+            label: "Automática",
+            description: "Você cadastra os itens (códigos, chaves ou logins) e a plataforma entrega um na hora da compra.",
+            icon: Zap,
+          },
+        ]
+      : []),
   ]
 
   // Anúncios antigos podem ter um prazo em texto livre que não é mais uma opção —
@@ -289,7 +314,7 @@ export function ProductForm({
               name="category"
               legend="Categoria do anúncio"
               value={categorySlug}
-              onChange={setCategorySlug}
+              onChange={changeCategory}
               options={CATEGORIES}
               columns={2}
               disabled={pending}
@@ -400,6 +425,27 @@ export function ProductForm({
             disabled={pending}
           />
 
+          {!autoOffered && categorySlug ? (
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {categoryAllowsAuto
+                ? "A entrega automática ainda não está disponível na plataforma."
+                : "A entrega automática está disponível para gift cards e contas."}
+            </p>
+          ) : null}
+
+          {automatic ? (
+            <p className="rounded-xl border border-border bg-muted/30 p-3 text-sm leading-relaxed text-muted-foreground">
+              Na entrega automática o estoque é o número de itens cadastrados.{" "}
+              {product ? (
+                <Link href={`/painel/vendedor/produtos/${product.id}/estoque`} className="font-medium text-primary hover:underline">
+                  Gerenciar o estoque de itens
+                </Link>
+              ) : (
+                "Depois de publicar, você cadastra os itens na tela de estoque do anúncio; ele só entra à venda quando houver itens."
+              )}
+            </p>
+          ) : null}
+
           {deliveryType === "manual" ? (
             <div className="flex flex-col gap-2">
               <span className="text-sm leading-none font-medium">Prazo de entrega</span>
@@ -500,10 +546,11 @@ export function ProductForm({
                     <Field label="Estoque" htmlFor={`stock-${index}`}>
                       <Input
                         id={`stock-${index}`}
-                        value={row.stock}
+                        value={automatic ? (row.id ? row.stock : "0") : row.stock}
                         onChange={(e) => patchRow(index, { stock: e.target.value })}
                         inputMode="numeric"
-                        disabled={pending}
+                        disabled={pending || automatic}
+                        title={automatic ? "Na entrega automática o estoque é o número de itens cadastrados" : undefined}
                       />
                     </Field>
                   </div>

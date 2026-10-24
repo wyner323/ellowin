@@ -23,6 +23,7 @@ type SellerProduct = {
   ratingCount: number
   salesCount: number
   description: string
+  deliveryType: string
   attributes: Record<string, string>
   imageCount: number
   variants: { active: boolean; stock: number; priceCents: number }[]
@@ -213,13 +214,20 @@ export function SellerProductsList({
               </div>
 
               <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-                <Button
-                  render={<Link href={`/painel/vendedor/produtos/${p.id}`} />}
-                  variant="outline"
-                  size="sm"
-                >
-                  Editar
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    render={<Link href={`/painel/vendedor/produtos/${p.id}`} />}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Editar
+                  </Button>
+                  {p.deliveryType === "automatica" ? (
+                    <Button render={<Link href={`/painel/vendedor/produtos/${p.id}/estoque`} />} variant="outline" size="sm">
+                      Estoque
+                    </Button>
+                  ) : null}
+                </div>
                 <ProductStatusToggle productId={p.id} status={p.status} />
               </div>
             </div>

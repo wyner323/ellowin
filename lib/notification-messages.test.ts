@@ -75,6 +75,18 @@ describe("composeOrderMessages", () => {
     expect(seller.intro).toContain("por você")
   })
 
+  it("entrega automática: um aviso só, que diz que já foi entregue, sem mandar o vendedor entregar e sem os dados por email", () => {
+    const [seller, buyer] = composeOrderMessages("order_created", { ...ctx, automatic: true })
+    expect(seller.intro).toContain("entrega já foi feita automaticamente")
+    expect(seller.intro).toContain("92,00")
+    expect(seller.buttonLabel).not.toMatch(/entregar/i)
+    expect(seller.intro).not.toMatch(/entregue (até|o quanto antes)/i)
+    expect(buyer.title).toBe("Seu pedido já foi entregue")
+    expect(buyer.intro).toContain("não vão por email")
+    expect(buyer.intro).toContain("100,00")
+    expect(buyer.path).toBe("/pedidos/42")
+  })
+
   it("pedido sem prazo (entrega automática) não inventa horário", () => {
     const [seller] = composeOrderMessages("order_created", { ...ctx, deliveryDueAt: null })
     expect(seller.intro).toContain("o quanto antes")

@@ -198,7 +198,7 @@ describe("purchase", () => {
     expect(await wallet("buyer")).toEqual({ availableCents: 90_000, heldCents: 10_000 })
     expect(await wallet("seller")).toBeUndefined()
     expect(await stockOf(variantId)).toBe(2)
-    expect(holder.notifications).toEqual([["order_created", result.orderId, undefined]])
+    expect(holder.notifications).toEqual([["order_created", result.orderId, { automatic: false }]])
     expect(holder.revalidated).toEqual(["/pedidos", "/carteira"])
   })
 
@@ -219,10 +219,14 @@ describe("purchase", () => {
     expect((await orderRow(orderId)).autoReleaseAt).toBeNull()
   })
 
-  it("entrega automática não tem prazo de entrega (nada para o reembolso por atraso disparar)", async () => {
+  it("anúncio de entrega automática sem item no estoque não vende: o pedido nunca nasce sem entrega e sem prazo de reembolso", async () => {
+    // Antes da entrega automática de verdade, esse pedido nascia aguardando entrega e SEM prazo (deliveryDueAt nulo),
+    // então o reembolso por atraso nunca disparava. A compra com item está em app/actions/auto-delivery.test.ts.
     const { variantId } = await addListing({ deliveryType: "automatica", deliveryTime: "Imediata (entrega automática)" })
-    const orderId = await buy(variantId)
-    expect((await orderRow(orderId)).deliveryDueAt).toBeNull()
+    holder.userId = "buyer"
+    expect(await purchase(variantId, 10_000)).toMatchObject({ ok: false, error: "Item esgotado." })
+    expect(await orderCount()).toBe(0)
+    expect((await wallet("buyer")).heldCents).toBe(0)
   })
 
   it("exige estar logado", async () => {

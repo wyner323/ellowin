@@ -9,6 +9,7 @@ import { ProductForm } from "@/components/seller/product-form"
 import { SellerTabs } from "@/components/seller/seller-tabs"
 import { Button } from "@/components/ui/button"
 import { db } from "@/lib/db"
+import { autoDeliveryAvailable } from "@/lib/delivery-stock"
 import { sellerApplication } from "@/lib/db/schema"
 import { getSellerUnansweredQuestionsCount } from "@/lib/marketplace"
 import { getSession } from "@/lib/session"
@@ -34,7 +35,10 @@ export default async function NovoProdutoPage({
 
   if (!application || application.status !== "aprovado") redirect("/vender")
 
-  const pendingQuestions = await getSellerUnansweredQuestionsCount(session.user.id)
+  const [pendingQuestions, autoDelivery] = await Promise.all([
+    getSellerUnansweredQuestionsCount(session.user.id),
+    autoDeliveryAvailable(),
+  ])
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -62,7 +66,7 @@ export default async function NovoProdutoPage({
             </p>
           </header>
 
-          <ProductForm defaultGame={jogo} />
+          <ProductForm defaultGame={jogo} autoDelivery={autoDelivery} />
         </div>
       </main>
 

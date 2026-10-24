@@ -78,6 +78,13 @@
       "when": 1792452919275,
       "tag": "0010_strong_luckman",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792843549435,
+      "tag": "0011_brown_leader",
+      "breakpoints": true
     }
   ]
 }

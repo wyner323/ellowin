@@ -275,6 +275,36 @@ export const productVariant = pgTable("product_variant", {
 ])
 
 /**
+ * Estoque de entrega automática (docs/entrega-automatica.md): um código, chave ou login por linha, cifrado em repouso.
+ * `payload` só existe enquanto o item está disponível: a compra MOVE o conteúdo para `order.deliveryPayload`
+ * (cifrado de novo para o pedido) e zera esta coluna, então o segredo nunca fica em dois lugares. `orderId` nulo =
+ * disponível; preenchido = vendido, e um item vendido nunca volta ao estoque (o código já foi exibido).
+ * `payloadHash` (HMAC) barra o mesmo item cadastrado duas vezes sem guardar nada legível; `mask` é o que o painel mostra.
+ */
+export const deliveryStockItem = pgTable("delivery_stock_item", {
+  id: serial("id").primaryKey(),
+  variantId: integer("variantId")
+    .notNull()
+    .references(() => productVariant.id, { onDelete: "cascade" }),
+  sellerId: text("sellerId")
+    .notNull()
+    .references(() => user.id),
+  payload: text("payload"),
+  payloadHash: text("payloadHash").notNull(),
+  mask: text("mask").notNull(),
+  orderId: integer("orderId")
+    .unique()
+    .references(() => order.id),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  soldAt: timestamp("soldAt"),
+}, (t) => [
+  uniqueIndex("delivery_stock_variant_hash_idx").on(t.variantId, t.payloadHash),
+  index("delivery_stock_available_idx").on(t.variantId, t.id).where(sql`${t.orderId} is null`),
+  index("delivery_stock_seller_idx").on(t.sellerId),
+  check("delivery_stock_payload_when_available", sql`(${t.orderId} is null) = (${t.payload} is not null)`),
+])
+
+/**
  * Pergunta pública feita no anúncio antes da compra — visível a qualquer
  * visitante, respondida só pelo vendedor dono do anúncio. Reduz o "tenho uma
  * dúvida antes de comprar" sem precisar abrir um pedido/chat.

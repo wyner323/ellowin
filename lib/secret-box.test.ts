@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { randomBytes } from "node:crypto"
-import { decryptField, encryptField, isEncrypted } from "@/lib/secret-box"
+import { decryptField, encryptField, hasEncryptionKey, hashField, isEncrypted } from "@/lib/secret-box"
 
 const KEY = randomBytes(32).toString("base64")
 
@@ -103,5 +103,31 @@ describe("sem a chave em produção", () => {
     const { mod, messages } = await load()
     expect(mod.isEncrypted(mod.encryptField("x", "order:1"))).toBe(true)
     expect(messages).toEqual([])
+  })
+})
+
+describe("hashField e hasEncryptionKey (estoque de entrega automática)", () => {
+  it("sem chave: hasEncryptionKey é falso e hashField recusa (nunca cai em hash sem segredo)", () => {
+    vi.stubEnv("DELIVERY_ENCRYPTION_KEY", "")
+    expect(hasEncryptionKey()).toBe(false)
+    expect(() => hashField("CODE-1234", "stock:1")).toThrow(/DELIVERY_ENCRYPTION_KEY/)
+  })
+
+  it("com chave: o hash é estável, hexadecimal, e muda com o valor, com o contexto e com a chave", () => {
+    vi.stubEnv("DELIVERY_ENCRYPTION_KEY", KEY)
+    expect(hasEncryptionKey()).toBe(true)
+    const h = hashField("CODE-1234", "stock:1")
+    expect(h).toMatch(/^[0-9a-f]{64}$/)
+    expect(hashField("CODE-1234", "stock:1")).toBe(h)
+    expect(hashField("CODE-1235", "stock:1")).not.toBe(h)
+    expect(hashField("CODE-1234", "stock:2")).not.toBe(h)
+    expect(h).not.toContain("CODE")
+    vi.stubEnv("DELIVERY_ENCRYPTION_KEY", randomBytes(32).toString("base64"))
+    expect(hashField("CODE-1234", "stock:1")).not.toBe(h) // sem a chave não dá para testar palpites contra o banco
+  })
+
+  it("a fronteira valor/contexto não confunde (\"a\"+\"bc\" não colide com \"ab\"+\"c\")", () => {
+    vi.stubEnv("DELIVERY_ENCRYPTION_KEY", KEY)
+    expect(hashField("bc", "a")).not.toBe(hashField("c", "ab"))
   })
 })

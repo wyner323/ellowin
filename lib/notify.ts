@@ -97,7 +97,7 @@ async function deliver(userId: string, kind: string, refId: string, message: Mes
 export function notifyOrder(
   kind: OrderNotifyKind,
   orderId: number,
-  extra: { outcome?: "comprador" | "vendedor"; cancelledBy?: "comprador" | "vendedor" } = {},
+  extra: { outcome?: "comprador" | "vendedor"; cancelledBy?: "comprador" | "vendedor"; automatic?: boolean } = {},
 ) {
   schedule(async () => {
     const [row] = await db
