@@ -13,6 +13,8 @@ import { OrderTimeline } from "@/components/orders/order-timeline"
 import { OpenDisputeForm } from "@/components/orders/open-dispute-form"
 import { ReviewForm } from "@/components/orders/review-form"
 import { StarRating } from "@/components/marketplace/star-rating"
+import { ReviewReplyView } from "@/components/marketplace/review-reply-view"
+import { ReviewReplyForm } from "@/components/seller/review-reply-form"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -254,6 +256,10 @@ export default async function PedidoPage({
                       <p className="text-sm leading-relaxed text-muted-foreground">
                         {detail.review.comment}
                       </p>
+                    ) : null}
+                    <ReviewReplyView reply={detail.review.reply} />
+                    {viewer.isSeller ? (
+                      <ReviewReplyForm reviewId={detail.review.id} initial={detail.review.reply?.body ?? ""} />
                     ) : null}
                   </section>
                 ) : null}

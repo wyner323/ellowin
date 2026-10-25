@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { ProductCard } from "@/components/marketplace/product-card"
 import { StarRating } from "@/components/marketplace/star-rating"
+import { ReviewReplyView } from "@/components/marketplace/review-reply-view"
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ReportButton } from "@/components/report-button"
@@ -247,6 +248,7 @@ export default async function LojaPage({
                           {r.comment ? (
                             <p className="text-sm text-muted-foreground">{r.comment}</p>
                           ) : null}
+                          <ReviewReplyView reply={r.reply} />
                           <span className="text-xs text-muted-foreground">
                             {r.createdAt.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })}
                           </span>

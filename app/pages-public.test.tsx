@@ -283,6 +283,23 @@ describe("página do anúncio", () => {
     expect(txt).not.toContain("Carlos Pereira Lima")
   })
 
+  it("a resposta do vendedor aparece abaixo da avaliação, como texto (nada de HTML do vendedor na página)", async () => {
+    const id = await addListing({ slug: "com-resposta" })
+    const v = await t.query(`SELECT "id" FROM "product_variant" WHERE "productId" = $1`, [id])
+    const o = await t.query(
+      `INSERT INTO "order" ("buyerId", "sellerId", "productId", "variantId", "productTitle", "variantLabel", "amountCents", "status") VALUES ('comprador', 'ana', $1, $2, 'x', 'y', 1000, 'concluido') RETURNING "id"`,
+      [id, v.rows[0].id],
+    )
+    const r = await t.query(`INSERT INTO "review" ("orderId", "productId", "sellerId", "buyerId", "rating", "comment") VALUES ($1, $2, 'ana', 'comprador', 4, 'Chegou certinho') RETURNING "id"`, [o.rows[0].id, id])
+    await t.query(`INSERT INTO "review_reply" ("reviewId", "sellerId", "body") VALUES ($1, 'ana', $2)`, [r.rows[0].id, `Obrigado! <img src=x onerror=alert(1)> até a próxima`])
+    const html = await renderHtml(await ProductPage(params({ slug: "com-resposta" })))
+    const txt = htmlToText(html)
+    expect(txt).toContain("Resposta do vendedor")
+    expect(txt).toContain("Obrigado!")
+    expect(html).not.toContain("<img src=x")
+    expect(html).toContain("&lt;img src=x")
+  })
+
   it("anúncios relacionados: da mesma loja/jogo, sem repetir o próprio", async () => {
     await addListing({ slug: "principal", title: "Anúncio Principal" })
     await addListing({ slug: "irmao", title: "Anúncio Irmão" })

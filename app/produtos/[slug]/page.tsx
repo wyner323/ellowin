@@ -18,6 +18,7 @@ import {
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { StarRating } from "@/components/marketplace/star-rating"
+import { ReviewReplyView } from "@/components/marketplace/review-reply-view"
 import { BuyerProtection } from "@/components/product/buyer-protection"
 import { RelatedListings } from "@/components/product/related-listings"
 import { VariantPicker } from "@/components/product/variant-picker"
@@ -344,6 +345,7 @@ export default async function ProductPage({
                             {r.comment}
                           </p>
                         ) : null}
+                        <ReviewReplyView reply={r.reply} sellerName={item.seller.name} />
                       </li>
                     ))}
                   </ul>

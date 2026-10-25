@@ -21,6 +21,7 @@ import { positivePercent } from "@/lib/card-info"
 import { attributeFieldsForSlug, describeAttributes } from "@/lib/game-attributes"
 import { slugifyGame } from "@/lib/product-catalog"
 import { VACATION_STATUS } from "@/lib/store-vacation"
+import { withReplies } from "@/lib/review-replies"
 import {
   LISTING_PAGE_SIZE,
   deliveryRuleFor,
@@ -300,6 +301,8 @@ export type ProductDetail = {
     comment: string | null
     createdAt: Date
     buyerName: string
+    /** resposta pública do vendedor, se houver */
+    reply: { body: string; updatedAt: Date } | null
   }[]
 }
 
@@ -364,9 +367,10 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     .orderBy(desc(review.createdAt))
     .limit(20)
 
-  const [reputation, accountFlags] = await Promise.all([
+  const [reputation, accountFlags, reviewsWithReplies] = await Promise.all([
     getSellerReputationBreakdown(row.sellerId),
     getSellerAccountFlagSummary(row.sellerId),
+    withReplies(reviewRows),
   ])
 
   return {
@@ -403,12 +407,13 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       stock: v.stock,
       deliveryNote: v.deliveryNote,
     })),
-    reviews: reviewRows.map((r) => ({
+    reviews: reviewsWithReplies.map((r) => ({
       id: r.id,
       rating: r.rating,
       comment: r.comment,
       createdAt: r.createdAt,
       buyerName: r.buyerName ?? "Comprador",
+      reply: r.reply,
     })),
   }
 }
@@ -630,7 +635,7 @@ export async function getSellerDeliveryStats(sellerId: string) {
 
 /** Últimas avaliações recebidas por um vendedor, pro perfil público. */
 export async function getSellerRecentReviews(sellerId: string, limit = 5) {
-  return db
+  const rows = await db
     .select({
       id: review.id,
       rating: review.rating,
@@ -643,6 +648,7 @@ export async function getSellerRecentReviews(sellerId: string, limit = 5) {
     .where(eq(review.sellerId, sellerId))
     .orderBy(desc(review.createdAt))
     .limit(limit)
+  return withReplies(rows)
 }
 
 /**

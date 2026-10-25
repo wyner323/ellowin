@@ -3,6 +3,7 @@ import { aliasedTable, and, asc, desc, eq, inArray, notInArray, or, sql } from "
 import { db } from "@/lib/db"
 import { resolvePage } from "@/lib/pagination"
 import { publicNameCol } from "@/lib/public-name"
+import { withReplies } from "@/lib/review-replies"
 import { decryptField } from "@/lib/secret-box"
 import {
   dispute,
@@ -321,7 +322,7 @@ export async function getOrderDetail(
     deliveryPayload,
     payloadUnreadable,
     viewer: { isBuyer, isSeller, isStaff },
-    review: reviewRow ?? null,
+    review: reviewRow ? (await withReplies([reviewRow]))[0] : null,
     dispute: disputeRow ?? null,
   }
 }

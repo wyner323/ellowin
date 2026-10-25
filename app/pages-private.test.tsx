@@ -64,6 +64,8 @@ import CadastroPage from "@/app/cadastro/page"
 import PainelVendedorLayout from "@/app/painel/vendedor/layout"
 import PainelVendedorPage from "@/app/painel/vendedor/page"
 import PainelAnalisesPage from "@/app/painel/vendedor/analises/page"
+import PainelVendasPage from "@/app/painel/vendedor/vendas/page"
+import AvaliacoesPage from "@/app/painel/vendedor/avaliacoes/page"
 import MeusProdutosPage from "@/app/painel/vendedor/produtos/page"
 import AdminLayout from "@/app/admin/layout"
 import CasoDisputaPage from "@/app/admin/disputas/[id]/page"
@@ -416,6 +418,89 @@ describe("painel do vendedor", () => {
     const t3 = await txt(MeusProdutosPage({ searchParams: Promise.resolve({}) }))
     expect(t3).toContain("Visitas (30d)")
     expect(t3).toContain("42")
+  })
+
+  describe("entrega pela lista de vendas", () => {
+    it("pedido a entregar ganha o contador e o botão de entrega; pedido já entregue e de outro vendedor não", async () => {
+      as("ana")
+      const waiting = await addOrder({ status: "aguardando_entrega", title: "Venda a Entregar" })
+      await t.query(`UPDATE "order" SET "deliveryDueAt" = now() + interval '3 hours' WHERE "id" = $1`, [waiting])
+      await addOrder({ status: "entregue", title: "Venda Já Entregue" })
+      const page = await txt(PainelVendasPage(sp({})))
+      expect(page).toContain("Venda a Entregar")
+      expect(page).toContain("Entregar agora")
+      expect(page).toMatch(/Entregar até \d{2}\/\d{2} \d{2}:\d{2}/)
+      expect(page.match(/Entregar agora/g)).toHaveLength(1)
+    })
+
+    it("pedido sem prazo avisa para entregar o quanto antes", async () => {
+      as("ana")
+      await addOrder({ status: "aguardando_entrega" })
+      expect(await txt(PainelVendasPage(sp({})))).toContain("Sem prazo definido")
+    })
+  })
+
+  describe("avaliações recebidas", () => {
+    const addReview = async (buyer = "comprador", comment = "Tudo certo na entrega") => {
+      const orderId = await addOrder({ buyer, status: "concluido" })
+      const r = await t.query(`INSERT INTO "review" ("orderId", "productId", "sellerId", "buyerId", "rating", "comment") VALUES ($1, $2, 'ana', $3, 5, $4) RETURNING "id"`, [orderId, productId, buyer, comment])
+      return r.rows[0].id as number
+    }
+
+    it("exige login", async () => {
+      as(null)
+      await expect(AvaliacoesPage(sp({}))).rejects.toThrow()
+    })
+
+    it("lista as avaliações com o nome público do comprador e o formulário de resposta", async () => {
+      as("ana")
+      await addReview()
+      const page = await txt(AvaliacoesPage(sp({})))
+      expect(page).toContain("Tudo certo na entrega")
+      expect(page).toContain("CarlosPlay")
+      expect(page).not.toContain("Carlos Pereira Lima")
+      expect(page).toContain("Responder (a resposta é pública)")
+      expect(page).toContain("Publicar resposta")
+      expect(page).toContain("Respostas prontas")
+    })
+
+    it("avaliação respondida mostra a resposta e o botão de editar; o filtro 'sem resposta' esconde as respondidas", async () => {
+      as("ana")
+      const answered = await addReview("comprador", "Avaliação respondida")
+      await addReview("outro", "Avaliação pendente")
+      await t.query(`INSERT INTO "review_reply" ("reviewId", "sellerId", "body") VALUES ($1, 'ana', 'Obrigado pela compra!')`, [answered])
+      const all = await txt(AvaliacoesPage(sp({})))
+      expect(all).toContain("Resposta do vendedor")
+      expect(all).toContain("Obrigado pela compra!")
+      expect(all).toContain("Salvar resposta")
+      const pending = await txt(AvaliacoesPage(sp({ filtro: "sem-resposta" })))
+      expect(pending).toContain("Avaliação pendente")
+      expect(pending).not.toContain("Avaliação respondida")
+    })
+
+    it("não mostra avaliações de outro vendedor", async () => {
+      await addReview()
+      await t.query(`INSERT INTO "user" ("id", "name", "email", "displayName", "emailVerified") VALUES ('vend2', 'Vendedor Dois', 'v2@teste.dev', 'Vend2', true)`)
+      await t.query(`INSERT INTO "seller_application" ("userId", "storeName", "storeSlug", "level", "status") VALUES ('vend2', 'Loja 2', 'loja-2', 4, 'aprovado')`)
+      as("vend2")
+      const page = await txt(AvaliacoesPage(sp({})))
+      expect(page).toContain("Nenhuma avaliação recebida ainda")
+      expect(page).not.toContain("Tudo certo na entrega")
+    })
+
+    it("o vendedor vê o formulário de resposta na página do pedido avaliado; o comprador só vê a resposta", async () => {
+      const reviewId = await addReview()
+      const orderId = (await t.query(`SELECT "orderId" FROM "review" WHERE "id" = $1`, [reviewId])).rows[0].orderId as number
+      await t.query(`INSERT INTO "review_reply" ("reviewId", "sellerId", "body") VALUES ($1, 'ana', 'Resposta pública do vendedor')`, [reviewId])
+      as("ana")
+      const seller = await txt(PedidoPage(props({ id: String(orderId) })))
+      expect(seller).toContain("Resposta pública do vendedor")
+      expect(seller).toContain("Salvar resposta")
+      as("comprador")
+      const buyer = await txt(PedidoPage(props({ id: String(orderId) })))
+      expect(buyer).toContain("Resposta pública do vendedor")
+      expect(buyer).not.toContain("Salvar resposta")
+    })
   })
 
   describe("estoque de entrega automática", () => {

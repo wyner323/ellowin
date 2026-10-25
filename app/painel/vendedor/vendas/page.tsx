@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
 import { FilterPills, type PillItem } from "@/components/filter-pills"
 import { OrderRow } from "@/components/orders/order-row"
+import { QuickDelivery } from "@/components/orders/quick-delivery"
 import { Pagination } from "@/components/pagination"
 import { SellerTabs } from "@/components/seller/seller-tabs"
 import { StatTiles } from "@/components/stat-tiles"
@@ -152,7 +153,7 @@ export default async function VendasPage({
 
               <ul className="flex flex-col gap-3">
                 {list.orders.map((o) => (
-                  <li key={o.id}>
+                  <li key={o.id} className="flex flex-col gap-2">
                     <OrderRow
                       order={o}
                       role="vendedor"
@@ -160,6 +161,7 @@ export default async function VendasPage({
                       amountCents={o.sellerNetCents}
                       amountCaption="líquido"
                     />
+                    {o.status === "aguardando_entrega" ? <QuickDelivery orderId={o.id} dueAt={o.deliveryDueAt?.toISOString() ?? null} /> : null}
                   </li>
                 ))}
               </ul>

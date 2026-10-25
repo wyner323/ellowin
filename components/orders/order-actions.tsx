@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { CheckCircle2, Loader2, PackageCheck, XCircle } from "lucide-react"
 import { cancelOrder, confirmReceipt, markDelivered } from "@/app/actions/orders"
+import { CannedReplies } from "@/components/seller/canned-replies"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { DELIVERY_TEMPLATES, appendReply } from "@/lib/canned-replies"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,6 +67,7 @@ export function OrderActions({
           <label htmlFor="payload" className="text-sm font-medium">
             Dados da entrega
           </label>
+          <CannedReplies label="Modelos" replies={DELIVERY_TEMPLATES} onPick={(text) => setPayload((current) => appendReply(current, text))} disabled={pending} />
           <Textarea
             id="payload"
             value={payload}

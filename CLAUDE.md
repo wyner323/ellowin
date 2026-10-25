@@ -251,6 +251,16 @@ items (`purgeAvailableStock`). The order_created email for an automatic order sa
 A migration 0011 data step turns pre-existing "automatic" listings into manual ones with the 24 h deadline (they were only a label and their orders had no deadline, so late delivery was never refunded). Until that migration runs
 (`stockTableExistsIn` false), `purchase` treats an old "automatic" listing like before (awaiting delivery, seller delivers by hand) instead of refusing the sale.
 
+### Review replies, quick delivery and canned replies
+
+The seller answers a review they RECEIVED with one public, editable reply (`review_reply` table, migration 0012, a table of its own so the many review readers never depend on it): `replyToReview`/`deleteReviewReply`
+(`app/actions/review-replies.ts`, 30/h, 3–500 chars from `lib/review-reply-rules.ts`, `review.sellerId` must be the session user; the review id only selects the row). Every reader goes through `withReplies`/`getRepliesByReview`
+(`lib/review-replies.ts`) which treat a missing table as "no replies" (`isUndefinedTable`, `lib/db-errors.ts`, walks the `cause` chain like `isUniqueViolation`): the product page, the storefront and the order page show the reply
+under the review (`ReviewReplyView`, plain text); the seller panel has `/painel/vendedor/avaliacoes` (filter `?filtro=sem-resposta`) and the order page shows the reply form to the seller. Without the migration the panel says so and hides the form.
+Sales list: an order awaiting delivery gets `QuickDelivery` under its row (deadline counter `DeliveryCountdown`, pure math in `lib/countdown.ts`: ok / under 1 h "entregue logo" / overdue, always words + icon; it renders only the deadline on the
+server and ticks in 30 s slices on the client with `useSyncExternalStore`, so there is no hydration mismatch) and the same `markDelivered` action as the order page. Canned replies (`lib/canned-replies.ts`, static text, `CannedReplies` chips) fill the
+delivery box, the seller side of the order chat and the review reply; they only insert text, nothing is sent, and a test bans the claims the site never makes ("garantia", "24/7", "em minutos"...).
+
 ### Wallet reconciliation
 
 `lib/reconcile.ts` (read-only, 12 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =

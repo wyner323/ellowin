@@ -464,6 +464,26 @@ export const orderMessage = pgTable("order_message", {
   index("order_message_order_idx").on(t.orderId),
 ])
 
+/**
+ * Resposta pública do vendedor a uma avaliação (uma por avaliação, editável). Tabela própria, e não coluna de `review`,
+ * para as leituras de avaliações da vitrine não dependerem desta migração: quem lê as respostas busca à parte e, sem a
+ * tabela, simplesmente não mostra resposta nenhuma.
+ */
+export const reviewReply = pgTable("review_reply", {
+  reviewId: integer("reviewId")
+    .primaryKey()
+    .references(() => review.id, { onDelete: "cascade" }),
+  sellerId: text("sellerId")
+    .notNull()
+    .references(() => user.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+}, (t) => [
+  index("review_reply_seller_idx").on(t.sellerId),
+  check("review_reply_body_length", sql`char_length(${t.body}) between 3 and 500`),
+])
+
 /** Histórico compartilhado: qualquer moderador lê o caso inteiro e dá continuidade. */
 export const disputeMessage = pgTable("dispute_message", {
   id: serial("id").primaryKey(),

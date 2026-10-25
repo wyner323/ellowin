@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2, MessageCircle, RefreshCw, Send } from "lucide-react"
 import { fetchOrderMessages, postOrderMessage } from "@/app/actions/orders"
+import { CannedReplies } from "@/components/seller/canned-replies"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { CHAT_REPLIES, appendReply } from "@/lib/canned-replies"
 import { cn } from "@/lib/utils"
 
 export type OrderChatMessage = {
@@ -276,6 +278,14 @@ export function OrderChat({
       </div>
 
       <div className="flex flex-col gap-2 border-t border-border bg-muted/20 p-3.5">
+        {viewerRole === "seller" ? (
+          <CannedReplies
+            label="Respostas prontas"
+            replies={CHAT_REPLIES}
+            onPick={(text) => setBody((current) => appendReply(current, text).slice(0, MAX_LENGTH))}
+            disabled={pending}
+          />
+        ) : null}
         <div className="flex items-end gap-2">
           <Textarea
             value={body}
