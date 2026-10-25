@@ -202,6 +202,7 @@ export const walletTransaction = pgTable("wallet_transaction", {
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 }, (t) => [
   index("wallet_tx_user_created_idx").on(t.userId, t.createdAt),
+  check("wallet_tx_balance_nonneg", sql`${t.balanceAfterCents} >= 0`),
 ])
 
 /* ---------------------------------------------------------------------------
@@ -272,6 +273,8 @@ export const productVariant = pgTable("product_variant", {
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 }, (t) => [
   index("variant_product_idx").on(t.productId),
+  check("variant_price_positive", sql`${t.priceCents} > 0`),
+  check("variant_stock_nonneg", sql`${t.stock} >= 0`),
 ])
 
 /**
@@ -393,6 +396,8 @@ export const order = pgTable("order", {
   index("order_seller_idx").on(t.sellerId),
   index("order_status_auto_release_idx").on(t.status, t.autoReleaseAt),
   index("order_status_delivery_due_idx").on(t.status, t.deliveryDueAt),
+  check("order_amount_positive", sql`${t.amountCents} > 0`),
+  check("order_split_nonneg", sql`${t.feeCents} >= 0 and ${t.sellerNetCents} >= 0`),
 ])
 
 /** Uma avaliação por pedido concluído — alimenta o ranking do vendedor. */
@@ -417,6 +422,7 @@ export const review = pgTable("review", {
 }, (t) => [
   index("review_product_idx").on(t.productId),
   index("review_seller_idx").on(t.sellerId),
+  check("review_rating_range", sql`${t.rating} between 1 and 5`),
 ])
 
 export const dispute = pgTable("dispute", {

@@ -76,6 +76,8 @@ the platform and only released to the seller after delivery is confirmed.
    in a `drizzle.__drizzle_migrations` table). Editing `schema.ts` alone does **not** touch the
    database; the SQL file existing alone doesn't either.
 
+Value rules the code already respects are also CHECK constraints (migration 0014: variant price > 0 / stock >= 0, order amount > 0 and fee/net >= 0, review rating 1–5, wallet_transaction balanceAfter >= 0), created `NOT VALID` so old rows never block the migration (`lib/db-constraints.test.ts` proves the database refuses each one). A new column with a hard rule gets its `check()` in `schema.ts` the same way. Money columns stay `integer` (int4, R$ 21 million per value): an overflow would fail loudly (never wrap) and every sum already runs in `bigint`; moving them to `int8` is a table-rewriting migration that is not worth it until a balance can approach that ceiling.
+
 The `scripts/add-*.sql` files predate this setup — they're the historical record of what was
 hand-applied before `drizzle-kit` existed (baselined into `drizzle/0000_wooden_sway.sql` as a
 single migration, marked already-applied rather than re-run). Don't add new schema changes as a

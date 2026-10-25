@@ -65,6 +65,7 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
 
 - [ ] **Migrações 0012 (respostas às avaliações) e 0013 (favoritos).** Entram no mesmo `pnpm db:migrate` das anteriores. Até serem aplicadas o site funciona: a aba "Avaliações" do vendedor mostra as avaliações e avisa que as respostas ainda
   não estão disponíveis, o botão "Guardar nos favoritos" não aparece e a página /favoritos avisa que ainda não está disponível; nada de público quebra.
+- [ ] **Migração 0014 (regras de valor no banco).** Também entra no `pnpm db:migrate`: CHECK de preço > 0, estoque ≥ 0, valor/taxa/líquido do pedido, nota de 1 a 5 e saldo do extrato ≥ 0. Elas nascem `NOT VALID` (valem para toda linha nova ou alterada, sem reprovar a migração por dado antigo). Depois de migrar, rode uma vez no console SQL da Neon, para conferir o histórico: `ALTER TABLE "product_variant" VALIDATE CONSTRAINT variant_price_positive; ... variant_stock_nonneg; ALTER TABLE "order" VALIDATE CONSTRAINT order_amount_positive; ... order_split_nonneg; ALTER TABLE "review" VALIDATE CONSTRAINT review_rating_range; ALTER TABLE "wallet_transaction" VALIDATE CONSTRAINT wallet_tx_balance_nonneg;`. Se alguma falhar, o erro mostra que há uma linha antiga fora da regra: me avise em vez de apagar a constraint.
 
 - [ ] **Ligar a entrega automática (estoque de itens cifrados).** O código já está no ar, mas a opção "Automática" só aparece para o vendedor quando as duas coisas abaixo existem; sem elas o site segue
   como hoje, com entrega manual. Ordem:
