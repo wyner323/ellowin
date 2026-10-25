@@ -277,3 +277,31 @@ export function composeQuestionMessage(
         path: `/produtos/${c.productSlug}`,
       }
 }
+
+/**
+ * Aviso de estoque baixo ou esgotado de um item de anúncio ativo. Sem estoque o item sai da vitrine (ninguém consegue
+ * comprar), então o texto diz isso; o botão leva à tela certa para repor: o estoque de itens (entrega automática) ou a edição.
+ */
+export function composeLowStockMessage(c: { productId: number; productTitle: string; variantLabel: string; stock: number; automatic: boolean }): Message {
+  const what = `“${c.variantLabel}” do anúncio “${c.productTitle}”`
+  const how = c.automatic ? "Cadastre mais itens no estoque do anúncio" : "Atualize o estoque do anúncio"
+  const path = c.automatic ? `/painel/vendedor/produtos/${c.productId}/estoque` : `/painel/vendedor/produtos/${c.productId}`
+  if (c.stock <= 0) {
+    return {
+      recipient: "seller",
+      subject: `Estoque esgotado: ${c.variantLabel}`,
+      title: "Um item do seu anúncio ficou sem estoque",
+      intro: `${what} ficou sem estoque e não pode mais ser comprado até você repor. ${how}.`,
+      buttonLabel: c.automatic ? "Cadastrar itens" : "Atualizar o estoque",
+      path,
+    }
+  }
+  return {
+    recipient: "seller",
+    subject: `Estoque baixo: ${c.variantLabel}`,
+    title: "O estoque de um item do seu anúncio está acabando",
+    intro: `${what} está com ${c.stock} ${c.stock === 1 ? "unidade" : "unidades"} em estoque. ${how} para não perder vendas.`,
+    buttonLabel: c.automatic ? "Cadastrar itens" : "Atualizar o estoque",
+    path,
+  }
+}

@@ -97,6 +97,7 @@ import AdminDisputaPage from "@/app/admin/disputas/[id]/page"
 import AdminDenunciasPage from "@/app/admin/denuncias/page"
 import AdminDenunciaPage from "@/app/admin/denuncias/[id]/page"
 import AdminConferenciaPage from "@/app/admin/conferencia/page"
+import AdminEntregaAutomaticaPage from "@/app/admin/entrega-automatica/page"
 import AdminUsuariosPage from "@/app/admin/usuarios/page"
 
 let t: TestDb
@@ -210,6 +211,7 @@ const screens: Screen[] = [
   { name: "moderação: fila de denúncias", as: "adm", admin: true, render: () => AdminDenunciasPage(sp({})) },
   { name: "moderação: caso de denúncia", as: "adm", admin: true, render: () => AdminDenunciaPage(params({ id: String(ids.report) })) },
   { name: "moderação: conferência", as: "adm", admin: true, render: () => AdminConferenciaPage() },
+  { name: "moderação: entrega automática", as: "adm", admin: true, render: () => AdminEntregaAutomaticaPage() },
   { name: "moderação: cargos", as: "adm", admin: true, render: () => AdminUsuariosPage() },
 ]
 

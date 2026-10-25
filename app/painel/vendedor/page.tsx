@@ -14,6 +14,7 @@ import { MonthlyGoalCard } from "@/components/seller/monthly-goal-card"
 import { ReceivablesBreakdown } from "@/components/seller/receivables-breakdown"
 import { SellerActionItems, type SellerActionItem } from "@/components/seller/seller-action-items"
 import { SellerBalanceHero } from "@/components/seller/seller-balance-hero"
+import { SellerChecklist } from "@/components/seller/seller-checklist"
 import { SellerIdentityCard } from "@/components/seller/seller-identity-card"
 import { SellerTabs } from "@/components/seller/seller-tabs"
 import { SellerTips, type SellerTip } from "@/components/seller/seller-tips"
@@ -32,6 +33,8 @@ import {
 import { formatCents } from "@/lib/money"
 import { getMyOpenDisputes, getSellerOrderAggregates } from "@/lib/orders"
 import { getLowStock } from "@/lib/seller-alerts"
+import { buildChecklist } from "@/lib/seller-checklist"
+import { getChecklistInputs } from "@/lib/seller-checklist-data"
 import { getSellerAnalytics } from "@/lib/seller-analytics"
 import { getMonthProgressInputs } from "@/lib/seller-goals"
 import { getSession } from "@/lib/session"
@@ -77,6 +80,7 @@ export default async function PainelVendedorPage() {
     accountFlags,
     monthProgress,
     lowStock,
+    checklistInputs,
   ] = await Promise.all([
     getSellerStats(session.user.id),
     getSellerOrderAggregates(session.user.id),
@@ -94,8 +98,10 @@ export default async function PainelVendedorPage() {
     getSellerAccountFlagSummary(session.user.id),
     getMonthProgressInputs(session.user.id),
     getLowStock(session.user.id),
+    getChecklistInputs(session.user.id),
   ])
 
+  const checklist = buildChecklist(checklistInputs)
   const pendingCount = aggregates.stat("aguardando_entrega")?.count ?? 0
 
   // Mesmo total do card "A receber", quebrado por etapa — pra o vendedor ver em
@@ -275,6 +281,8 @@ export default async function PainelVendedorPage() {
             />
             <SellerActionItems items={actionItems} />
           </div>
+
+          <SellerChecklist checklist={checklist} />
 
           <section aria-labelledby="resumo-30d" className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end justify-between gap-2">

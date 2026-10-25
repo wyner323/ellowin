@@ -71,6 +71,7 @@ import MeusProdutosPage from "@/app/painel/vendedor/produtos/page"
 import AdminLayout from "@/app/admin/layout"
 import CasoDisputaPage from "@/app/admin/disputas/[id]/page"
 import ConferenciaPage from "@/app/admin/conferencia/page"
+import EntregaAutomaticaPage from "@/app/admin/entrega-automatica/page"
 import CargosPage from "@/app/admin/usuarios/page"
 import FilaDisputasPage from "@/app/admin/disputas/page"
 import FilaDenunciasPage from "@/app/admin/denuncias/page"
@@ -642,6 +643,28 @@ describe("moderação", () => {
       expect(await txt(FilaDisputasPage(search))).toContain("FILA-SECRETA")
       expect(await txt(FilaDenunciasPage(search))).toContain("denúncias")
     }
+  })
+
+  it("entrega automática: só a equipe vê o acompanhamento, com nome de loja e sem nome legal", async () => {
+    for (const who of [null, "comprador"]) {
+      as(who)
+      await expect(EntregaAutomaticaPage()).rejects.toThrow("NEXT_REDIRECT:/")
+    }
+    as("mod")
+    expect(await txt(EntregaAutomaticaPage())).toContain("Nenhum pedido de entrega automática ainda")
+
+    // 5 pedidos entregues pelo estoque, 1 em disputa: 20% e volume mínimo, então a loja fica "Em atenção".
+    for (let i = 0; i < 5; i++) {
+      const orderId = await addOrder({ status: "concluido", title: `Gift ${i}` })
+      await t.query(`INSERT INTO "delivery_stock_item" ("variantId", "sellerId", "payload", "payloadHash", "mask", "orderId", "soldAt") VALUES ($1, 'ana', NULL, $2, '••••••', $3, now())`, [variantId, `monitor-${i}`, orderId])
+      if (i === 0) await addDispute(orderId)
+    }
+    as("adm")
+    const page = await txt(EntregaAutomaticaPage())
+    expect(page).toContain("Loja da Ana")
+    expect(page).toContain("Em atenção")
+    expect(page).toContain("1 vendedor em atenção")
+    expect(page).not.toContain("Ana Maria da Silva")
   })
 
   it("a conferência mostra 'Tudo bate' num banco consistente", async () => {

@@ -2,15 +2,17 @@ import { after } from "next/server"
 import * as Sentry from "@sentry/nextjs"
 import { eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { notificationLog, order, product, productQuestion, user } from "@/lib/db/schema"
+import { notificationLog, order, product, productQuestion, productVariant, user } from "@/lib/db/schema"
 import { actionTemplate, sendMail } from "@/lib/email"
 import {
+  composeLowStockMessage,
   composeOrderMessages,
   composeQuestionMessage,
   type Message,
   type OrderNotifyKind,
 } from "@/lib/notification-messages"
 import { publicNameRaw } from "@/lib/public-name"
+import { LOW_STOCK_THRESHOLD } from "@/lib/seller-alerts"
 import { SITE_URL } from "@/lib/site"
 
 /**
@@ -160,6 +162,47 @@ export function notifyQuestion(kind: "question_asked" | "question_answered", que
       kind,
       `question:${questionId}`,
       message,
+    )
+  })
+}
+
+/**
+ * Estoque baixo ou esgotado depois de uma compra: avisa o vendedor por e-mail. Lê o estoque DE AGORA (não o que a compra
+ * achou) e só avisa de item ativo, de anúncio ativo, a partir do limite do painel. No máximo um aviso de "baixo" e um de
+ * "esgotado" por item por dia (Brasília), para uma sequência de vendas não virar uma sequência de e-mails.
+ */
+export function notifyLowStock(variantId: number) {
+  schedule(async () => {
+    const [row] = await db
+      .select({
+        sellerId: product.sellerId,
+        productId: product.id,
+        productTitle: product.title,
+        deliveryType: product.deliveryType,
+        productStatus: product.status,
+        variantLabel: productVariant.label,
+        stock: productVariant.stock,
+        active: productVariant.active,
+      })
+      .from(productVariant)
+      .innerJoin(product, eq(product.id, productVariant.productId))
+      .where(eq(productVariant.id, variantId))
+      .limit(1)
+    if (!row || row.productStatus !== "ativo" || !row.active || row.stock > LOW_STOCK_THRESHOLD) return
+
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date())
+    const level = row.stock <= 0 ? "zero" : "baixo"
+    await deliver(
+      row.sellerId,
+      "low_stock",
+      `stock:${variantId}:${day}:${level}`,
+      composeLowStockMessage({
+        productId: row.productId,
+        productTitle: row.productTitle,
+        variantLabel: row.variantLabel,
+        stock: row.stock,
+        automatic: row.deliveryType === "automatica",
+      }),
     )
   })
 }

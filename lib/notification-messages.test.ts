@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  composeOrderMessages,
+  composeLowStockMessage, composeOrderMessages,
   composeQuestionMessage,
   type OrderContext,
   type OrderNotifyKind,
@@ -106,5 +106,36 @@ describe("composeQuestionMessage", () => {
     const m = composeQuestionMessage("question_asked", { ...base, text: "x".repeat(400) })
     expect(m.intro.length).toBeLessThan(500)
     expect(m.intro).toContain("…")
+  })
+})
+
+describe("composeLowStockMessage", () => {
+  const base = { productId: 7, productTitle: "Conta Valorant", variantLabel: "Imortal", stock: 2, automatic: false }
+
+  it("estoque baixo: diz quantas unidades restam e leva à edição do anúncio", () => {
+    const m = composeLowStockMessage(base)
+    expect(m.recipient).toBe("seller")
+    expect(m.subject).toBe("Estoque baixo: Imortal")
+    expect(m.intro).toContain("2 unidades")
+    expect(composeLowStockMessage({ ...base, stock: 1 }).intro).toContain("1 unidade ")
+    expect(m.path).toBe("/painel/vendedor/produtos/7")
+    expect(m.buttonLabel).toBe("Atualizar o estoque")
+  })
+
+  it("sem estoque: avisa que não pode mais ser comprado", () => {
+    const m = composeLowStockMessage({ ...base, stock: 0 })
+    expect(m.subject).toBe("Estoque esgotado: Imortal")
+    expect(m.intro).toContain("não pode mais ser comprado")
+  })
+
+  it("entrega automática pede para cadastrar itens e leva à tela de estoque", () => {
+    const m = composeLowStockMessage({ ...base, automatic: true, stock: 0 })
+    expect(m.intro).toContain("Cadastre mais itens")
+    expect(m.path).toBe("/painel/vendedor/produtos/7/estoque")
+    expect(m.buttonLabel).toBe("Cadastrar itens")
+  })
+
+  it("não promete o que o site não cumpre", () => {
+    for (const stock of [0, 1, 2]) expect(JSON.stringify(composeLowStockMessage({ ...base, stock }))).not.toMatch(/garantia|24\/7|em minutos|verificado/i)
   })
 })

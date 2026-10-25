@@ -270,6 +270,15 @@ R$ 1,00…R$ 100.000,00) only fills the fields, nothing leaves the browser until
 of a listing of the session user, every value is validated before anything is written (one bad row refuses the batch, one transaction), and the stock of an automatic listing is refused (it is the number of registered items). Price/stock limits
 (`MAX_PRICE_CENTS`, `MIN_PRICE_CENTS`, `MAX_STOCK`) live in `lib/listing-checks.ts` and are shared with the listing form.
 
+### Fee statement, new-seller checklist, low-stock email, auto-delivery watch
+
+`/painel/vendedor/extrato` (+ `/exportar` CSV, 10/h): COMPLETED sales of the last 12 São Paulo months, one row per month plus total (`getMonthlyStatement`, `lib/seller-statement.ts`; pure month math in `lib/statement-math.ts`), a sale counts in the month of its
+`completedAt`, refunded/cancelled never count, and the page says it is not a tax document. `buildChecklist` (`lib/seller-checklist.ts`, pure; inputs from `getChecklistInputs` in `lib/seller-checklist-data.ts`) is the "Complete a sua loja" card on the summary:
+fixed steps count for progress, "pendências" (unanswered questions/reviews) only appear while they exist, and the card disappears at `NEW_SELLER_SALES` (10) completed sales or when nothing is left; a missing goal/reply table just drops that
+item. `notifyLowStock(variantId)` (`lib/notify.ts`, called by `purchase` after the commit) emails the seller when an ACTIVE item of an ACTIVE listing is at ≤ `LOW_STOCK_THRESHOLD` (2) units, reading the stock at send time, at most one "baixo" and one "zero"
+email per item per São Paulo day (`refId stock:<variant>:<day>:<level>` in `notification_log`); `purchase` tests that mock `@/lib/notify` must also provide `notifyLowStock`. `/admin/entrega-automatica` (`lib/auto-delivery-monitor.ts`, staff only via
+`getStaff()`, NOT `getCurrentStaff()` which returns any logged user) shows, per seller of stock-delivered orders, orders / disputes / buyer-won / refunded and flags 5+ orders with 10%+ disputes: this is the brake for the "no sales gate" decision on automatic delivery.
+
 ### Wallet reconciliation
 
 `lib/reconcile.ts` (read-only, 12 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =

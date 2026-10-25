@@ -14,6 +14,7 @@ const holder = vi.hoisted(() => ({
   pool: null as unknown as TestDb["pool"],
   userId: null as string | null,
   notifications: [] as [string, number, unknown?][],
+  lowStock: [] as number[],
 }))
 
 vi.mock("@/lib/db", () => ({
@@ -35,6 +36,9 @@ vi.mock("@vercel/blob", () => ({ del: async () => {} }))
 vi.mock("@/lib/notify", () => ({
   notifyOrder: (kind: string, orderId: number, extra?: unknown) => {
     holder.notifications.push([kind, orderId, extra])
+  },
+  notifyLowStock: (variantId: number) => {
+    holder.lowStock.push(variantId)
   },
 }))
 
@@ -67,6 +71,7 @@ beforeEach(async () => {
   vi.stubEnv("DELIVERY_ENCRYPTION_KEY", KEY)
   holder.userId = null
   holder.notifications.length = 0
+  holder.lowStock.length = 0
   await t.query(
     `TRUNCATE "auth_attempt", "delivery_stock_item", "wallet_transaction", "order_message", "dispute_message", "dispute", "order", "product_image", "product_variant", "product", "wallet", "seller_application", "profile", "user" RESTART IDENTITY CASCADE`,
   )

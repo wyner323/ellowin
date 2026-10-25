@@ -38,6 +38,7 @@ vi.mock("@/lib/notify", () => ({
   notifyOrder: (kind: string, orderId: number, extra?: unknown) => {
     holder.notifications.push([kind, orderId, extra])
   },
+  notifyLowStock: () => {},
 }))
 vi.mock("@sentry/nextjs", () => ({ captureException: () => {} }))
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
 import { redirect } from "next/navigation"
-import { CheckCircle2, Clock, Download, Lock } from "lucide-react"
+import { CheckCircle2, Clock, Download, Lock, Receipt } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
@@ -88,14 +88,20 @@ export default async function VendasPage({
               </p>
             </div>
             {list.allCount > 0 ? (
-              <Button
-                render={<Link href={`/painel/vendedor/vendas/exportar?periodo=todos${status ? `&status=${status}` : ""}`} prefetch={false} />}
-                variant="outline"
-                size="sm"
-              >
-                <Download className="size-3.5" aria-hidden="true" />
-                Exportar CSV{status ? ` (${PILL_LABEL[status] ?? status})` : ""}
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button render={<Link href="/painel/vendedor/extrato" />} variant="outline" size="sm">
+                  <Receipt className="size-3.5" aria-hidden="true" />
+                  Extrato de taxas
+                </Button>
+                <Button
+                  render={<Link href={`/painel/vendedor/vendas/exportar?periodo=todos${status ? `&status=${status}` : ""}`} prefetch={false} />}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Download className="size-3.5" aria-hidden="true" />
+                  Exportar CSV{status ? ` (${PILL_LABEL[status] ?? status})` : ""}
+                </Button>
+              </div>
             ) : null}
           </header>
 

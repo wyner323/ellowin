@@ -15,7 +15,7 @@ import { claimStockItem, stockTableExistsIn, syncStock } from "@/lib/delivery-st
 import { getOrderMessages } from "@/lib/orders"
 import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, formatCents, splitOrderAmount } from "@/lib/money"
-import { notifyOrder } from "@/lib/notify"
+import { notifyLowStock, notifyOrder } from "@/lib/notify"
 import { hitRateLimit } from "@/lib/rate-limit"
 import { encryptField, isEncrypted } from "@/lib/secret-box"
 import { accountBlock, getUserId } from "@/lib/session"
@@ -190,6 +190,7 @@ export async function purchase(
 
     // Um único aviso para entrega automática (o texto já diz que foi entregue): não manda também "pedido entregue".
     notifyOrder("order_created", orderId, { automatic })
+    notifyLowStock(variantId)
 
     revalidatePath("/pedidos")
     revalidatePath("/carteira")

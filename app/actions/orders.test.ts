@@ -15,6 +15,7 @@ const holder = vi.hoisted(() => ({
   pool: null as unknown as TestDb["pool"],
   userId: null as string | null,
   notifications: [] as [string, number, unknown?][],
+  lowStock: [] as number[],
   revalidated: [] as string[],
 }))
 
@@ -45,6 +46,9 @@ vi.mock("@/lib/notify", () => ({
   notifyOrder: (kind: string, orderId: number, extra?: unknown) => {
     holder.notifications.push([kind, orderId, extra])
   },
+  notifyLowStock: (variantId: number) => {
+    holder.lowStock.push(variantId)
+  },
 }))
 
 import { cancelOrder, confirmReceipt, markDelivered, postOrderMessage, purchase } from "@/app/actions/orders"
@@ -72,6 +76,7 @@ afterAll(async () => {
 beforeEach(async () => {
   holder.userId = null
   holder.notifications.length = 0
+  holder.lowStock.length = 0
   holder.revalidated.length = 0
   await t.query(
     `TRUNCATE "auth_attempt", "wallet_transaction", "order_message", "dispute_message", "dispute", "order", "product_variant", "product", "wallet", "profile", "user" RESTART IDENTITY CASCADE`,
@@ -227,6 +232,16 @@ describe("purchase", () => {
     expect(await purchase(variantId, 10_000)).toMatchObject({ ok: false, error: "Item esgotado." })
     expect(await orderCount()).toBe(0)
     expect((await wallet("buyer")).heldCents).toBe(0)
+  })
+
+  it("depois de comprar, pede o aviso de estoque baixo do item comprado (e só se a compra deu certo)", async () => {
+    const { variantId } = await addListing({ stock: 3 })
+    await buy(variantId)
+    expect(holder.lowStock).toEqual([variantId])
+    holder.lowStock.length = 0
+    holder.userId = "buyer"
+    expect(await purchase(999_999, 10_000)).toMatchObject({ ok: false })
+    expect(holder.lowStock).toEqual([])
   })
 
   it("exige estar logado", async () => {

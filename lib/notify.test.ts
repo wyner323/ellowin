@@ -44,7 +44,7 @@ vi.mock("@sentry/nextjs", () => ({
   captureMessage: () => {},
 }))
 
-import { notificationsLive, notifyOrder, notifyQuestion } from "@/lib/notify"
+import { notificationsLive, notifyLowStock, notifyOrder, notifyQuestion } from "@/lib/notify"
 import { SITE_URL } from "@/lib/site"
 
 let t: TestDb
@@ -391,5 +391,87 @@ describe("notifyQuestion", () => {
     notifyQuestion("question_asked", 999)
     await settle()
     expect(holder.sendMail).not.toHaveBeenCalled()
+  })
+})
+
+describe("notifyLowStock", () => {
+  const setStock = (stock: number) => t.query(`UPDATE "product_variant" SET "stock" = $2 WHERE "id" = $1`, [variantId, stock])
+
+  it("estoque baixo: avisa o VENDEDOR com o item, a quantidade e o link para atualizar o estoque", async () => {
+    await setStock(2)
+    notifyLowStock(variantId)
+    await settle()
+    expect(mails()).toHaveLength(1)
+    const [to, subject, html] = mails()[0]
+    expect(to).toBe("ana@teste.dev")
+    expect(subject).toBe("Estoque baixo: Imortal")
+    expect(html).toContain("2 unidades")
+    expect(html).toContain(`${SITE_URL}/painel/vendedor/produtos/${productId}`)
+  })
+
+  it("esgotado: texto próprio, e anúncio de entrega automática leva à tela de estoque de itens", async () => {
+    await t.query(`UPDATE "product" SET "deliveryType" = $2 WHERE "id" = $1`, [productId, "automatica"])
+    await setStock(0)
+    notifyLowStock(variantId)
+    await settle()
+    expect(mails()[0][1]).toBe("Estoque esgotado: Imortal")
+    expect(mails()[0][2]).toContain("sem estoque")
+    expect(mails()[0][2]).toContain(`/painel/vendedor/produtos/${productId}/estoque`)
+  })
+
+  it("acima do limite do painel (2 unidades) não avisa", async () => {
+    await setStock(3)
+    notifyLowStock(variantId)
+    await settle()
+    expect(holder.sendMail).not.toHaveBeenCalled()
+  })
+
+  it("anúncio pausado, item desativado ou inexistente: não avisa", async () => {
+    await setStock(1)
+    await t.query(`UPDATE "product" SET "status" = $2 WHERE "id" = $1`, [productId, "pausado"])
+    notifyLowStock(variantId)
+    await settle()
+    await t.query(`UPDATE "product" SET "status" = $2 WHERE "id" = $1`, [productId, "ativo"])
+    await t.query(`UPDATE "product_variant" SET "active" = false WHERE "id" = $1`, [variantId])
+    notifyLowStock(variantId)
+    await settle()
+    notifyLowStock(999_999)
+    await settle()
+    expect(holder.sendMail).not.toHaveBeenCalled()
+  })
+
+  it("no máximo um aviso de estoque baixo e um de esgotado por item por dia", async () => {
+    await setStock(2)
+    notifyLowStock(variantId)
+    notifyLowStock(variantId)
+    await settle()
+    await setStock(1)
+    notifyLowStock(variantId) // mesmo dia, mesmo nível ("baixo"): não repete
+    await settle()
+    expect(mails()).toHaveLength(1)
+    await setStock(0)
+    notifyLowStock(variantId) // nível novo ("zero"): avisa
+    notifyLowStock(variantId)
+    await settle()
+    expect(mails().map((m) => m[1])).toEqual(["Estoque baixo: Imortal", "Estoque esgotado: Imortal"])
+  })
+
+  it("itens diferentes não se bloqueiam", async () => {
+    const other = (await t.query(`INSERT INTO "product_variant" ("productId", "label", "priceCents", "stock") VALUES ($1, $2, 5000, 1) RETURNING "id"`, [productId, "Radiante"])).rows[0].id as number
+    await setStock(1)
+    notifyLowStock(variantId)
+    notifyLowStock(other)
+    await settle()
+    expect(mails().map((m) => m[1]).sort()).toEqual(["Estoque baixo: Imortal", "Estoque baixo: Radiante"])
+  })
+
+  it("FORA da produção não envia nada nem grava reserva", async () => {
+    vi.stubEnv("ELLOWIN_NOTIFY", "")
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    await setStock(0)
+    notifyLowStock(variantId)
+    await settle()
+    expect(holder.sendMail).not.toHaveBeenCalled()
+    expect(await logRows()).toEqual([])
   })
 })

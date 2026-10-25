@@ -49,6 +49,12 @@ export default async function AdminLayout({
             >
               Denúncias
             </Link>
+            <Link
+              href="/admin/entrega-automatica"
+              className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Entrega automática
+            </Link>
             {staff.role === "admin" ? (
               <Link
                 href="/admin/conferencia"
