@@ -31,22 +31,29 @@ export type TestDb = {
   close: () => Promise<void>
 }
 
+/** Todas as instruções SQL das migrações de `drizzle/`, na ordem (banco em memória e Postgres real dos testes de concorrência). */
+export function migrationStatements(): string[] {
+  const dir = path.resolve(process.cwd(), "drizzle")
+  const files = readdirSync(dir)
+    .filter((f) => /^\d{4}_.+\.sql$/.test(f))
+    .sort()
+  const statements: string[] = []
+  for (const file of files) {
+    const text = readFileSync(path.join(dir, file), "utf8")
+    for (const statement of text.split("--> statement-breakpoint")) {
+      if (statement.trim()) statements.push(statement)
+    }
+  }
+  return statements
+}
+
 export async function createTestDb(): Promise<TestDb> {
   const pg = new PGlite()
   // O Neon roda em UTC; sem isto o PGlite usa o fuso da máquina e `now()` gravado em colunas
   // `timestamp` (sem fuso) deixa de bater com as datas que o Drizzle envia (ISO em UTC).
   await pg.exec("SET TIME ZONE 'UTC'")
 
-  const dir = path.resolve(process.cwd(), "drizzle")
-  const files = readdirSync(dir)
-    .filter((f) => /^\d{4}_.+\.sql$/.test(f))
-    .sort()
-  for (const file of files) {
-    const text = readFileSync(path.join(dir, file), "utf8")
-    for (const statement of text.split("--> statement-breakpoint")) {
-      if (statement.trim()) await pg.exec(statement)
-    }
-  }
+  for (const statement of migrationStatements()) await pg.exec(statement)
 
   const query = async (text: string, params?: unknown[]): Promise<QueryResult> => {
     const result = await pg.query<Record<string, unknown>>(text, params)

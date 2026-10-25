@@ -58,3 +58,43 @@ jobs:
       # travar a CI, avalie o caso e, se não for explorável aqui, suba o nível temporariamente.
       - name: Audit
         run: pnpm audit --prod --audit-level=high
+
+  # Concorrência de verdade: o banco em memória dos testes comuns tem uma conexão só e não reproduz duas
+  # transações simultâneas. Aqui um Postgres real roda `app/actions/concurrency.pg.test.ts` (compras da última
+  # unidade, confirmação em dobro, varredura x cancelamento, saques e depósitos paralelos). Cada arquivo cria e
+  # apaga o próprio banco `ellowin_test_*` dentro deste serviço descartável.
+  concurrency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Testes de concorrência (Postgres real)
+        run: pnpm exec vitest run app/actions/concurrency.pg.test.ts
+        env:
+          PG_TEST_URL: postgresql://postgres:postgres@localhost:5432/postgres

@@ -3,7 +3,13 @@ import * as Sentry from "@sentry/nextjs"
 import { db } from "@/lib/db"
 import { dispute, order } from "@/lib/db/schema"
 import { notifyOrder } from "@/lib/notify"
-import { refundEscrow, releaseEscrowToSeller, transitionOrder, withTransaction } from "@/lib/wallet"
+import {
+  refundEscrow,
+  releaseEscrowToSeller,
+  StateConflictError,
+  transitionOrder,
+  withTransaction,
+} from "@/lib/wallet"
 
 /**
  * As três varreduras de SLA — separadas de lib/sla.ts (que fica só com as
@@ -151,7 +157,19 @@ export async function sweepDeliveryDeadline() {
 
       if (!ord || ord.status !== "aguardando_entrega") continue
 
-      await withTransaction(async (client) => {
+      const settled = await withTransaction(async (client) => {
+        // Primeiro passo, como em cancelOrder/confirmReceipt: trava a linha do pedido ANTES das
+        // carteiras. Com a ordem invertida (carteiras, depois o pedido) uma varredura e um
+        // cancelamento simultâneos travavam um ao outro ("deadlock detected" no Postgres real).
+        // Se o status mudou depois do SELECT acima (o vendedor entregou, o comprador cancelou),
+        // não há o que fazer: a outra rota já cuidou do pedido.
+        try {
+          await transitionOrder(client, ord.id, ["aguardando_entrega"], "reembolsado", { completed: true })
+        } catch (error) {
+          if (error instanceof StateConflictError) return false
+          throw error
+        }
+
         await refundEscrow(
           client,
           ord.buyerId,
@@ -159,20 +177,6 @@ export async function sweepDeliveryDeadline() {
           ord.id,
           `Reembolso automático por prazo de entrega — pedido #${ord.id}`,
         )
-
-        // Guarda a mesma corrida do re-check acima, mas dentro da própria
-        // transação: se o status mudou entre o SELECT de cima e aqui (ex.:
-        // vendedor entregou ou comprador cancelou nesse intervalo), o UPDATE
-        // não afeta nenhuma linha e a transação inteira desfaz o
-        // refundEscrow já executado.
-        const updated = await client.query(
-          `UPDATE "order" SET "status" = 'reembolsado', "completedAt" = now()
-            WHERE "id" = $1 AND "status" = 'aguardando_entrega'`,
-          [ord.id],
-        )
-        if (updated.rowCount === 0) {
-          throw new Error(`pedido #${ord.id} saiu de aguardando_entrega durante o reembolso`)
-        }
 
         await client.query(
           `UPDATE "product_variant" SET "stock" = "stock" + 1 WHERE "id" = $1`,
@@ -187,8 +191,10 @@ export async function sweepDeliveryDeadline() {
             "Prazo de entrega encerrado sem confirmação do vendedor. O valor em custódia foi devolvido ao comprador automaticamente.",
           ],
         )
+        return true
       })
 
+      if (!settled) continue
       notifyOrder("order_refunded_deadline", ord.id)
       processed += 1
     } catch (error) {
@@ -237,7 +243,16 @@ export async function sweepAutoRelease() {
 
       if (!ord || ord.status !== "entregue") continue
 
-      await withTransaction(async (client) => {
+      const settled = await withTransaction(async (client) => {
+        // Primeiro passo: trava o pedido antes das carteiras (mesma ordem de confirmReceipt;
+        // ver o comentário em sweepDeliveryDeadline). Status já mudado = outra rota liquidou.
+        try {
+          await transitionOrder(client, ord.id, ["entregue"], "concluido", { completed: true })
+        } catch (error) {
+          if (error instanceof StateConflictError) return false
+          throw error
+        }
+
         await releaseEscrowToSeller(client, {
           buyerId: ord.buyerId,
           sellerId: ord.sellerId,
@@ -247,18 +262,6 @@ export async function sweepAutoRelease() {
           orderId: ord.id,
           description: `${ord.productTitle} (${ord.variantLabel})`,
         })
-
-        // Mesma trava por linha afetada dos outros sweeps: se o status mudou
-        // entre o SELECT de cima e aqui, desfaz o releaseEscrowToSeller já
-        // executado.
-        const updated = await client.query(
-          `UPDATE "order" SET "status" = 'concluido', "completedAt" = now()
-            WHERE "id" = $1 AND "status" = 'entregue'`,
-          [ord.id],
-        )
-        if (updated.rowCount === 0) {
-          throw new Error(`pedido #${ord.id} saiu de entregue durante a liberação`)
-        }
 
         await client.query(
           `UPDATE "product" SET "salesCount" = "salesCount" + 1 WHERE "id" = $1`,
@@ -273,8 +276,10 @@ export async function sweepAutoRelease() {
             "Prazo de confirmação encerrado sem ação do comprador. O valor em custódia foi liberado ao vendedor automaticamente.",
           ],
         )
+        return true
       })
 
+      if (!settled) continue
       notifyOrder("order_auto_completed", ord.id)
       processed += 1
     } catch (error) {
