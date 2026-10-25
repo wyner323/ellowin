@@ -52,3 +52,17 @@ export function accountOriginRetainsRecoveryData(id: string | null) {
 export function isValidAccountOrigin(id: string): id is AccountOriginId {
   return OPTION_BY_ID.has(id as AccountOriginId)
 }
+
+/**
+ * Registro da procedência declarada, gravado como mensagem do sistema no chat do pedido na hora da compra: o vendedor pode
+ * editar o anúncio depois, mas o que ele declarou quando o comprador pagou fica no pedido (para os dois e para a moderação
+ * numa disputa). Nulo se não há procedência válida. A Ellowin não confere a informação: o texto diz que é declaração.
+ */
+export function originPurchaseNote(id: string | null): string | null {
+  const label = accountOriginLabel(id)
+  if (!label) return null
+  const base = `Procedência da conta declarada pelo vendedor no anúncio (registrada na hora da compra): ${label}.`
+  return accountOriginRetainsRecoveryData(id)
+    ? `${base} O vendedor informou que ainda tem dados de recuperação da conta: troque a senha, o e-mail e a verificação em duas etapas assim que receber, antes de confirmar o recebimento.`
+    : base
+}

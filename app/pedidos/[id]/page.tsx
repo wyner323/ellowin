@@ -6,6 +6,7 @@ import { ArrowLeft, MessageSquare, ShieldCheck } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { LiveRefresh } from "@/components/live-refresh"
+import { AccountSecurityChecklist } from "@/components/orders/account-security-checklist"
 import { OrderActions } from "@/components/orders/order-actions"
 import { OrderChat } from "@/components/orders/order-chat"
 import { OrderStatusBadge, OrderStatusIcon } from "@/components/orders/order-status-badge"
@@ -192,6 +193,8 @@ export default async function PedidoPage({
                     </p>
                   </section>
                 ) : null}
+
+                {viewer.isBuyer && detail.status === "entregue" && detail.categorySlug === "contas" ? <AccountSecurityChecklist /> : null}
 
                 {detail.dispute ? (
                   <section className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-5">

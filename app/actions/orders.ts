@@ -13,6 +13,7 @@ import {
 } from "@/lib/chat-limits"
 import { claimStockItem, stockTableExistsIn, syncStock } from "@/lib/delivery-stock"
 import { getOrderMessages } from "@/lib/orders"
+import { originPurchaseNote } from "@/lib/account-origin"
 import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, formatCents, splitOrderAmount } from "@/lib/money"
 import { notifyLowStock, notifyOrder } from "@/lib/notify"
@@ -91,9 +92,11 @@ export async function purchase(
         status: string
         deliveryType: string
         deliveryTime: string
+        categorySlug: string
+        accountOrigin: string | null
       }>(
         `SELECT v."id", v."productId", v."label", v."priceCents", v."stock", v."active",
-                p."title", p."sellerId", p."status", p."deliveryType", p."deliveryTime"
+                p."title", p."sellerId", p."status", p."deliveryType", p."deliveryTime", p."categorySlug", p."accountOrigin"
            FROM "product_variant" v
            JOIN "product" p ON p."id" = v."productId"
           WHERE v."id" = $1
@@ -143,6 +146,13 @@ export async function purchase(
       )
 
       const newOrderId = inserted.rows[0].id
+
+      // Conta de jogo: o que o vendedor declarou sobre a procedência na hora em que o comprador pagou fica registrado no
+      // pedido (mensagem do sistema), mesmo que ele edite o anúncio depois. É declaração, a Ellowin não confere.
+      const originNote = variant.categorySlug === "contas" ? originPurchaseNote(variant.accountOrigin) : null
+      if (originNote) {
+        await client.query(`INSERT INTO "order_message" ("orderId", "authorRole", "body") VALUES ($1, 'system', $2)`, [newOrderId, originNote])
+      }
 
       await moveToEscrow(
         client,

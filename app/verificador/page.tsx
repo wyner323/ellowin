@@ -1,11 +1,12 @@
 import type { Metadata } from "next"
-import { Search, ShieldCheck, ShieldAlert } from "lucide-react"
+import { Info, Search, ShieldCheck, ShieldAlert } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getSellerStorefront } from "@/lib/marketplace"
+import { sealState, sealText } from "@/lib/seller-seal"
 
 export const metadata: Metadata = {
   title: "Verificador de contas",
@@ -28,6 +29,7 @@ export default async function VerificadorPage({
       : raw
     : undefined
   const store = slug ? await getSellerStorefront(slug) : null
+  const seal = store ? sealState({ flagCount: store.accountFlags.count, completedSales: store.accountFlags.completedSales, lastFlaggedAt: store.accountFlags.lastFlaggedAt }) : null
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -70,10 +72,15 @@ export default async function VerificadorPage({
                   </div>
                 </div>
 
-                {store.accountFlags.count === 0 ? (
+                {seal?.kind === "certificado" ? (
                   <p className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/5 p-3 text-sm text-success">
                     <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                    Selo de Certificação — nenhum registro de conta recuperada encontrado.
+                    {sealText(seal)}.
+                  </p>
+                ) : seal?.kind === "novo" ? (
+                  <p className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+                    <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                    {sealText(seal)}.
                   </p>
                 ) : (
                   <p className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">

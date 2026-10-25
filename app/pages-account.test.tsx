@@ -323,13 +323,26 @@ describe("verificador de contas", () => {
     expect(t1).not.toContain("Loja não encontrada")
   })
 
-  it("loja sem registros recebe o selo; o nome legal não aparece", async () => {
+  it("loja sem registros E com vendas concluídas recebe o selo, com o número de vendas; o nome legal não aparece", async () => {
     await addStore("loja-da-ana")
+    await t.query(`INSERT INTO "user" ("id", "name", "email") VALUES ('c', 'Comprador', 'c@teste.dev')`)
+    await t.query(`INSERT INTO "product" ("sellerId", "slug", "title", "categorySlug") VALUES ('ana', 'p', 'P', 'contas')`)
+    await t.query(`INSERT INTO "product_variant" ("productId", "label", "priceCents", "stock") VALUES (1, 'x', 100, 1)`)
+    for (let i = 0; i < 2; i++) {
+      await t.query(`INSERT INTO "order" ("buyerId", "sellerId", "productId", "variantId", "productTitle", "variantLabel", "amountCents", "status") VALUES ('c', 'ana', 1, 1, 'x', 'y', 100, 'concluido')`)
+    }
     const t1 = await verificar("loja-da-ana")
     expect(t1).toContain("Loja da Ana")
     expect(t1).toContain("Nível 3")
-    expect(t1).toContain("nenhum registro de conta recuperada encontrado")
+    expect(t1).toContain("Selo de Certificação: sem registros de conta recuperada em 2 vendas concluídas")
     expect(t1).not.toContain("Ana Maria da Silva")
+  })
+
+  it("loja nova, sem vendas concluídas, NÃO recebe o selo: aparece como vendedor novo", async () => {
+    await addStore("loja-da-ana")
+    const t1 = await verificar("loja-da-ana")
+    expect(t1).toContain("Vendedor novo: ainda sem vendas concluídas")
+    expect(t1).not.toContain("Selo de Certificação")
   })
 
   it("aceita o link colado inteiro, com ou sem protocolo, e ignora o resto da URL", async () => {

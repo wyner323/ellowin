@@ -7,6 +7,7 @@ import {
   BadgeCheck,
   ChevronRight,
   Clock,
+  Info,
   Meh,
   Package,
   ShieldAlert,
@@ -35,6 +36,7 @@ import { buildProductJsonLd, serializeJsonLd } from "@/lib/product-jsonld"
 import { countsAsView, recordProductView } from "@/lib/product-views"
 import { breadcrumbJsonLd, productSeo } from "@/lib/seo"
 import { getFavoriteState } from "@/lib/favorites"
+import { sealState, sealText } from "@/lib/seller-seal"
 import { getSession } from "@/lib/session"
 import { SITE_URL } from "@/lib/site"
 import { getWalletSummary } from "@/lib/wallet"
@@ -106,6 +108,8 @@ export default async function ProductPage({
       : item.game
         ? `/busca?q=${encodeURIComponent(item.game)}`
         : `/catalogo/${item.categorySlug}`
+  const seal = sealState({ flagCount: item.seller.accountFlags.count, completedSales: item.seller.accountFlags.completedSales })
+  const sealLine = sealText(seal)
   const originLabel = accountOriginLabel(item.accountOrigin)
   const originRetainsRecovery = accountOriginRetainsRecoveryData(item.accountOrigin)
   const { positivas, neutras, negativas } = item.seller.reputation
@@ -215,10 +219,10 @@ export default async function ProductPage({
                   </div>
                 ) : null}
 
-                {item.seller.accountFlags.count === 0 ? (
-                  <p className="flex items-center gap-1.5 text-xs font-medium text-success">
-                    <ShieldCheck className="size-3.5 shrink-0" aria-hidden="true" />
-                    Selo de Certificação — sem registros de conta recuperada
+                {sealLine ? (
+                  <p className={seal.kind === "certificado" ? "flex items-center gap-1.5 text-xs font-medium text-success" : "flex items-center gap-1.5 text-xs text-muted-foreground"}>
+                    {seal.kind === "certificado" ? <ShieldCheck className="size-3.5 shrink-0" aria-hidden="true" /> : <Info className="size-3.5 shrink-0" aria-hidden="true" />}
+                    {sealLine}
                   </p>
                 ) : null}
 
@@ -275,8 +279,13 @@ export default async function ProductPage({
                     ) : (
                       <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                     )}
-                    <span>
-                      <strong>Procedência:</strong> {originLabel}
+                    <span className="flex flex-col gap-0.5">
+                      <span>
+                        <strong>Procedência declarada pelo vendedor:</strong> {originLabel}
+                      </span>
+                      <span className="text-xs opacity-80">
+                        A Ellowin não confere essa informação. O pagamento fica em custódia até você receber a conta, conferir e confirmar o recebimento.
+                      </span>
                     </span>
                   </div>
                 ) : null}

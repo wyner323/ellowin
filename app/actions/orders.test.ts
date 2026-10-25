@@ -244,6 +244,29 @@ describe("purchase", () => {
     expect(holder.lowStock).toEqual([])
   })
 
+  it("conta de jogo: a procedência declarada na hora da compra fica registrada no pedido, mesmo se o anúncio mudar depois", async () => {
+    const { productId, variantId } = await addListing()
+    await t.query(`UPDATE "product" SET "categorySlug" = 'contas', "accountOrigin" = 'comprado_com_recuperacao' WHERE "id" = $1`, [productId])
+    const orderId = await buy(variantId)
+    await t.query(`UPDATE "product" SET "accountOrigin" = 'criador_sem_recuperacao' WHERE "id" = $1`, [productId]) // o vendedor edita depois
+    const notes = (await t.query(`SELECT "authorRole", "body" FROM "order_message" WHERE "orderId" = $1`, [orderId])).rows as { authorRole: string; body: string }[]
+    expect(notes).toHaveLength(1)
+    expect(notes[0].authorRole).toBe("system")
+    expect(notes[0].body).toContain("Comprei de outro jogador/loja — ainda tenho dados de recuperação")
+    expect(notes[0].body).toContain("antes de confirmar o recebimento")
+    expect(notes[0].body).not.toContain("Sou o criador")
+  })
+
+  it("só conta de jogo registra procedência: outra categoria, ou conta sem procedência, não grava mensagem", async () => {
+    const outra = await addListing()
+    await t.query(`UPDATE "product" SET "categorySlug" = 'gift-cards', "accountOrigin" = 'criador_sem_recuperacao' WHERE "id" = $1`, [outra.productId])
+    const semOrigem = await addListing()
+    for (const variantId of [outra.variantId, semOrigem.variantId]) {
+      const orderId = await buy(variantId)
+      expect((await t.query(`SELECT 1 FROM "order_message" WHERE "orderId" = $1`, [orderId])).rows).toEqual([])
+    }
+  })
+
   it("exige estar logado", async () => {
     const { variantId } = await addListing()
     holder.userId = null

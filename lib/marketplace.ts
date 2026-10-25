@@ -286,7 +286,7 @@ export type ProductDetail = {
     level: number
     storeSlug: string | null
     reputation: { positivas: number; neutras: number; negativas: number }
-    accountFlags: { count: number; lastFlaggedAt: Date | null }
+    accountFlags: { count: number; lastFlaggedAt: Date | null; completedSales: number }
   }
   variants: {
     id: number
@@ -580,16 +580,24 @@ export async function getSellerReputationBreakdown(sellerId: string) {
  * sinalizar sem vazar detalhes de um caso específico publicamente.
  */
 export async function getSellerAccountFlagSummary(sellerId: string) {
-  const [row] = await db
-    .select({
-      count: sql<number>`count(*)`,
-      lastFlaggedAt: sql<Date | null>`max(${sellerAccountFlag.createdAt})`,
-    })
-    .from(sellerAccountFlag)
-    .where(eq(sellerAccountFlag.sellerId, sellerId))
+  const [[row], [sales]] = await Promise.all([
+    db
+      .select({
+        count: sql<number>`count(*)`,
+        lastFlaggedAt: sql<Date | null>`max(${sellerAccountFlag.createdAt})`,
+      })
+      .from(sellerAccountFlag)
+      .where(eq(sellerAccountFlag.sellerId, sellerId)),
+    // Vendas concluídas: o histórico que dá valor ao selo (sem vendas, "sem registros" não prova nada; ver lib/seller-seal.ts).
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(order)
+      .where(and(eq(order.sellerId, sellerId), eq(order.status, "concluido"))),
+  ])
 
   return {
     count: Number(row?.count ?? 0),
+    completedSales: sales?.n ?? 0,
     // O driver devolve o agregado `max()` como string, não como Date — apesar
     // do `sql<Date | null>` acima ser só uma anotação de tipo, sem conversão
     // em tempo de execução.

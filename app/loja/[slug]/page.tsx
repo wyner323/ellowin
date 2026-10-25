@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Image from "next/image"
 import { notFound } from "next/navigation"
-import { CalendarDays, Clock, Gauge, MessageSquareText, Meh, ShieldCheck, Timer, ThumbsDown, ThumbsUp } from "lucide-react"
+import { CalendarDays, Clock, Gauge, Info, MessageSquareText, Meh, ShieldCheck, Timer, ThumbsDown, ThumbsUp } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { ProductCard } from "@/components/marketplace/product-card"
@@ -14,6 +14,7 @@ import { BADGE_META } from "@/lib/badges"
 import { accentColorHex } from "@/lib/accent-colors"
 import { getSellerStorefront } from "@/lib/marketplace"
 import { getSession } from "@/lib/session"
+import { sealState, sealText } from "@/lib/seller-seal"
 import { formatDurationHours, formatLastActive, isOnline } from "@/lib/time"
 import { cn, initialsOf } from "@/lib/utils"
 
@@ -42,6 +43,8 @@ export default async function LojaPage({
   if (!store) notFound()
   const viewerId = session?.user?.id ?? null
 
+  const seal = sealState({ flagCount: store.accountFlags.count, completedSales: store.accountFlags.completedSales })
+  const sealLine = sealText(seal)
   const accent = accentColorHex(store.accentColor)
   const memberSince = store.memberSince.toLocaleDateString("pt-BR", {
     month: "long",
@@ -122,10 +125,10 @@ export default async function LojaPage({
             </p>
           ) : null}
 
-          {store.accountFlags.count === 0 ? (
-            <p className="mt-4 flex items-center gap-1.5 text-xs font-medium text-success">
-              <ShieldCheck className="size-3.5 shrink-0" aria-hidden="true" />
-              Selo de Certificação — sem registros de conta recuperada
+          {sealLine ? (
+            <p className={seal.kind === "certificado" ? "mt-4 flex items-center gap-1.5 text-xs font-medium text-success" : "mt-4 flex items-center gap-1.5 text-xs text-muted-foreground"}>
+              {seal.kind === "certificado" ? <ShieldCheck className="size-3.5 shrink-0" aria-hidden="true" /> : <Info className="size-3.5 shrink-0" aria-hidden="true" />}
+              {sealLine}
             </p>
           ) : null}
 

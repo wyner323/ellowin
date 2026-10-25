@@ -310,6 +310,28 @@ describe("detalhe do pedido", () => {
   })
 })
 
+describe("proteger a conta recebida", () => {
+  it("conta de jogo entregue: o comprador vê o passo a passo; o vendedor, pedido concluído e outras categorias não", async () => {
+    const id = await addOrder({ status: "entregue", payload: "login: abc123" })
+    as("comprador")
+    const buyer = await txt(PedidoPage(props({ id: String(id) })))
+    expect(buyer).toContain("Proteja a conta antes de confirmar")
+    expect(buyer).toContain("Troque a senha")
+    expect(buyer).toContain("abra uma disputa antes de confirmar")
+
+    as("ana")
+    expect(await txt(PedidoPage(props({ id: String(id) })))).not.toContain("Proteja a conta antes de confirmar")
+
+    as("comprador")
+    await t.query(`UPDATE "order" SET "status" = 'concluido' WHERE "id" = $1`, [id])
+    expect(await txt(PedidoPage(props({ id: String(id) })))).not.toContain("Proteja a conta antes de confirmar")
+
+    await t.query(`UPDATE "order" SET "status" = 'entregue' WHERE "id" = $1`, [id])
+    await t.query(`UPDATE "product" SET "categorySlug" = 'gift-cards' WHERE "id" = $1`, [productId])
+    expect(await txt(PedidoPage(props({ id: String(id) })))).not.toContain("Proteja a conta antes de confirmar")
+  })
+})
+
 describe("disputa do pedido", () => {
   it("pedido sem disputa: 404; estranho: 404", async () => {
     const sem = await addOrder()

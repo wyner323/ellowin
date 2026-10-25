@@ -37,6 +37,7 @@ import { buildChecklist } from "@/lib/seller-checklist"
 import { getChecklistInputs } from "@/lib/seller-checklist-data"
 import { getSellerAnalytics } from "@/lib/seller-analytics"
 import { getMonthProgressInputs } from "@/lib/seller-goals"
+import { sealState } from "@/lib/seller-seal"
 import { getSession } from "@/lib/session"
 import { sweepAutoRelease, sweepDeliveryDeadline } from "@/lib/sla-sweeps"
 import { formatDurationHours } from "@/lib/time"
@@ -270,7 +271,7 @@ export default async function PainelVendedorPage() {
             level={application.level}
             rating={stats.rating}
             ratingCount={stats.ratingCount}
-            hasCertificationSeal={accountFlags.count === 0}
+            hasCertificationSeal={sealState({ flagCount: accountFlags.count, completedSales: accountFlags.completedSales }).kind === "certificado"}
           />
 
           <div className="grid gap-4 md:grid-cols-[1.6fr_1fr]">

@@ -271,6 +271,7 @@ export async function getOrderDetail(
       sellerEmail: seller.email,
       storeName: sellerApplication.storeName,
       productSlug: product.slug,
+      categorySlug: product.categorySlug,
     })
     .from(order)
     .leftJoin(buyer, eq(buyer.id, order.buyerId))

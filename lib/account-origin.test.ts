@@ -4,6 +4,7 @@ import {
   accountOriginLabel,
   accountOriginRetainsRecoveryData,
   isValidAccountOrigin,
+  originPurchaseNote,
 } from "@/lib/account-origin"
 
 describe("isValidAccountOrigin", () => {
@@ -41,5 +42,29 @@ describe("accountOriginRetainsRecoveryData", () => {
   it("retorna false pra id nulo ou desconhecido", () => {
     expect(accountOriginRetainsRecoveryData(null)).toBe(false)
     expect(accountOriginRetainsRecoveryData("chute_qualquer")).toBe(false)
+  })
+})
+
+describe("originPurchaseNote", () => {
+  it("registra o rótulo declarado e diz que a Ellowin não o confere", () => {
+    const note = originPurchaseNote("criador_sem_recuperacao")
+    expect(note).toContain("declarada pelo vendedor")
+    expect(note).toContain("registrada na hora da compra")
+    expect(note).toContain("Sou o criador da conta")
+    expect(note).not.toContain("dados de recuperação da conta:") // sem aviso extra quando não retém
+  })
+
+  it("quando o vendedor declara que ainda tem dados de recuperação, o registro manda trocar tudo antes de confirmar", () => {
+    for (const option of ACCOUNT_ORIGIN_OPTIONS.filter((o) => o.retainsRecoveryData)) {
+      const note = originPurchaseNote(option.id)
+      expect(note).toContain("ainda tem dados de recuperação")
+      expect(note).toContain("antes de confirmar o recebimento")
+    }
+  })
+
+  it("sem procedência válida não há o que registrar", () => {
+    expect(originPurchaseNote(null)).toBeNull()
+    expect(originPurchaseNote("")).toBeNull()
+    expect(originPurchaseNote("inventada")).toBeNull()
   })
 })

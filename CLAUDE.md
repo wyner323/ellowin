@@ -287,6 +287,13 @@ one SQL statement locks the product's favorites, moves every changed baseline to
 is active), a price rise just raises the baseline so a later drop alerts again. Anonymizing an account deletes its favorites (`purgeFavorites`, guarded by `to_regclass`). Every reader tolerates the missing table (`available: false`, the button simply does not render).
 Tests that mock `@/lib/notify` for `products`/bulk need `notifyPriceChange`; for `purchase`, `notifyLowStock`.
 
+### Account origin, the certification seal and buyer account safety
+
+The origin of an account listing is a DECLARATION by the seller (`lib/account-origin.ts`): the product page says so and that Ellowin does not check it. `purchase` copies what was declared at the moment of payment into the order chat as a `system` message
+(`originPurchaseNote`, only for category `contas` with a valid origin; no migration needed), so a later edit of the listing cannot change what the buyer saw, and both parties and the moderation can read it. The Selo de Certificação is evidence-based:
+`sealState` (`lib/seller-seal.ts`) gives the seal only to a seller with NO recovered-account flag AND at least one completed sale, and the text carries the number of sales ("… em N vendas concluídas"); a seller with no completed sale is "Vendedor novo", with no seal
+(zero records proves nothing). `getSellerAccountFlagSummary` returns `completedSales` for that. An `entregue` order of a `contas` listing shows the buyer `AccountSecurityChecklist` (change password, e-mails, 2FA, sessions, only then confirm).
+
 ### Wallet reconciliation
 
 `lib/reconcile.ts` (read-only, 12 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =

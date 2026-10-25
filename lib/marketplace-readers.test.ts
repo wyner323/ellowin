@@ -581,8 +581,20 @@ describe("getSellerAccountFlagSummary / getAccountFlagForDispute", () => {
     expect(await getAccountFlagForDispute(d4)).toBe(false)
   })
 
-  it("sem registros: zero e data nula", async () => {
-    expect(await getSellerAccountFlagSummary("ana")).toEqual({ count: 0, lastFlaggedAt: null })
+  it("sem registros: zero e data nula, e sem vendas concluídas", async () => {
+    expect(await getSellerAccountFlagSummary("ana")).toEqual({ count: 0, lastFlaggedAt: null, completedSales: 0 })
+  })
+
+  it("conta as vendas concluídas do vendedor (base do selo): só as dele e só as concluídas", async () => {
+    const p = await addListing({ seller: "ana" })
+    await addOrderRow(p)
+    await addOrderRow(p)
+    const q = await addListing({ seller: "bia" })
+    await addOrderRow(q, { seller: "bia" })
+    const aberto = await addOrderRow(p)
+    await t.query(`UPDATE "order" SET "status" = 'entregue' WHERE "id" = $1`, [aberto])
+    expect((await getSellerAccountFlagSummary("ana")).completedSales).toBe(2)
+    expect((await getSellerAccountFlagSummary("bia")).completedSales).toBe(1)
   })
 })
 

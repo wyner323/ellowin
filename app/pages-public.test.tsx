@@ -326,6 +326,37 @@ describe("página do anúncio", () => {
     expect(txt).toContain("Conta")
   })
 
+  it("procedência: aparece como DECLARAÇÃO do vendedor, dizendo que a Ellowin não a confere", async () => {
+    const id = await addListing({ slug: "com-origem" })
+    await t.query(`UPDATE "product" SET "accountOrigin" = 'criador_com_recuperacao' WHERE "id" = $1`, [id])
+    const txt = await text(ProductPage(params({ slug: "com-origem" })))
+    expect(txt).toContain("Procedência declarada pelo vendedor")
+    expect(txt).toContain("Sou o criador da conta")
+    expect(txt).toContain("A Ellowin não confere essa informação")
+  })
+
+  it("selo: vendedor com vendas concluídas e sem registros recebe o selo COM o número de vendas; vendedor novo aparece como novo", async () => {
+    const id = await addListing({ slug: "selo" })
+    const novo = await text(ProductPage(params({ slug: "selo" })))
+    expect(novo).toContain("Vendedor novo")
+    expect(novo).not.toContain("Selo de Certificação")
+
+    const v = await t.query(`SELECT "id" FROM "product_variant" WHERE "productId" = $1`, [id])
+    for (let i = 0; i < 3; i++) {
+      await t.query(
+        `INSERT INTO "order" ("buyerId", "sellerId", "productId", "variantId", "productTitle", "variantLabel", "amountCents", "status") VALUES ('comprador', 'ana', $1, $2, 'x', 'y', 1000, 'concluido')`,
+        [id, v.rows[0].id],
+      )
+    }
+    const certificado = await text(ProductPage(params({ slug: "selo" })))
+    expect(certificado).toContain("Selo de Certificação: sem registros de conta recuperada em 3 vendas concluídas")
+    expect(certificado).not.toContain("Vendedor novo")
+
+    // a loja pública diz o mesmo
+    const loja = await text(LojaPage(params({ slug: "loja-da-ana" })))
+    expect(loja).toContain("em 3 vendas concluídas")
+  })
+
   it("anúncios relacionados: da mesma loja/jogo, sem repetir o próprio", async () => {
     await addListing({ slug: "principal", title: "Anúncio Principal" })
     await addListing({ slug: "irmao", title: "Anúncio Irmão" })

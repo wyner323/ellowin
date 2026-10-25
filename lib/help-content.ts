@@ -190,8 +190,8 @@ export const HELP_TOPICS: HelpTopic[] = [
         id: "procedencia-da-conta",
         question: "O que é a procedência da conta e o Selo de Certificação?",
         answer: [
-          "Ao anunciar uma conta de jogo, o vendedor informa se é o criador da conta e se mantém dados de recuperação. Isso aparece no anúncio.",
-          "Vendedores sem registro de conta recuperada ganham o Selo de Certificação. Qualquer pessoa pode consultar um vendedor no Verificador de contas.",
+          "Ao anunciar uma conta de jogo, o vendedor informa se é o criador da conta e se mantém dados de recuperação. Isso aparece no anúncio como declaração do vendedor: a Ellowin não confere a informação, e o que foi declarado na hora da compra fica registrado no pedido.",
+          "O Selo de Certificação aparece para o vendedor que já tem vendas concluídas e nenhum registro de conta recuperada; vendedor novo aparece como novo, sem selo. Antes de confirmar o recebimento de uma conta, troque a senha e os e-mails de acesso e recuperação. Qualquer pessoa pode consultar um vendedor no Verificador de contas.",
         ],
         links: [{ label: "Verificador de contas", href: "/verificador" }],
       },
