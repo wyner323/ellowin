@@ -66,6 +66,7 @@ import PainelVendedorPage from "@/app/painel/vendedor/page"
 import PainelAnalisesPage from "@/app/painel/vendedor/analises/page"
 import PainelVendasPage from "@/app/painel/vendedor/vendas/page"
 import AvaliacoesPage from "@/app/painel/vendedor/avaliacoes/page"
+import EditarEmLotePage from "@/app/painel/vendedor/produtos/lote/page"
 import MeusProdutosPage from "@/app/painel/vendedor/produtos/page"
 import AdminLayout from "@/app/admin/layout"
 import CasoDisputaPage from "@/app/admin/disputas/[id]/page"
@@ -418,6 +419,32 @@ describe("painel do vendedor", () => {
     const t3 = await txt(MeusProdutosPage({ searchParams: Promise.resolve({}) }))
     expect(t3).toContain("Visitas (30d)")
     expect(t3).toContain("42")
+  })
+
+  describe("duplicar e editar em lote", () => {
+    it("Meus anúncios oferece Duplicar em cada anúncio e o atalho para editar em lote", async () => {
+      as("ana")
+      const page = await txt(MeusProdutosPage({ searchParams: Promise.resolve({}) }))
+      expect(page).toContain("Duplicar")
+      expect(page).toContain("Editar em lote")
+    })
+
+    it("a tela de lote lista os itens ativos do vendedor, com a busca por título", async () => {
+      as("ana")
+      const page = await txt(EditarEmLotePage(sp({})))
+      expect(page).toContain("Editar preço e estoque em lote")
+      expect(page).toContain("Imortal")
+      expect(page).toContain("Conta Valorant")
+      expect(page).toContain("Salvar alterações")
+      expect(await txt(EditarEmLotePage(sp({ q: "gift card" })))).toContain("Nenhum item encontrado")
+    })
+
+    it("quem não tem anúncios vê a tela vazia, e quem não está logado vai para o login", async () => {
+      as("outro")
+      expect(await txt(EditarEmLotePage(sp({})))).toContain("ainda não tem itens ativos")
+      as(null)
+      await expect(EditarEmLotePage(sp({}))).rejects.toThrow("NEXT_REDIRECT:/entrar")
+    })
   })
 
   describe("entrega pela lista de vendas", () => {

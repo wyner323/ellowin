@@ -14,10 +14,11 @@ import {
 } from "@/lib/delivery"
 import { isValidAccountOrigin } from "@/lib/account-origin"
 import { sanitizeAttributes } from "@/lib/game-attributes"
-import { MAX_DESCRIPTION, MAX_TITLE } from "@/lib/listing-checks"
+import { MAX_DESCRIPTION, MAX_PRICE_CENTS, MAX_STOCK, MAX_TITLE, copyTitle } from "@/lib/listing-checks"
 import { parseToCents } from "@/lib/money"
 import { slugifyGame } from "@/lib/product-catalog"
 import { getCategory } from "@/lib/catalog"
+import { hitRateLimit } from "@/lib/rate-limit"
 import { accountBlock, getUserId } from "@/lib/session"
 import { allowsAutoDelivery } from "@/lib/delivery-stock-lines"
 import { autoDeliveryAvailable, availableStockInProduct } from "@/lib/delivery-stock"
@@ -33,8 +34,6 @@ const MAX_IMAGES = 5
 const MAX_GAME = 80
 const MAX_LABEL = 80
 const MAX_NOTE = 200
-const MAX_PRICE_CENTS = 10_000_000 // R$ 100.000,00 por item
-const MAX_STOCK = 100_000
 
 /**
  * Entrega automática é sempre instantânea — nunca confia no que o cliente
@@ -575,5 +574,81 @@ export async function toggleProductStatus(productId: number): Promise<ActionResu
   return {
     ok: true,
     message: next === "ativo" ? "Anúncio reativado." : "Anúncio pausado.",
+  }
+}
+
+/**
+ * Duplica um anúncio do próprio vendedor: copia título (com " (cópia)"), categoria, jogo, descrição, entrega, procedência,
+ * detalhes do jogo e os itens (nome, preço e observação). A cópia nasce PAUSADA e com estoque zero, para o vendedor revisar
+ * e publicar quando quiser, e sem as fotos: o arquivo de uma foto é apagado do Blob quando ela sai de um anúncio, então
+ * duas listagens apontando para o mesmo arquivo deixariam uma delas sem imagem.
+ */
+export async function duplicateProduct(productId: number): Promise<ActionResult & { id?: number }> {
+  const userId = await getUserId()
+
+  const [source] = await db
+    .select()
+    .from(product)
+    .where(and(eq(product.id, productId), eq(product.sellerId, userId)))
+    .limit(1)
+  if (!source) return { ok: false, error: "Anúncio não encontrado." }
+
+  const blocked = await accountBlock(userId, "anunciar")
+  if (blocked) return blocked
+
+  if (!(await hitRateLimit(`duplicate-product:${userId}`, 20, 60 * 60))) {
+    return { ok: false, error: "Muitas cópias em pouco tempo. Tente de novo mais tarde." }
+  }
+
+  const variants = await db
+    .select()
+    .from(productVariant)
+    .where(and(eq(productVariant.productId, source.id), eq(productVariant.active, true)))
+    .orderBy(asc(productVariant.sortOrder), asc(productVariant.id))
+  if (variants.length === 0) return { ok: false, error: "Este anúncio não tem itens ativos para copiar." }
+
+  // Entrega automática só continua automática se a plataforma ainda pode guardar o estoque; senão a cópia vira manual.
+  const automatic = source.deliveryType === "automatica" && (await autoDeliveryAvailable())
+  const delivery = automatic
+    ? normalizeDelivery("automatica", "")
+    : normalizeDelivery("manual", source.deliveryType === "automatica" ? DEFAULT_MANUAL_DELIVERY_TIME : source.deliveryTime)
+
+  const title = copyTitle(source.title)
+  const slug = await uniqueSlug(slugify(title))
+
+  const [created] = await db
+    .insert(product)
+    .values({
+      sellerId: userId,
+      slug,
+      title,
+      categorySlug: source.categorySlug,
+      game: source.game,
+      description: source.description,
+      deliveryType: delivery.deliveryType,
+      deliveryTime: delivery.deliveryTime,
+      accountOrigin: source.accountOrigin,
+      attributes: source.attributes,
+      status: "pausado",
+    })
+    .returning({ id: product.id })
+
+  await db.insert(productVariant).values(
+    variants.map((v, i) => ({
+      productId: created.id,
+      label: v.label,
+      priceCents: v.priceCents,
+      stock: 0,
+      deliveryNote: v.deliveryNote,
+      sortOrder: i,
+    })),
+  )
+
+  revalidatePath("/painel/vendedor/produtos")
+  revalidatePath("/painel/vendedor")
+  return {
+    ok: true,
+    id: created.id,
+    message: "Anúncio duplicado e pausado, sem fotos e com estoque zero. Revise e publique quando estiver pronto.",
   }
 }

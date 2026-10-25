@@ -261,6 +261,15 @@ Sales list: an order awaiting delivery gets `QuickDelivery` under its row (deadl
 server and ticks in 30 s slices on the client with `useSyncExternalStore`, so there is no hydration mismatch) and the same `markDelivered` action as the order page. Canned replies (`lib/canned-replies.ts`, static text, `CannedReplies` chips) fill the
 delivery box, the seller side of the order chat and the review reply; they only insert text, nothing is sent, and a test bans the claims the site never makes ("garantia", "24/7", "em minutos"...).
 
+### Duplicating a listing and bulk price/stock edit
+
+`duplicateProduct` (`app/actions/products.ts`, 20/h, same email/profile gate as publishing) copies title (+ " (cópia)", `copyTitle`), category, game, description, delivery, origin, attributes and the ACTIVE items (name, price, note); the copy is
+created PAUSED with stock 0 and WITHOUT photos on purpose (removing a photo from a listing deletes the Blob file, so two listings sharing one file would break one of them); an automatic listing is copied as automatic only while
+`autoDeliveryAvailable()`, else as manual 24 h. `/painel/vendedor/produtos/lote` (`BulkEditTable`, 50 items per page, `getBulkRowsPage` in `lib/seller-bulk.ts`) edits price and stock of many items: ticking rows + "ajustar %" (`applyPercent`, −90…+1000, clamped to
+R$ 1,00…R$ 100.000,00) only fills the fields, nothing leaves the browser until "Salvar", which sends just the changed rows (`diffChanges`) to `bulkUpdateVariants` (`app/actions/products-bulk.ts`, ≤ 100 per call, 30/h): every id must be an ACTIVE item
+of a listing of the session user, every value is validated before anything is written (one bad row refuses the batch, one transaction), and the stock of an automatic listing is refused (it is the number of registered items). Price/stock limits
+(`MAX_PRICE_CENTS`, `MIN_PRICE_CENTS`, `MAX_STOCK`) live in `lib/listing-checks.ts` and are shared with the listing form.
+
 ### Wallet reconciliation
 
 `lib/reconcile.ts` (read-only, 12 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =

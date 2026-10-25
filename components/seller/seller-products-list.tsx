@@ -2,6 +2,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { ImageIcon, Search } from "lucide-react"
 import { StarRating } from "@/components/marketplace/star-rating"
+import { DuplicateProductButton } from "@/components/seller/duplicate-product-button"
 import { ProductStatusToggle } from "@/components/seller/product-status-toggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -228,7 +229,10 @@ export function SellerProductsList({
                     </Button>
                   ) : null}
                 </div>
-                <ProductStatusToggle productId={p.id} status={p.status} />
+                <div className="flex items-center">
+                  <DuplicateProductButton productId={p.id} />
+                  <ProductStatusToggle productId={p.id} status={p.status} />
+                </div>
               </div>
             </div>
           </li>

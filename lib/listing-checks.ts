@@ -11,6 +11,19 @@ export const MIN_TITLE = 8
 export const MIN_DESCRIPTION = 20
 export const MAX_TITLE = 100
 export const MAX_DESCRIPTION = 4000
+/** Teto de preço por item (R$ 100.000,00) e de estoque, iguais no cadastro do anúncio e na edição em lote. */
+export const MAX_PRICE_CENTS = 10_000_000
+export const MIN_PRICE_CENTS = 100
+export const MAX_STOCK = 100_000
+
+const COPY_SUFFIX = " (cópia)"
+
+/** Título da cópia de um anúncio: "… (cópia)", cortando o original se o total passar do máximo. */
+export function copyTitle(title: string): string {
+  const base = title.trim()
+  if (base.length + COPY_SUFFIX.length <= MAX_TITLE) return base + COPY_SUFFIX
+  return base.slice(0, MAX_TITLE - COPY_SUFFIX.length).trimEnd() + COPY_SUFFIX
+}
 
 export type ListingDraft = {
   title: string

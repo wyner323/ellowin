@@ -42,7 +42,7 @@ vi.mock("@vercel/blob", () => ({
   },
 }))
 
-import { createProduct, toggleProductStatus, updateProduct } from "@/app/actions/products"
+import { createProduct, duplicateProduct, toggleProductStatus, updateProduct } from "@/app/actions/products"
 
 let t: TestDb
 
@@ -591,5 +591,119 @@ describe("toggleProductStatus", () => {
     const { id } = await create()
     holder.userId = null
     await expect(toggleProductStatus(id)).rejects.toThrow("Não autenticado")
+  })
+})
+
+describe("duplicateProduct", () => {
+  // O limite por hora é guardado em auth_attempt, que este arquivo não limpa entre os testes.
+  beforeEach(async () => {
+    await t.query(`TRUNCATE "auth_attempt"`)
+  })
+
+  it("copia os dados e os itens, e a cópia nasce PAUSADA, com estoque zero e sem fotos", async () => {
+    const { id } = await create({
+      title: "Conta Valorant Imortal",
+      categorySlug: "contas",
+      game: "Valorant",
+      accountOrigin: "criador_sem_recuperacao",
+      attributes: { rank: "imortal", regiao: "br" },
+      images: [blob("ana", "capa.webp")],
+      variants: [
+        { label: "Imortal 2", price: "199,90", stock: "4", deliveryNote: "e-mail original incluso" },
+        { label: "Radiante", price: "399,00", stock: "1" },
+      ],
+    })
+    holder.userId = "ana"
+    const r = await duplicateProduct(id)
+    expect(r.ok, r.error).toBe(true)
+    expect(r.id).toBeGreaterThan(id)
+
+    const copy = await productRow(r.id!)
+    expect(copy).toMatchObject({
+      sellerId: "ana",
+      title: "Conta Valorant Imortal (cópia)",
+      categorySlug: "contas",
+      game: "Valorant",
+      status: "pausado",
+      salesCount: 0,
+      ratingCount: 0,
+    })
+    expect(copy.slug).not.toBe((await productRow(id)).slug)
+    expect(copy.attributes).toEqual({ rank: "imortal", regiao: "br" })
+    expect(copy.accountOrigin).toBe("criador_sem_recuperacao")
+    expect(await imagesOf(r.id!)).toEqual([]) // o original continua com a foto dele
+    expect(await imagesOf(id)).toHaveLength(1)
+
+    const items = await variantsOf(r.id!)
+    expect(items.map((v) => [v.label, v.priceCents, v.stock, v.deliveryNote])).toEqual([
+      ["Imortal 2", 19_990, 0, "e-mail original incluso"],
+      ["Radiante", 39_900, 0, null],
+    ])
+    // o original não foi tocado
+    expect((await variantsOf(id)).map((v) => v.stock)).toEqual([4, 1])
+  })
+
+  it("só copia itens ativos, e anúncio sem item ativo não é copiado", async () => {
+    const { id } = await create({ variants: [{ label: "Ativo", price: "10,00", stock: "1" }, { label: "Sai", price: "20,00", stock: "1" }] })
+    await t.query(`UPDATE "product_variant" SET "active" = false WHERE "productId" = $1 AND "label" = 'Sai'`, [id])
+    holder.userId = "ana"
+    const r = await duplicateProduct(id)
+    expect((await variantsOf(r.id!)).map((v) => v.label)).toEqual(["Ativo"])
+
+    await t.query(`UPDATE "product_variant" SET "active" = false WHERE "productId" = $1`, [id])
+    expect(await duplicateProduct(id)).toMatchObject({ ok: false, error: expect.stringContaining("não tem itens ativos") })
+  })
+
+  it("copiar duas vezes gera slugs diferentes", async () => {
+    const { id } = await create()
+    holder.userId = "ana"
+    const a = await duplicateProduct(id)
+    const b = await duplicateProduct(id)
+    expect(new Set([(await productRow(a.id!)).slug, (await productRow(b.id!)).slug]).size).toBe(2)
+  })
+
+  it("título longo é cortado para caber com (cópia)", async () => {
+    const { id } = await create({ title: "x".repeat(MAX_TITLE) })
+    holder.userId = "ana"
+    const r = await duplicateProduct(id)
+    const title = (await productRow(r.id!)).title
+    expect(title.length).toBeLessThanOrEqual(MAX_TITLE)
+    expect(title.endsWith(" (cópia)")).toBe(true)
+  })
+
+  it("só o dono duplica: outro vendedor, quem não vendeu nada e quem não está logado são recusados", async () => {
+    const { id } = await create()
+    holder.userId = "bia"
+    expect(await duplicateProduct(id)).toMatchObject({ ok: false, error: "Anúncio não encontrado." })
+    holder.userId = null
+    await expect(duplicateProduct(id)).rejects.toThrow("Não autenticado")
+    expect(await productCount()).toBe(1)
+  })
+
+  it("exige e-mail confirmado e cadastro completo, como anunciar", async () => {
+    const { id } = await create()
+    await t.query(`UPDATE "product" SET "sellerId" = 'sem-email' WHERE "id" = $1`, [id])
+    holder.userId = "sem-email"
+    expect(await duplicateProduct(id)).toMatchObject({ ok: false, field: "email" })
+    expect(await productCount()).toBe(1)
+  })
+
+  it("limite de 20 cópias por hora", async () => {
+    const { id } = await create()
+    holder.userId = "ana"
+    for (let i = 0; i < 20; i++) {
+      const copy = await duplicateProduct(id)
+      expect(copy.ok, `cópia ${i + 1}: ${copy.error}`).toBe(true)
+    }
+    expect(await duplicateProduct(id)).toMatchObject({ ok: false, error: expect.stringContaining("Muitas cópias") })
+  })
+
+  it("anúncio de entrega automática vira manual (24 h) se a plataforma não pode mais guardar estoque", async () => {
+    const { id } = await create()
+    await t.query(`UPDATE "product" SET "deliveryType" = 'automatica', "deliveryTime" = $2 WHERE "id" = $1`, [id, INSTANT_DELIVERY_TIME])
+    holder.userId = "ana"
+    const r = await duplicateProduct(id) // sem DELIVERY_ENCRYPTION_KEY no teste
+    expect(r.ok, r.error).toBe(true)
+    expect(await productRow(r.id!)).toMatchObject({ deliveryType: "manual", deliveryTime: "Até 24 horas" })
   })
 })

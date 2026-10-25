@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
 import { redirect } from "next/navigation"
-import { PackageX, PauseCircle, Plus, Store } from "lucide-react"
+import { ListChecks, PackageX, PauseCircle, Plus, Store } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { FilterPills } from "@/components/filter-pills"
@@ -61,10 +61,18 @@ export default async function MeusProdutosPage({
                 Cada anúncio pode ter vários itens com preço e estoque próprios.
               </p>
             </div>
-            <Button render={<Link href="/painel/vendedor/produtos/novo" />} size="sm">
-              <Plus className="size-4" />
-              Novo anúncio
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {list.hasAny ? (
+                <Button render={<Link href="/painel/vendedor/produtos/lote" />} variant="outline" size="sm">
+                  <ListChecks className="size-4" aria-hidden="true" />
+                  Editar em lote
+                </Button>
+              ) : null}
+              <Button render={<Link href="/painel/vendedor/produtos/novo" />} size="sm">
+                <Plus className="size-4" />
+                Novo anúncio
+              </Button>
+            </div>
           </header>
 
           {!list.hasAny ? (
