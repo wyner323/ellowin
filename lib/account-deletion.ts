@@ -1,6 +1,7 @@
 import { and, eq, inArray, or, sql } from "drizzle-orm"
 import { db, pool } from "@/lib/db"
 import { purgeAvailableStock } from "@/lib/delivery-stock"
+import { purgeFavorites } from "@/lib/favorites"
 import { order, product, user, wallet } from "@/lib/db/schema"
 
 /**
@@ -109,6 +110,9 @@ export async function anonymizeAccount(userId: string): Promise<void> {
 
     // Itens de entrega automática ainda não vendidos são segredos do vendedor, sem prazo de retenção: apagam junto.
     await purgeAvailableStock(client, userId)
+
+    // Favoritos são preferência pessoal, sem prazo de retenção: apagam junto.
+    await purgeFavorites(client, userId)
 
     // Login fica impossível: sem sessão e sem credencial (senha) ou vínculo social.
     await client.query(`DELETE FROM "session" WHERE "userId" = $1`, [userId])

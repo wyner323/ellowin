@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
+  Heart,
   LayoutDashboard,
   LogOut,
   ShieldCheck,
@@ -94,6 +95,10 @@ export function UserMenu({
         <DropdownMenuItem render={<Link href="/pedidos" />}>
           <ShoppingBag className="size-4" />
           Minhas compras
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/favoritos" />}>
+          <Heart className="size-4" />
+          Favoritos
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link href="/carteira" />}>
           <Wallet className="size-4" />

@@ -66,6 +66,7 @@ import PainelVendedorPage from "@/app/painel/vendedor/page"
 import PainelAnalisesPage from "@/app/painel/vendedor/analises/page"
 import PainelVendasPage from "@/app/painel/vendedor/vendas/page"
 import AvaliacoesPage from "@/app/painel/vendedor/avaliacoes/page"
+import FavoritosPage from "@/app/favoritos/page"
 import EditarEmLotePage from "@/app/painel/vendedor/produtos/lote/page"
 import MeusProdutosPage from "@/app/painel/vendedor/produtos/page"
 import AdminLayout from "@/app/admin/layout"
@@ -339,6 +340,46 @@ describe("disputa do pedido", () => {
 /* ---------------------------------------------------------------------------
  * Carteira
  * ------------------------------------------------------------------------ */
+
+describe("favoritos", () => {
+  it("exige login e volta para a lista depois", async () => {
+    as(null)
+    await expect(FavoritosPage()).rejects.toThrow("NEXT_REDIRECT:/entrar?next=/favoritos")
+  })
+
+  it("lista vazia explica como guardar", async () => {
+    as("comprador")
+    expect(await txt(FavoritosPage())).toContain("ainda não guardou nenhum anúncio")
+  })
+
+  it("mostra só os favoritos da pessoa, com o menor preço de agora; anúncio sem estoque aparece como indisponível", async () => {
+    await t.query(`INSERT INTO "favorite" ("userId", "productId", "baselineCents") VALUES ('comprador', $1, 10000)`, [productId])
+    const outro = (await t.query(`INSERT INTO "product" ("sellerId", "slug", "title", "categorySlug") VALUES ('ana', 'sem-estoque', 'Anúncio Sem Estoque', 'contas') RETURNING "id"`)).rows[0].id as number
+    await t.query(`INSERT INTO "product_variant" ("productId", "label", "priceCents", "stock") VALUES ($1, 'x', 5000, 0)`, [outro])
+    await t.query(`INSERT INTO "favorite" ("userId", "productId") VALUES ('comprador', $1), ('outro', $2)`, [outro, productId])
+
+    as("comprador")
+    const mine = await txt(FavoritosPage())
+    expect(mine).toContain("Conta Valorant")
+    expect(mine).toContain("R$")
+    expect(mine).toContain("Anúncio Sem Estoque")
+    expect(mine).toContain("Indisponível no momento")
+    expect(mine).toContain("Loja da Ana")
+    expect(mine).not.toContain("Ana Maria da Silva")
+    expect(mine).toContain("2 de 200")
+
+    as("outro")
+    const theirs = await txt(FavoritosPage())
+    expect(theirs).toContain("Conta Valorant")
+    expect(theirs).not.toContain("Anúncio Sem Estoque")
+  })
+
+  it("sem a tabela (migração pendente) avisa em vez de quebrar", async () => {
+    await t.query(`DROP TABLE "favorite" CASCADE`)
+    as("comprador")
+    expect(await txt(FavoritosPage())).toContain("ainda não estão disponíveis")
+  })
+})
 
 describe("carteira", () => {
   it("mostra o saldo do usuário e só o extrato dele", async () => {

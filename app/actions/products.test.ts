@@ -15,6 +15,7 @@ const holder = vi.hoisted(() => ({
   pool: null as unknown as TestDb["pool"],
   userId: null as string | null,
   deleted: [] as string[][],
+  priced: [] as number[],
 }))
 
 vi.mock("@/lib/db", () => ({
@@ -36,6 +37,11 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }))
 vi.mock("next/server", () => ({ after: () => {} }))
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }))
+vi.mock("@/lib/notify", () => ({
+  notifyPriceChange: (productId: number) => {
+    holder.priced.push(productId)
+  },
+}))
 vi.mock("@vercel/blob", () => ({
   del: async (urls: string[]) => {
     holder.deleted.push(urls)
@@ -59,6 +65,7 @@ afterAll(async () => {
 beforeEach(async () => {
   holder.userId = null
   holder.deleted.length = 0
+  holder.priced.length = 0
   await t.query(
     `TRUNCATE "order", "product_image", "product_variant", "product", "seller_application", "profile", "user" RESTART IDENTITY CASCADE`,
   )
@@ -705,5 +712,42 @@ describe("duplicateProduct", () => {
     const r = await duplicateProduct(id) // sem DELIVERY_ENCRYPTION_KEY no teste
     expect(r.ok, r.error).toBe(true)
     expect(await productRow(r.id!)).toMatchObject({ deliveryType: "manual", deliveryTime: "Até 24 horas" })
+  })
+})
+
+describe("aviso de queda de preço (favoritos)", () => {
+  const edit = (id: number, variants: Parameters<typeof updateProduct>[0]["variants"], over: Record<string, unknown> = {}) =>
+    updateProduct({ productId: id, ...valid(), ...over, variants } as Parameters<typeof updateProduct>[0])
+
+  it("editar o anúncio mudando o preço de um item pede o aviso, uma vez", async () => {
+    const { id } = await create({ variants: [{ label: "Imortal", price: "100,00", stock: "3" }] })
+    const variantId = (await variantsOf(id))[0].id
+    holder.userId = "ana"
+    expect((await edit(id, [{ id: variantId, label: "Imortal", price: "80,00", stock: "3" }])).ok).toBe(true)
+    expect(holder.priced).toEqual([id])
+  })
+
+  it("editar só o estoque, o título ou a descrição NÃO pede o aviso", async () => {
+    const { id } = await create({ variants: [{ label: "Imortal", price: "100,00", stock: "3" }] })
+    const variantId = (await variantsOf(id))[0].id
+    holder.userId = "ana"
+    await edit(id, [{ id: variantId, label: "Imortal", price: "100,00", stock: "9" }], { title: "Outro título bem descritivo" })
+    expect(holder.priced).toEqual([])
+  })
+
+  it("acrescentar um item novo pede o aviso (o menor preço pode ter mudado)", async () => {
+    const { id } = await create({ variants: [{ label: "Imortal", price: "100,00", stock: "3" }] })
+    const variantId = (await variantsOf(id))[0].id
+    holder.userId = "ana"
+    await edit(id, [{ id: variantId, label: "Imortal", price: "100,00", stock: "3" }, { label: "Barato", price: "10,00", stock: "1" }])
+    expect(holder.priced).toEqual([id])
+  })
+
+  it("edição recusada (validação) não pede o aviso", async () => {
+    const { id } = await create({ variants: [{ label: "Imortal", price: "100,00", stock: "3" }] })
+    const variantId = (await variantsOf(id))[0].id
+    holder.userId = "ana"
+    expect((await edit(id, [{ id: variantId, label: "Imortal", price: "0,10", stock: "3" }])).ok).toBe(false)
+    expect(holder.priced).toEqual([])
   })
 })

@@ -12,6 +12,7 @@ const holder = vi.hoisted(() => ({
   pool: null as unknown as TestDb["pool"],
   userId: null as string | null,
   revalidated: [] as string[],
+  priced: [] as number[],
 }))
 
 vi.mock("@/lib/db", () => ({
@@ -28,6 +29,11 @@ vi.mock("@/lib/auth", () => ({
 }))
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }))
 vi.mock("next/server", () => ({ after: () => {} }))
+vi.mock("@/lib/notify", () => ({
+  notifyPriceChange: (productId: number) => {
+    holder.priced.push(productId)
+  },
+}))
 vi.mock("next/cache", () => ({ revalidatePath: (path: string) => holder.revalidated.push(path) }))
 
 import { bulkUpdateVariants } from "@/app/actions/products-bulk"
@@ -48,6 +54,7 @@ afterAll(async () => {
 beforeEach(async () => {
   holder.userId = null
   holder.revalidated.length = 0
+  holder.priced.length = 0
   await t.query(`TRUNCATE "auth_attempt", "product_variant", "product", "seller_application", "profile", "user" RESTART IDENTITY CASCADE`)
   for (const [id, verified] of [["ana", true], ["bia", true], ["sem-email", false]] as const) {
     await t.query(`INSERT INTO "user" ("id", "name", "email", "emailVerified") VALUES ($1, $1, $1 || '@teste.dev', $2)`, [id, verified])
@@ -139,6 +146,29 @@ describe("bulkUpdateVariants", () => {
     holder.userId = "ana"
     for (let i = 0; i < 30; i++) await bulkUpdateVariants([{ variantId: a, price: `${10 + i},00` }])
     expect(await bulkUpdateVariants([{ variantId: a, price: "99,00" }])).toMatchObject({ ok: false, error: expect.stringContaining("Muitas edições") })
+  })
+})
+
+describe("aviso de queda de preço (favoritos)", () => {
+  it("pede o aviso dos anúncios cujo preço mudou de verdade, uma vez por anúncio", async () => {
+    const a1 = await item("ana", "a1", "Imortal", 10_000, 5)
+    const a2 = await item("ana", "a2", "Radiante", 20_000, 5)
+    const a3 = await item("ana", "a3", "Ouro", 5_000, 5)
+    holder.userId = "ana"
+    await bulkUpdateVariants([
+      { variantId: a1, price: "80,00" }, // mudou
+      { variantId: a2, price: "200,00" }, // mesmo preço: não conta
+      { variantId: a3, stock: "9" }, // só estoque: não conta
+    ])
+    const productOf = async (variantId: number) => (await t.query(`SELECT "productId" FROM "product_variant" WHERE "id" = $1`, [variantId])).rows[0].productId as number
+    expect(holder.priced).toEqual([await productOf(a1)])
+  })
+
+  it("lote recusado não pede aviso nenhum", async () => {
+    const a1 = await item("ana", "a1", "Imortal", 10_000, 5)
+    holder.userId = "ana"
+    await bulkUpdateVariants([{ variantId: a1, price: "0,50" }])
+    expect(holder.priced).toEqual([])
   })
 })
 

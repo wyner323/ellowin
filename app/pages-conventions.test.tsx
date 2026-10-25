@@ -89,6 +89,7 @@ import PainelProdutoPage from "@/app/painel/vendedor/produtos/[id]/page"
 import PainelNovoProdutoPage from "@/app/painel/vendedor/produtos/novo/page"
 import PainelEstoquePage from "@/app/painel/vendedor/produtos/[id]/estoque/page"
 import PainelAvaliacoesPage from "@/app/painel/vendedor/avaliacoes/page"
+import FavoritosPage from "@/app/favoritos/page"
 import PainelLotePage from "@/app/painel/vendedor/produtos/lote/page"
 import PainelVendasPage from "@/app/painel/vendedor/vendas/page"
 import AdminLayout from "@/app/admin/layout"
@@ -202,6 +203,7 @@ const screens: Screen[] = [
   { name: "painel: editar anúncio", as: "ana", render: () => PainelProdutoPage(params({ id: String(ids.product) })) },
   { name: "painel: novo anúncio", as: "ana", render: () => PainelNovoProdutoPage(sp({})) },
   { name: "painel: estoque do anúncio", as: "ana", render: () => PainelEstoquePage(params({ id: String(ids.product) })) },
+  { name: "favoritos", as: "comprador", render: () => FavoritosPage() },
   { name: "painel: avaliações recebidas", as: "ana", render: () => PainelAvaliacoesPage(sp({})) },
   { name: "painel: editar em lote", as: "ana", render: () => PainelLotePage(sp({})) },
   { name: "painel: vendas", as: "ana", render: () => PainelVendasPage(sp({})) },

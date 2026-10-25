@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  composeLowStockMessage, composeOrderMessages,
+  composeLowStockMessage, composeOrderMessages, composePriceDropMessage,
   composeQuestionMessage,
   type OrderContext,
   type OrderNotifyKind,
@@ -106,6 +106,23 @@ describe("composeQuestionMessage", () => {
     const m = composeQuestionMessage("question_asked", { ...base, text: "x".repeat(400) })
     expect(m.intro.length).toBeLessThan(500)
     expect(m.intro).toContain("…")
+  })
+})
+
+describe("composePriceDropMessage", () => {
+  const c = { productTitle: "Conta Valorant", productSlug: "conta-valorant", fromCents: 10_000, toCents: 8_000 }
+
+  it("diz de quanto para quanto, leva ao anúncio e fala com o COMPRADOR", () => {
+    const m = composePriceDropMessage(c)
+    expect(m.recipient).toBe("buyer")
+    expect(m.subject).toBe("Baixou o preço: Conta Valorant")
+    expect(m.intro).toContain("100,00")
+    expect(m.intro).toContain("80,00")
+    expect(m.path).toBe("/produtos/conta-valorant")
+  })
+
+  it("não promete o que o site não cumpre", () => {
+    expect(JSON.stringify(composePriceDropMessage(c))).not.toMatch(/garantia|24\/7|em minutos|verificado/i)
   })
 })
 

@@ -63,8 +63,8 @@ Atualizado em 2026-10-11. O que já foi entregue está no histórico do Git; aqu
   (ele mostra o banco de destino e pede a confirmação digitando "sim"). Depois, as visitas começam a ser contadas a partir da próxima abertura de anúncio.
   A tabela é só de contadores; se quiser mencionar isso nos `/termos` ou na política de privacidade, é decisão sua (não é dado pessoal).
 
-- [ ] **Migração 0012 (respostas às avaliações).** Entra no mesmo `pnpm db:migrate` das anteriores. Até ela ser aplicada o site funciona: a aba "Avaliações" do vendedor mostra as avaliações e avisa que as respostas ainda
-  não estão disponíveis, e nada de público muda.
+- [ ] **Migrações 0012 (respostas às avaliações) e 0013 (favoritos).** Entram no mesmo `pnpm db:migrate` das anteriores. Até serem aplicadas o site funciona: a aba "Avaliações" do vendedor mostra as avaliações e avisa que as respostas ainda
+  não estão disponíveis, o botão "Guardar nos favoritos" não aparece e a página /favoritos avisa que ainda não está disponível; nada de público quebra.
 
 - [ ] **Ligar a entrega automática (estoque de itens cifrados).** O código já está no ar, mas a opção "Automática" só aparece para o vendedor quando as duas coisas abaixo existem; sem elas o site segue
   como hoje, com entrega manual. Ordem:

@@ -19,6 +19,7 @@ const contaDeslogada = [
 
 const contaLogada = [
   { label: 'Minhas compras', href: '/pedidos' },
+  { label: 'Favoritos', href: '/favoritos' },
   { label: 'Carteira', href: '/carteira' },
   { label: 'Verificações', href: '/conta#verificacoes' },
 ]

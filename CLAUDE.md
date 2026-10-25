@@ -279,6 +279,14 @@ item. `notifyLowStock(variantId)` (`lib/notify.ts`, called by `purchase` after t
 email per item per São Paulo day (`refId stock:<variant>:<day>:<level>` in `notification_log`); `purchase` tests that mock `@/lib/notify` must also provide `notifyLowStock`. `/admin/entrega-automatica` (`lib/auto-delivery-monitor.ts`, staff only via
 `getStaff()`, NOT `getCurrentStaff()` which returns any logged user) shows, per seller of stock-delivered orders, orders / disputes / buyer-won / refunded and flags 5+ orders with 10%+ disputes: this is the brake for the "no sales gate" decision on automatic delivery.
 
+### Favorites and price-drop alerts
+
+`favorite` (migration 0013, PK user+product) is private to the buyer (the seller never sees who saved a listing; `/favoritos` is `noindex` and in robots): `toggleFavorite` (`app/actions/favorites.ts`, 60/h, max 200, not your own listing, hidden for deleted sellers) stores
+`baselineCents` = the lowest price FOR SALE right now (`minSellingPrice`: active listing, active item, stock > 0). `notifyPriceChange(productId)` (`lib/notify.ts`) runs after an edit that really changed a price or added an item (`updateProduct`, `bulkUpdateVariants`; NOT on stock edits):
+one SQL statement locks the product's favorites, moves every changed baseline to the new minimum and returns the OLD baselines; a person whose old baseline is higher gets one email ("Baixou o preço", at most one per person per listing per São Paulo day, never the seller, only while the listing
+is active), a price rise just raises the baseline so a later drop alerts again. Anonymizing an account deletes its favorites (`purgeFavorites`, guarded by `to_regclass`). Every reader tolerates the missing table (`available: false`, the button simply does not render).
+Tests that mock `@/lib/notify` for `products`/bulk need `notifyPriceChange`; for `purchase`, `notifyLowStock`.
+
 ### Wallet reconciliation
 
 `lib/reconcile.ts` (read-only, 12 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =

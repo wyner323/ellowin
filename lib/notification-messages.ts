@@ -305,3 +305,15 @@ export function composeLowStockMessage(c: { productId: number; productTitle: str
     path,
   }
 }
+
+/** Aviso ao comprador de que um anúncio que ele guardou ficou mais barato (menor preço à venda). */
+export function composePriceDropMessage(c: { productTitle: string; productSlug: string; fromCents: number; toCents: number }): Message {
+  return {
+    recipient: "buyer",
+    subject: `Baixou o preço: ${c.productTitle}`,
+    title: "Um anúncio que você guardou ficou mais barato",
+    intro: `O menor preço de “${c.productTitle}” baixou de ${formatCents(c.fromCents)} para ${formatCents(c.toCents)}. Vale conferir: o preço e o estoque podem mudar a qualquer momento.`,
+    buttonLabel: "Ver o anúncio",
+    path: `/produtos/${c.productSlug}`,
+  }
+}

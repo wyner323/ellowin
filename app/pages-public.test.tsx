@@ -300,6 +300,32 @@ describe("página do anúncio", () => {
     expect(html).toContain("&lt;img src=x")
   })
 
+  it("favoritar: visitante vê o link para entrar (que volta ao anúncio), comprador vê o botão, dono não vê", async () => {
+    await addListing({ slug: "favoritavel" })
+    const anon = await page(ProductPage(params({ slug: "favoritavel" })))
+    expect(htmlToText(anon)).toContain("Guardar nos favoritos")
+    expect(anon).toContain("/entrar?next=/produtos/favoritavel")
+
+    holder.userId = "comprador"
+    expect(await text(ProductPage(params({ slug: "favoritavel" })))).toContain("Guardar nos favoritos")
+
+    const id = (await t.query(`SELECT "id" FROM "product" WHERE "slug" = 'favoritavel'`)).rows[0].id as number
+    await t.query(`INSERT INTO "favorite" ("userId", "productId", "baselineCents") VALUES ('comprador', $1, 1000)`, [id])
+    expect(await text(ProductPage(params({ slug: "favoritavel" })))).toContain("Nos favoritos")
+
+    holder.userId = "ana" // o dono
+    expect(await text(ProductPage(params({ slug: "favoritavel" })))).not.toContain("favoritos")
+  })
+
+  it("favoritar some sem a tabela (migração pendente), mas a página do anúncio continua abrindo", async () => {
+    await addListing({ slug: "sem-tabela" })
+    await t.query(`DROP TABLE "favorite" CASCADE`)
+    holder.userId = "comprador"
+    const txt = await text(ProductPage(params({ slug: "sem-tabela" })))
+    expect(txt).not.toContain("Guardar nos favoritos")
+    expect(txt).toContain("Conta")
+  })
+
   it("anúncios relacionados: da mesma loja/jogo, sem repetir o próprio", async () => {
     await addListing({ slug: "principal", title: "Anúncio Principal" })
     await addListing({ slug: "irmao", title: "Anúncio Irmão" })

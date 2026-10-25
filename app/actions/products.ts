@@ -18,6 +18,7 @@ import { MAX_DESCRIPTION, MAX_PRICE_CENTS, MAX_STOCK, MAX_TITLE, copyTitle } fro
 import { parseToCents } from "@/lib/money"
 import { slugifyGame } from "@/lib/product-catalog"
 import { getCategory } from "@/lib/catalog"
+import { notifyPriceChange } from "@/lib/notify"
 import { hitRateLimit } from "@/lib/rate-limit"
 import { accountBlock, getUserId } from "@/lib/session"
 import { allowsAutoDelivery } from "@/lib/delivery-stock-lines"
@@ -432,6 +433,11 @@ export async function updateProduct(input: {
     })
     .where(eq(product.id, owned.id))
 
+  // Preços de antes da edição: o aviso de queda de preço (favoritos) só dispara se um preço mudou ou entrou um item novo.
+  const previousPrices = new Map(
+    (await db.select({ id: productVariant.id, priceCents: productVariant.priceCents }).from(productVariant).where(eq(productVariant.productId, owned.id))).map((v) => [v.id, v.priceCents]),
+  )
+  let repriced = false
   const keptIds: number[] = []
 
   for (const [i, v] of input.variants.entries()) {
@@ -451,6 +457,7 @@ export async function updateProduct(input: {
         .where(
           and(eq(productVariant.id, v.id), eq(productVariant.productId, owned.id)),
         )
+      if (previousPrices.get(v.id) !== data.priceCents) repriced = true
       keptIds.push(v.id)
       continue
     }
@@ -467,6 +474,7 @@ export async function updateProduct(input: {
       })
       .returning({ id: productVariant.id })
 
+    repriced = true
     keptIds.push(inserted.id)
   }
 
@@ -526,6 +534,7 @@ export async function updateProduct(input: {
   if (input.game.trim()) revalidatePath(`/jogos/${slugifyGame(input.game.trim())}`)
 
   pingIndexNow([`/produtos/${owned.slug}`])
+  if (repriced) notifyPriceChange(owned.id)
 
   return { ok: true, message: "Anúncio atualizado." }
 }

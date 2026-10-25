@@ -1,12 +1,15 @@
 import { after } from "next/server"
 import * as Sentry from "@sentry/nextjs"
 import { eq, sql } from "drizzle-orm"
-import { db } from "@/lib/db"
+import { db, pool } from "@/lib/db"
+import { isUndefinedTable } from "@/lib/db-errors"
+import { minSellingPrice } from "@/lib/favorites"
 import { notificationLog, order, product, productQuestion, productVariant, user } from "@/lib/db/schema"
 import { actionTemplate, sendMail } from "@/lib/email"
 import {
   composeLowStockMessage,
   composeOrderMessages,
+  composePriceDropMessage,
   composeQuestionMessage,
   type Message,
   type OrderNotifyKind,
@@ -204,5 +207,59 @@ export function notifyLowStock(variantId: number) {
         automatic: row.deliveryType === "automatica",
       }),
     )
+  })
+}
+
+/**
+ * Preço de um anúncio mudou (edição do anúncio ou em lote): atualiza a base de preço dos favoritos e avisa por e-mail quem
+ * guardou o anúncio se o MENOR preço à venda ficou abaixo da base dela. Se o preço subiu, a base sobe junto, e uma queda
+ * futura volta a avisar. No máximo um aviso de queda por pessoa por anúncio por dia (Brasília), para o vendedor ajustando
+ * o preço várias vezes não virar uma sequência de e-mails. Sem a tabela de favoritos (migração pendente), não faz nada.
+ */
+export function notifyPriceChange(productId: number) {
+  schedule(async () => {
+    const min = await minSellingPrice(productId)
+    if (min === null) return
+
+    let rows: { userId: string; baselineCents: number | null }[]
+    try {
+      // Uma instrução só: trava os favoritos do anúncio, atualiza as bases que mudaram e devolve a base ANTIGA delas.
+      rows = (
+        await pool.query<{ userId: string; baselineCents: number | null }>(
+          `WITH old AS (SELECT "userId", "baselineCents" FROM "favorite" WHERE "productId" = $1 FOR UPDATE),
+                upd AS (
+                  UPDATE "favorite" f SET "baselineCents" = $2
+                    FROM old WHERE f."userId" = old."userId" AND f."productId" = $1 AND f."baselineCents" IS DISTINCT FROM $2
+                  RETURNING f."userId"
+                )
+           SELECT old."userId", old."baselineCents" FROM old JOIN upd ON upd."userId" = old."userId"`,
+          [productId, min],
+        )
+      ).rows
+    } catch (error) {
+      if (isUndefinedTable(error)) return
+      throw error
+    }
+
+    const drops = rows.filter((r): r is { userId: string; baselineCents: number } => r.baselineCents !== null && r.baselineCents > min)
+    if (drops.length === 0) return
+
+    const [item] = await db
+      .select({ title: product.title, slug: product.slug, status: product.status, sellerId: product.sellerId })
+      .from(product)
+      .where(eq(product.id, productId))
+      .limit(1)
+    if (!item || item.status !== "ativo") return
+
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date())
+    for (const drop of drops) {
+      if (drop.userId === item.sellerId) continue
+      await deliver(
+        drop.userId,
+        "price_drop",
+        `price:${productId}:${day}`,
+        composePriceDropMessage({ productTitle: item.title, productSlug: item.slug, fromCents: drop.baselineCents, toCents: min }),
+      )
+    }
   })
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { pool } from "@/lib/db"
 import { MAX_BULK_CHANGES, parseChange, type BulkChange } from "@/lib/bulk-edit"
 import { pingIndexNow } from "@/lib/indexnow"
+import { notifyPriceChange } from "@/lib/notify"
 import { hitRateLimit } from "@/lib/rate-limit"
 import { accountBlock, getUserId } from "@/lib/session"
 import { withTransaction } from "@/lib/wallet"
@@ -33,8 +34,8 @@ export async function bulkUpdateVariants(changes: BulkChange[]): Promise<ActionR
   }
 
   // Só os itens ATIVOS de anúncios do próprio vendedor entram.
-  const { rows } = await pool.query<{ id: number; label: string; deliveryType: string; slug: string }>(
-    `SELECT v."id", v."label", p."deliveryType", p."slug"
+  const { rows } = await pool.query<{ id: number; label: string; deliveryType: string; slug: string; productId: number; priceCents: number }>(
+    `SELECT v."id", v."label", v."priceCents", p."id" AS "productId", p."deliveryType", p."slug"
        FROM "product_variant" v JOIN "product" p ON p."id" = v."productId"
       WHERE v."id" = ANY($1::int[]) AND p."sellerId" = $2 AND v."active"`,
     [ids, userId],
@@ -74,6 +75,10 @@ export async function bulkUpdateVariants(changes: BulkChange[]): Promise<ActionR
   for (const slug of slugs) revalidatePath(`/produtos/${slug}`)
   // O título do resultado na busca traz o preço: avisa os buscadores dos anúncios que mudaram de preço.
   if (parsed.some((p) => p.priceCents !== undefined)) pingIndexNow(slugs.slice(0, 100).map((s) => `/produtos/${s}`))
+
+  // Quem favoritou o anúncio recebe o aviso de queda de preço quando o menor preço à venda baixou (só preço realmente mudado).
+  const repriced = new Set(parsed.filter((p) => p.priceCents !== undefined && p.priceCents !== byId.get(p.variantId)!.priceCents).map((p) => byId.get(p.variantId)!.productId))
+  for (const productId of repriced) notifyPriceChange(productId)
 
   return { ok: true, updated: parsed.length, message: `${parsed.length} ${parsed.length === 1 ? "item atualizado" : "itens atualizados"}.` }
 }

@@ -21,6 +21,7 @@ import { StarRating } from "@/components/marketplace/star-rating"
 import { ReviewReplyView } from "@/components/marketplace/review-reply-view"
 import { BuyerProtection } from "@/components/product/buyer-protection"
 import { RelatedListings } from "@/components/product/related-listings"
+import { FavoriteButton } from "@/components/product/favorite-button"
 import { VariantPicker } from "@/components/product/variant-picker"
 import { ProductGallery } from "@/components/product/product-gallery"
 import { ProductQuestions } from "@/components/product/product-questions"
@@ -33,6 +34,7 @@ import { findGameBySlug, slugifyGame } from "@/lib/product-catalog"
 import { buildProductJsonLd, serializeJsonLd } from "@/lib/product-jsonld"
 import { countsAsView, recordProductView } from "@/lib/product-views"
 import { breadcrumbJsonLd, productSeo } from "@/lib/seo"
+import { getFavoriteState } from "@/lib/favorites"
 import { getSession } from "@/lib/session"
 import { SITE_URL } from "@/lib/site"
 import { getWalletSummary } from "@/lib/wallet"
@@ -82,7 +84,7 @@ export default async function ProductPage({
   // Conta a visita depois da resposta (não atrasa a página): só anúncio ativo, que não é do próprio dono nem de robô.
   if (countsAsView({ productStatus: item.status, sellerId: item.seller.id, viewerId, userAgent: (await headers()).get("user-agent") }))
     after(() => recordProductView(item.id))
-  const [walletSummary, questions, related] = await Promise.all([
+  const [walletSummary, questions, related, favoriteState] = await Promise.all([
     viewerId ? getWalletSummary(viewerId) : Promise.resolve({ availableCents: 0, heldCents: 0 }),
     getProductQuestions(item.id),
     getRelatedListings({
@@ -91,6 +93,7 @@ export default async function ProductPage({
       categorySlug: item.categorySlug,
       sellerId: item.seller.id,
     }),
+    viewerId ? getFavoriteState(viewerId, item.id) : Promise.resolve({ available: true, favorite: false }),
   ])
 
   const category = getCategory(item.categorySlug)
@@ -232,6 +235,14 @@ export default async function ProductPage({
                   </Badge>
                   <Badge variant="outline">{item.deliveryTime}</Badge>
                 </div>
+
+                {viewerId !== item.seller.id && favoriteState.available ? (
+                  <FavoriteButton
+                    productId={item.id}
+                    initial={favoriteState.favorite}
+                    signInHref={viewerId ? null : `/entrar?next=/produtos/${item.slug}`}
+                  />
+                ) : null}
 
                 {viewerId && viewerId !== item.seller.id ? (
                   <ReportButton target={{ type: "anuncio", productId: item.id }} label="Denunciar anúncio" />

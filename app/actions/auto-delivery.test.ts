@@ -40,6 +40,7 @@ vi.mock("@/lib/notify", () => ({
   notifyLowStock: (variantId: number) => {
     holder.lowStock.push(variantId)
   },
+  notifyPriceChange: () => {},
 }))
 
 import { addStock, removeStock } from "@/app/actions/delivery-stock"

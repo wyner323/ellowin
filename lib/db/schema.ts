@@ -465,6 +465,27 @@ export const orderMessage = pgTable("order_message", {
 ])
 
 /**
+ * Anúncios que o comprador guardou. Privado: só a própria pessoa lê, o vendedor não vê quem favoritou. `baselineCents`
+ * é o menor preço À VENDA do anúncio na última conferência (centavos): quando um preço editado fica abaixo dele, a pessoa
+ * recebe o aviso de queda de preço e a base desce; se o preço sobe, a base sobe junto (uma queda futura volta a avisar).
+ * Nulo = o anúncio não estava à venda quando foi favoritado.
+ */
+export const favorite = pgTable("favorite", {
+  userId: text("userId")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  productId: integer("productId")
+    .notNull()
+    .references(() => product.id, { onDelete: "cascade" }),
+  baselineCents: integer("baselineCents"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.productId] }),
+  index("favorite_product_idx").on(t.productId),
+  check("favorite_baseline_positive", sql`${t.baselineCents} is null or ${t.baselineCents} > 0`),
+])
+
+/**
  * Resposta pública do vendedor a uma avaliação (uma por avaliação, editável). Tabela própria, e não coluna de `review`,
  * para as leituras de avaliações da vitrine não dependerem desta migração: quem lê as respostas busca à parte e, sem a
  * tabela, simplesmente não mostra resposta nenhuma.
