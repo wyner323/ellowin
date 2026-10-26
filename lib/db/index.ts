@@ -9,6 +9,16 @@ if (typeof WebSocket === "undefined") {
   neonConfig.webSocketConstructor = ws
 }
 
+// Só os testes de ponta a ponta (e2e/): apontam o driver para um proxy WebSocket local na frente de um Postgres comum.
+// Em produção a variável não existe e nada muda.
+if (process.env.ELLOWIN_DB_WSPROXY) {
+  const proxy = process.env.ELLOWIN_DB_WSPROXY
+  neonConfig.wsProxy = () => proxy
+  neonConfig.useSecureWebSocket = false
+  neonConfig.pipelineConnect = false
+  neonConfig.pipelineTLS = false
+}
+
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 // Conexão ociosa derrubada pelo banco emite "error" no pool; sem ouvinte o Node trata como exceção não capturada e derruba a função.
 pool.on("error", (error: Error) => {

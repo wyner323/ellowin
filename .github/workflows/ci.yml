@@ -98,3 +98,63 @@ jobs:
         run: pnpm exec vitest run app/actions/concurrency.pg.test.ts
         env:
           PG_TEST_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+  # Ponta a ponta: o app de verdade (`next start`) num navegador de verdade (Chromium) sobre um Postgres descartável.
+  # `e2e/server.mjs` cria o banco `ellowin_e2e`, aplica as migrações, grava a semente e sobe o app; os testes cobrem a
+  # compra inteira (pagar, entregar, confirmar, avaliar, responder), login, favoritos, tema e layout de celular.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Navegador (Chromium do Playwright)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          BETTER_AUTH_SECRET: ci-build-only-secret-0123456789abcdefghijklmnop
+          BETTER_AUTH_URL: http://localhost:3100
+
+      - name: Testes de ponta a ponta
+        run: pnpm test:e2e
+        env:
+          PG_TEST_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+      - name: Relatório do Playwright (só se falhar)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
