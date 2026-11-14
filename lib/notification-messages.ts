@@ -317,3 +317,47 @@ export function composePriceDropMessage(c: { productTitle: string; productSlug: 
     path: `/produtos/${c.productSlug}`,
   }
 }
+
+/** Decisão da moderação sobre o pedido de aprovação do vendedor numa categoria. */
+export function composeCategoryDecisionMessage(c: { categoryName: string; decision: "aprovado" | "recusado"; note: string | null }): Message {
+  const note = c.note?.trim() ? ` Motivo informado pela moderação: ${c.note.trim()}` : ""
+  if (c.decision === "aprovado") {
+    return {
+      recipient: "seller",
+      subject: `Categoria aprovada: ${c.categoryName}`,
+      title: "Você já pode anunciar nessa categoria",
+      intro: `A moderação aprovou o seu pedido para vender em “${c.categoryName}”. Os anúncios novos já podem ser publicados.${note}`,
+      buttonLabel: "Criar um anúncio",
+      path: "/painel/vendedor/produtos/novo",
+    }
+  }
+  return {
+    recipient: "seller",
+    subject: `Pedido não aprovado: ${c.categoryName}`,
+    title: "A moderação não aprovou o seu pedido",
+    intro: `O pedido para vender em “${c.categoryName}” não foi aprovado e os anúncios dessa categoria ficam pausados.${note} Você pode ajustar a explicação e pedir de novo.`,
+    buttonLabel: "Ver o pedido",
+    path: "/painel/vendedor/categorias",
+  }
+}
+
+/** Decisão da moderação sobre um lote de estoque (itens cadastrados para entrega automática). */
+export function composeStockDecisionMessage(c: {
+  productId: number
+  productTitle: string
+  variantLabel: string
+  itemCount: number
+  decision: "aprovado" | "recusado" | "quarentena"
+  note: string | null
+}): Message {
+  const what = `${c.itemCount} ${c.itemCount === 1 ? "item" : "itens"} de “${c.variantLabel}” no anúncio “${c.productTitle}”`
+  const note = c.note?.trim() ? ` Motivo informado pela moderação: ${c.note.trim()}` : ""
+  const path = `/painel/vendedor/produtos/${c.productId}/estoque`
+  if (c.decision === "aprovado") {
+    return { recipient: "seller", subject: `Estoque aprovado: ${c.variantLabel}`, title: "Os itens que você enviou já estão à venda", intro: `A moderação aprovou ${what}.${note}`, buttonLabel: "Ver o estoque", path }
+  }
+  if (c.decision === "quarentena") {
+    return { recipient: "seller", subject: `Estoque em análise: ${c.variantLabel}`, title: "Um lote do seu estoque foi retirado da venda", intro: `A moderação retirou ${what} da venda para análise.${note} Os itens já vendidos seguem valendo.`, buttonLabel: "Ver o estoque", path }
+  }
+  return { recipient: "seller", subject: `Estoque recusado: ${c.variantLabel}`, title: "A moderação não aprovou os itens que você enviou", intro: `${what} não foram aprovados e foram retirados do estoque.${note}`, buttonLabel: "Ver o estoque", path }
+}

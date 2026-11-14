@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { CategoryArt } from '@/components/category-art'
 import { GameIcon } from '@/components/games/game-icon'
 import { ProductCard } from '@/components/marketplace/product-card'
 import { categories } from '@/lib/catalog'
@@ -119,12 +120,12 @@ export async function CategoryGrid() {
       <div className="flex flex-col gap-2">
         <h2 className="text-2xl font-bold sm:text-3xl">Catálogos da Ellowin</h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Quatro verticais, todas com pagamento intermediado e vendedores com
-          nível de verificação visível.
+          Contas, moedas, itens, gift cards, recargas e mais, todas com pagamento
+          intermediado e o nível do vendedor visível.
         </p>
       </div>
 
-      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
         {categories.map((category) => {
           const info = categoryCardInfo(categoryStats[category.slug])
           return (
@@ -134,12 +135,10 @@ export async function CategoryGrid() {
             className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-lg"
           >
             <div className="relative aspect-[4/3] overflow-hidden bg-accent">
-              <Image
-                src={category.image || '/placeholder.svg'}
-                alt={`Ilustração do catálogo de ${category.name}`}
-                fill
-                sizes="(max-width: 640px) 100vw, 25vw"
-                className="object-cover transition-transform duration-500 group-hover:scale-110"
+              <CategoryArt
+                category={category}
+                sizes="(max-width: 640px) 100vw, 20vw"
+                imageClassName="transition-transform duration-500 group-hover:scale-110"
               />
             </div>
             <div className="flex flex-1 flex-col gap-2 p-4">

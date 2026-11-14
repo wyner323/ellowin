@@ -54,7 +54,7 @@ describe("maskStockItem", () => {
 
 describe("allowsAutoDelivery", () => {
   it("só gift cards e contas", () => {
-    expect([...AUTO_DELIVERY_CATEGORIES]).toEqual(["gift-cards", "contas"])
+    expect([...AUTO_DELIVERY_CATEGORIES].sort()).toEqual(["assinaturas", "contas", "cursos", "gift-cards", "keys", "redes-sociais"])
     expect(allowsAutoDelivery("gift-cards")).toBe(true)
     expect(allowsAutoDelivery("contas")).toBe(true)
     expect(allowsAutoDelivery("moedas")).toBe(false)

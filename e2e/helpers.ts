@@ -1,9 +1,9 @@
 import { expect, type Page } from "@playwright/test"
 import pg from "pg"
-import { BUYER, PASSWORD, SELLER, e2eDatabaseUrl } from "./env.mjs"
+import { BUYER, MOD, PASSWORD, SELLER, e2eDatabaseUrl } from "./env.mjs"
 
-export { BUYER, PASSWORD, SELLER }
-export { LISTING } from "./env.mjs"
+export { BUYER, MOD, PASSWORD, SELLER }
+export { LISTING, RECARGA } from "./env.mjs"
 
 /** Consulta direta ao banco de teste (nunca o de produção: ver e2e/env.mjs) para conferir o dinheiro e o estado. */
 export async function query<T = Record<string, unknown>>(text: string, params: unknown[] = []): Promise<T[]> {
@@ -17,7 +17,7 @@ export async function query<T = Record<string, unknown>>(text: string, params: u
 }
 
 export const AUTH_DIR = "e2e/.auth"
-export const authFile = (who: "buyer" | "seller") => `${AUTH_DIR}/${who}.json`
+export const authFile = (who: "buyer" | "seller" | "mod") => `${AUTH_DIR}/${who}.json`
 
 /** Entra pela tela de login, como uma pessoa faria. */
 export async function login(page: Page, email: string) {

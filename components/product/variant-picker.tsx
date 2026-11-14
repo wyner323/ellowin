@@ -18,6 +18,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import type { BuyerField } from "@/lib/category-rules"
 import { formatCents } from "@/lib/money"
 import { cn } from "@/lib/utils"
 
@@ -41,11 +43,14 @@ export function VariantPicker({
   isAuthenticated,
   isOwnProduct,
   availableCents,
+  buyerFields = [],
 }: {
   variants: Variant[]
   isAuthenticated: boolean
   isOwnProduct: boolean
   availableCents: number
+  /** dados que a categoria pede ao comprador antes de pagar (ID do jogador...) */
+  buyerFields?: BuyerField[]
 }) {
   const router = useRouter()
   const inStock = variants.filter((v) => v.stock > 0)
@@ -53,7 +58,9 @@ export function VariantPicker({
   const [error, setError] = useState<string | null>(null)
   const [needs, setNeeds] = useState<"email" | "profile" | null>(null)
   const [pending, start] = useTransition()
+  const [info, setInfo] = useState<Record<string, string>>({})
   const pathname = usePathname()
+  const missingField = buyerFields.find((f) => f.required && !(info[f.key] ?? "").trim())
 
   const selected = variants.find((v) => v.id === selectedId) ?? null
   const insufficient = selected ? availableCents < selected.priceCents : false
@@ -63,7 +70,7 @@ export function VariantPicker({
     setError(null)
 
     start(async () => {
-      const result = await purchase(selected.id, selected.priceCents)
+      const result = await purchase(selected.id, selected.priceCents, buyerFields.length > 0 ? info : undefined)
       if (!result.ok) {
         setError(result.error ?? "Não foi possível concluir a compra.")
         setNeeds(result.field === "email" || result.field === "profile" ? result.field : null)
@@ -150,6 +157,31 @@ export function VariantPicker({
           confirmar a entrega.
         </p>
 
+        {isAuthenticated && !isOwnProduct && inStock.length > 0 && buyerFields.length > 0 ? (
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              O vendedor precisa destes dados para entregar. Só ele e a moderação veem, junto com o pedido.
+            </p>
+            {buyerFields.map((field) => (
+              <div key={field.key} className="flex flex-col gap-1.5">
+                <label htmlFor={`buyer-${field.key}`} className="text-xs font-medium">
+                  {field.label}
+                  {field.required ? "" : " (opcional)"}
+                </label>
+                <Input
+                  id={`buyer-${field.key}`}
+                  value={info[field.key] ?? ""}
+                  onChange={(event) => setInfo((current) => ({ ...current, [field.key]: event.target.value }))}
+                  maxLength={field.maxLength}
+                  placeholder={field.placeholder}
+                  autoComplete="off"
+                  disabled={pending}
+                />
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {!isAuthenticated ? (
           <Button render={<Link href="/entrar" />} className="w-full">
             <Lock className="size-4" />
@@ -178,7 +210,7 @@ export function VariantPicker({
           <AlertDialog>
             <AlertDialogTrigger
               render={
-                <Button disabled={pending || !selected} className="w-full">
+                <Button disabled={pending || !selected || Boolean(missingField)} className="w-full">
                   {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                   Comprar agora
                 </Button>

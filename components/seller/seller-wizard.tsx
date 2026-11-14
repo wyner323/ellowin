@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { categories } from "@/lib/catalog"
 import type { AccountState } from "@/lib/session"
 import { formatCpf, formatPhone } from "@/lib/validation"
 
@@ -48,12 +49,7 @@ const STEPS = [
   { title: "Dados de saque", icon: Wallet, level: 4 },
 ]
 
-const CATEGORIES = [
-  { value: "contas", label: "Contas de jogos" },
-  { value: "moedas", label: "Moedas e gold" },
-  { value: "gift-cards", label: "Gift cards" },
-  { value: "boosting", label: "Boosting e serviços" },
-]
+const CATEGORIES = categories.map((c) => ({ value: c.slug, label: c.name }))
 
 export function SellerWizard({ state }: { state: AccountState }) {
   const router = useRouter()

@@ -98,6 +98,8 @@ export default async function EstoqueProdutoPage({ params }: { params: Promise<{
                       variantId={variant.variantId}
                       label={variant.label}
                       available={variant.available}
+                      held={variant.held}
+                      batches={variant.batches}
                       sold={variant.sold}
                       items={variant.items}
                       disabled={!keyReady}

@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatCents } from "@/lib/money"
 import { getOrderDetail, getOrderMessages } from "@/lib/orders"
+import { getOrderBuyerInfo } from "@/lib/buyer-info"
+import { categoryRule } from "@/lib/category-rules"
 import { orderHint } from "@/lib/order-hints"
 import { getStaff } from "@/lib/roles"
 import { getSession } from "@/lib/session"
@@ -50,6 +52,8 @@ export default async function PedidoPage({
   if (!detail) notFound()
 
   const { viewer } = detail
+  // Dados que o comprador informou ao pagar (ID do jogador...): só chega aqui quem já passou pela checagem de acesso do pedido.
+  const buyerInfo = await getOrderBuyerInfo(orderId, detail.categorySlug)
 
   // O chat do pedido é só entre as duas partes — a moderação usa o canal da disputa.
   const chatMessages = viewer.isBuyer || viewer.isSeller ? await getOrderMessages(orderId) : []
@@ -177,6 +181,20 @@ export default async function PedidoPage({
           {(() => {
             const detailsPanel = (
               <div className="flex flex-col gap-6">
+                {buyerInfo.length > 0 ? (
+                  <section className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-5">
+                    <h2 className="text-sm font-semibold">Dados informados pelo comprador</h2>
+                    <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+                      {buyerInfo.map((line) => (
+                        <div key={line.label} className="contents">
+                          <dt className="text-muted-foreground">{line.label}</dt>
+                          <dd className="font-medium break-words">{line.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </section>
+                ) : null}
+
                 {detail.deliveryPayload ? (
                   <section className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-5">
                     <h2 className="text-sm font-semibold">Dados da entrega</h2>
@@ -194,7 +212,7 @@ export default async function PedidoPage({
                   </section>
                 ) : null}
 
-                {viewer.isBuyer && detail.status === "entregue" && detail.categorySlug === "contas" ? <AccountSecurityChecklist /> : null}
+                {viewer.isBuyer && detail.status === "entregue" && categoryRule(detail.categorySlug ?? "").declaresOrigin ? <AccountSecurityChecklist /> : null}
 
                 {detail.dispute ? (
                   <section className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-5">

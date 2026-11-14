@@ -3,7 +3,8 @@ export type Category = {
   name: string
   tagline: string
   description: string
-  image: string
+  /** Arte própria; sem ela a tela mostra um ícone da categoria (components/category-art.tsx). */
+  image?: string
 }
 
 export type Listing = {
@@ -26,26 +27,68 @@ export const categories: Category[] = [
   {
     slug: 'contas',
     name: 'Contas de jogos',
-    tagline: 'Perfis prontos, com garantia',
+    tagline: 'Perfis prontos para jogar',
     description:
-      'Contas completas de Valorant, League of Legends, CS2, Free Fire e mais, com transferência acompanhada pela Ellowin.',
+      'Contas completas de Valorant, League of Legends, CS2, Free Fire e mais, com transferência acompanhada pela Ellowin e pagamento retido até você confirmar.',
     image: '/images/cat-contas.png',
   },
   {
     slug: 'moedas',
     name: 'Moedas e gold',
-    tagline: 'Entrega automática ou combinada',
+    tagline: 'Entrega combinada no chat',
     description:
       'Robux, V-Bucks, Diamantes, FIFA Coins e gold de MMO anunciados por vendedores com cadastro completo na Ellowin.',
     image: '/images/cat-moedas.png',
   },
   {
+    slug: 'itens',
+    name: 'Itens de jogo',
+    tagline: 'Skins, cosméticos e equipamentos',
+    description:
+      'Skins, cosméticos, equipamentos e consumíveis de jogos, com o conteúdo descrito item a item e a entrega feita dentro do jogo.',
+  },
+  {
     slug: 'gift-cards',
     name: 'Gift cards',
-    tagline: 'Códigos conferidos na hora',
+    tagline: 'Códigos digitais, pagamento retido',
     description:
-      'Créditos de Steam, PlayStation, Xbox, Nintendo e recargas de jogos com código validado antes da liberação.',
+      'Créditos de Steam, PlayStation, Xbox, Nintendo e outros cartões digitais, de vendedores aprovados pela Ellowin, com o pagamento retido até o resgate.',
     image: '/images/cat-giftcards.png',
+  },
+  {
+    slug: 'recargas',
+    name: 'Recargas por ID',
+    tagline: 'Diamantes e moedas no seu perfil',
+    description:
+      'Recargas feitas direto no seu perfil do jogo a partir do ID que você informa na compra, com a prova de entrega no chat do pedido.',
+  },
+  {
+    slug: 'assinaturas',
+    name: 'Assinaturas e premium',
+    tagline: 'Streaming, música, IA e mais',
+    description:
+      'Códigos, links e acessos de assinaturas como streaming, música, Discord Nitro e ferramentas de IA, de vendedores aprovados pela Ellowin.',
+  },
+  {
+    slug: 'keys',
+    name: 'Keys de jogos',
+    tagline: 'Chaves de ativação para PC e consoles',
+    description:
+      'Chaves de ativação de jogos para Steam, Epic e consoles, com a origem do estoque declarada pelo vendedor e analisada pela moderação.',
+  },
+  {
+    slug: 'redes-sociais',
+    name: 'Redes sociais',
+    tagline: 'Perfis com a procedência declarada',
+    description:
+      'Contas e perfis de redes sociais, com a procedência declarada pelo vendedor. Cada rede tem as próprias regras sobre venda de contas: leia antes de comprar.',
+  },
+  {
+    slug: 'cursos',
+    name: 'Cursos e guias',
+    tagline: 'Cursos, e-books e modelos digitais',
+    description:
+      'Cursos, guias, e-books e modelos digitais de criadores e revendedores com licença, entregues por link ou código.',
   },
   {
     slug: 'boosting',
@@ -56,6 +99,9 @@ export const categories: Category[] = [
     image: '/images/cat-boosting.png',
   },
 ]
+
+/** Categorias na barra do cabeçalho (as demais ficam em /catalogo, no menu do celular e no rodapé): 10 links não cabem. */
+export const HEADER_CATEGORY_SLUGS = ['contas', 'moedas', 'gift-cards', 'boosting']
 
 export const listings: Listing[] = [
   {

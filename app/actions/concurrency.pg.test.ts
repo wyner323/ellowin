@@ -33,10 +33,18 @@ vi.mock("@/lib/auth", async () => {
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }))
 vi.mock("next/server", () => ({ after: () => {} }))
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }))
-vi.mock("@/lib/notify", () => ({ notifyOrder: () => {}, notifyLowStock: () => {}, notifyPriceChange: () => {}, notificationsLive: () => false }))
+vi.mock("@/lib/notify", () => ({
+  notifyOrder: () => {},
+  notifyLowStock: () => {},
+  notifyPriceChange: () => {},
+  notifyCategoryDecision: () => {},
+  notifyStockDecision: () => {},
+  notificationsLive: () => false,
+}))
 
 import { addFunds, requestWithdrawal } from "@/app/actions/wallet"
 import { addStock } from "@/app/actions/delivery-stock"
+import { reviewStockBatch } from "@/app/actions/stock-review"
 import { cancelOrder, confirmReceipt, markDelivered, purchase } from "@/app/actions/orders"
 import { runWalletReconciliation } from "@/lib/reconcile"
 import { decryptField } from "@/lib/secret-box"
@@ -69,15 +77,21 @@ describe.skipIf(!URL_)("concorrência em Postgres real", () => {
 
   beforeEach(async () => {
     await q(
-      `TRUNCATE "auth_attempt", "delivery_stock_item", "wallet_transaction", "order_message", "dispute", "order", "product_variant", "product", "wallet", "seller_application", "profile", "user" RESTART IDENTITY CASCADE`,
+      `TRUNCATE "auth_attempt", "delivery_stock_item", "stock_batch", "seller_category_approval", "wallet_transaction", "order_message", "dispute", "order", "product_variant", "product", "wallet", "seller_application", "profile", "user" RESTART IDENTITY CASCADE`,
     )
     // Pedidos 1–5 são a carga de demonstração antiga para a conferência (lib/reconcile.ts).
     await q(`SELECT setval(pg_get_serial_sequence('"order"', 'id'), 100)`)
     await addUser("seller", { seller: true, pix: true })
+    await addUser("mod", { role: "moderator" })
+    // Gift card é categoria restrita: o vendedor dos testes já está aprovado e SEM análise de estoque (as corridas abaixo
+    // tratam de compra e estoque; a análise dos lotes tem o teste de corrida próprio, no fim).
+    await q(
+      `INSERT INTO "seller_category_approval" ("userId", "categorySlug", "status", "statement", "decidedBy", "decidedAt", "stockReview") VALUES ('seller', 'gift-cards', 'aprovado', 'teste', 'teste', now(), false)`,
+    )
   })
 
-  async function addUser(id: string, opts: { seller?: boolean; pix?: boolean; funds?: number } = {}) {
-    await q(`INSERT INTO "user" ("id", "name", "email", "emailVerified") VALUES ($1, $1, $1 || '@teste.dev', true)`, [id])
+  async function addUser(id: string, opts: { seller?: boolean; pix?: boolean; funds?: number; role?: string } = {}) {
+    await q(`INSERT INTO "user" ("id", "name", "email", "emailVerified", "role") VALUES ($1, $1, $1 || '@teste.dev', true, $2)`, [id, opts.role ?? "user"])
     await q(`INSERT INTO "profile" ("userId", "fullName", "cpf", "phone", "birthDate") VALUES ($1, $1, '52998224725', '11999999999', '1990-01-01')`, [id])
     if (opts.seller) {
       await q(`INSERT INTO "seller_application" ("userId", "status", "storeSlug", "pixKey", "pixKeyType") VALUES ($1, 'aprovado', $1 || '-store', $2, 'cpf')`, [id, opts.pix ? "52998224725" : null])
@@ -260,6 +274,34 @@ describe.skipIf(!URL_)("concorrência em Postgres real", () => {
       expect(r.ok, r.error).toBe(true)
       return codes
     }
+
+    it("moderação tira o lote de circulação enquanto compram: depois da decisão ninguém recebe item do lote, e estoque e dinheiro fecham", async () => {
+      for (let round = 0; round < ROUNDS; round++) {
+        for (let i = 0; i < 4; i++) await addUser(`q${round}-${i}`, { funds: 50_000 })
+        const { variantId } = await listing({ stock: 0, deliveryType: "automatica", category: "gift-cards" })
+        await stockItems(variantId, 6)
+        const batchId = (await one<{ id: number }>(`SELECT "id" FROM "stock_batch" WHERE "variantId" = $1`, [variantId])).id
+
+        const results = await Promise.all([
+          ...Array.from({ length: 4 }, (_, i) => as(`q${round}-${i}`, () => purchase(variantId, 10_000))),
+          as("mod", () => reviewStockBatch({ batchId, decision: "quarentena", note: "corrida de teste" })),
+        ])
+        const review = results[4] as { ok: boolean; error?: string }
+        expect(review.ok, `rodada ${round}: ${review.error}`).toBe(true)
+
+        // Com o lote em quarentena nada mais vende: o estoque do anúncio é zero e uma compra nova é recusada.
+        expect(await stockOf(variantId), `rodada ${round}`).toBe(0)
+        const late = await as(`q${round}-0`, () => purchase(variantId, 10_000))
+        expect(late, `rodada ${round}`).toMatchObject({ ok: false, error: "Item esgotado." })
+
+        // O que foi vendido antes da decisão está inteiro: cada pedido com o próprio item, nenhum repetido.
+        const sold = (await q(`SELECT "orderId" FROM "delivery_stock_item" WHERE "variantId" = $1 AND "orderId" IS NOT NULL`, [variantId])).rows
+        const okBuys = results.slice(0, 4).filter((r) => (r as { ok: boolean }).ok).length
+        expect(sold.length, `rodada ${round}`).toBe(okBuys)
+        expect(new Set(sold.map((r) => (r as { orderId: number }).orderId)).size).toBe(okBuys)
+      }
+      await expectMoneyBalanced()
+    }, 180_000)
 
     it("6 compradores para 3 itens: 3 entregas, cada um com um item DIFERENTE, nenhum item entregue duas vezes", async () => {
       for (let i = 0; i < 6; i++) await addUser(`g${i}`, { funds: 50_000 })

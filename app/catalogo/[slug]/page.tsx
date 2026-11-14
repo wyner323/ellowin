@@ -1,15 +1,15 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ChevronRight } from 'lucide-react'
+import { CategoryArt } from '@/components/category-art'
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { ListingFilterBar } from '@/components/marketplace/listing-filter-bar'
 import { ListingResults } from '@/components/marketplace/listing-results'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { categories, getCategory } from '@/lib/catalog'
+import { HEADER_CATEGORY_SLUGS, categories, getCategory } from '@/lib/catalog'
 import { categoryCardInfo, sellerCountLabel } from '@/lib/home-stats'
 import { activeFilterCount, parseListingFilters } from '@/lib/listing-filters'
 import { getCategoryStats } from '@/lib/market-stats'
@@ -27,9 +27,13 @@ export async function generateMetadata({
   const { slug } = await params
   const category = getCategory(slug)
   if (!category) return { title: 'Catálogo não encontrado — Ellowin' }
+  // Categoria recente e ainda sem anúncio é uma página vazia: fora do Google até aparecer o primeiro (vira indexável sozinha).
+  const stats = await getCategoryStats()
+  const thin = !HEADER_CATEGORY_SLUGS.includes(slug) && (stats[slug]?.count ?? 0) < 1
   return {
     title: `${category.name} — Ellowin`,
     description: category.description,
+    ...(thin ? { robots: { index: false, follow: true } } : {}),
     // Filtros e ?pagina= não geram páginas novas para indexar.
     alternates: { canonical: `/catalogo/${slug}` },
   }
@@ -98,13 +102,7 @@ export default async function CatalogPage({
               </div>
             </div>
             <div className="relative aspect-[4/3] w-full max-w-64 shrink-0 overflow-hidden rounded-xl border border-border">
-              <Image
-                src={category.image || '/placeholder.svg'}
-                alt={`Ilustração do catálogo de ${category.name}`}
-                fill
-                sizes="256px"
-                className="object-cover"
-              />
+              <CategoryArt category={category} sizes="256px" />
             </div>
           </div>
         </section>

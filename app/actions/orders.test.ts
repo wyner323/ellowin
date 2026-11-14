@@ -260,6 +260,12 @@ describe("purchase", () => {
   it("só conta de jogo registra procedência: outra categoria, ou conta sem procedência, não grava mensagem", async () => {
     const outra = await addListing()
     await t.query(`UPDATE "product" SET "categorySlug" = 'gift-cards', "accountOrigin" = 'criador_sem_recuperacao' WHERE "id" = $1`, [outra.productId])
+    // gift card é categoria restrita: o vendedor precisa estar aprovado para a compra seguir
+    await t.query(
+      `INSERT INTO "seller_category_approval" ("userId", "categorySlug", "status", "statement", "decidedBy", "decidedAt", "stockReview")
+       SELECT DISTINCT "sellerId", 'gift-cards', 'aprovado', 'teste', 'teste', now(), false FROM "product" WHERE "id" = $1`,
+      [outra.productId],
+    )
     const semOrigem = await addListing()
     for (const variantId of [outra.variantId, semOrigem.variantId]) {
       const orderId = await buy(variantId)

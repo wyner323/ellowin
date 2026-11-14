@@ -73,6 +73,9 @@ import AdminLayout from "@/app/admin/layout"
 import CasoDisputaPage from "@/app/admin/disputas/[id]/page"
 import ConferenciaPage from "@/app/admin/conferencia/page"
 import EntregaAutomaticaPage from "@/app/admin/entrega-automatica/page"
+import CategoriasAdminPage from "@/app/admin/categorias/page"
+import EstoqueAdminPage from "@/app/admin/estoque/page"
+import CategoriasVendedorPage from "@/app/painel/vendedor/categorias/page"
 import CargosPage from "@/app/admin/usuarios/page"
 import FilaDisputasPage from "@/app/admin/disputas/page"
 import FilaDenunciasPage from "@/app/admin/denuncias/page"
@@ -728,6 +731,61 @@ describe("moderação", () => {
     expect(page).toContain("Em atenção")
     expect(page).toContain("1 vendedor em atenção")
     expect(page).not.toContain("Ana Maria da Silva")
+  })
+
+  it("categorias e estoque para análise: só a equipe, mostrando o nome da loja e a máscara, nunca o código", async () => {
+    for (const who of [null, "comprador", "ana"]) {
+      as(who)
+      await expect(CategoriasAdminPage()).rejects.toThrow("NEXT_REDIRECT:/")
+      await expect(EstoqueAdminPage()).rejects.toThrow("NEXT_REDIRECT:/")
+    }
+
+    await t.query(`INSERT INTO "seller_category_approval" ("userId", "categorySlug", "status", "statement") VALUES ('ana', 'gift-cards', 'pendente', 'Compro no distribuidor X com nota fiscal')`)
+    await t.query(`INSERT INTO "stock_batch" ("variantId", "sellerId", "itemCount", "status", "statement") VALUES ($1, 'ana', 1, 'pendente', 'Lote de teste do distribuidor')`, [variantId])
+    const batch = (await t.query(`SELECT "id" FROM "stock_batch"`)).rows[0].id as number
+    await t.query(
+      `INSERT INTO "delivery_stock_item" ("variantId", "sellerId", "payload", "payloadHash", "mask", "batchId") VALUES ($1, 'ana', $2, $3, $4, $5)`,
+      [variantId, encryptField("SEGREDO-DO-CODIGO-1234", `stock:${variantId}`), hashField("SEGREDO-DO-CODIGO-1234", `stock:${variantId}`), maskStockItem("SEGREDO-DO-CODIGO-1234"), batch],
+    )
+
+    as("mod")
+    const categorias = await txt(CategoriasAdminPage())
+    expect(categorias).toContain("Gift cards")
+    expect(categorias).toContain("Loja da Ana")
+    expect(categorias).toContain("Compro no distribuidor X com nota fiscal")
+    const estoque = await txt(EstoqueAdminPage())
+    expect(estoque).toContain("Lote de teste do distribuidor")
+    expect(estoque).toContain("SE••••34")
+    expect(estoque).not.toContain("SEGREDO-DO-CODIGO")
+  })
+
+  it("categorias do vendedor: pede login e mostra a situação de cada categoria restrita", async () => {
+    as(null)
+    await expect(CategoriasVendedorPage()).rejects.toThrow("NEXT_REDIRECT:/entrar")
+    await t.query(`INSERT INTO "seller_category_approval" ("userId", "categorySlug", "status", "statement", "decidedBy", "decidedAt") VALUES ('ana', 'keys', 'aprovado', 'x', 'mod', now())`)
+    await t.query(`INSERT INTO "seller_category_approval" ("userId", "categorySlug", "status", "statement", "decisionNote", "decidedBy", "decidedAt") VALUES ('ana', 'recargas', 'recusado', 'x', 'Sem comprovante', 'mod', now())`)
+    as("ana")
+    const page = await txt(CategoriasVendedorPage())
+    expect(page).toContain("Keys de jogos")
+    expect(page).toContain("Aprovado")
+    expect(page).toContain("Não aprovado")
+    expect(page).toContain("Sem comprovante")
+    expect(page).toContain("Pedir aprovação")
+  })
+
+  it("pedido: os dados que o comprador informou aparecem para as partes e a moderação, e não para quem não é parte", async () => {
+    const orderId = await addOrder({ status: "aguardando_entrega", title: "Recarga Free Fire" })
+    await t.query(`UPDATE "product" SET "categorySlug" = 'recargas' WHERE "id" = $1`, [productId])
+    await t.query(`INSERT INTO "order_buyer_info" ("orderId", "info") VALUES ($1, '{"playerId":"Fulano#1234","server":"Brasil"}'::jsonb)`, [orderId])
+    for (const who of ["comprador", "ana"]) {
+      as(who)
+      const page = await txt(PedidoPage(props({ id: String(orderId) })))
+      expect(page, who).toContain("Dados informados pelo comprador")
+      expect(page, who).toContain("Fulano#1234")
+      expect(page, who).toContain("Servidor ou região")
+    }
+    as("outro")
+    await expect(PedidoPage(props({ id: String(orderId) }))).rejects.toThrow("NEXT_NOT_FOUND")
   })
 
   it("a conferência mostra 'Tudo bate' num banco consistente", async () => {

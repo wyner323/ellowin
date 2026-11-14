@@ -1,5 +1,6 @@
 import type { PoolClient } from "@neondatabase/serverless"
 import { pool } from "@/lib/db"
+import { stockNeedsReview } from "@/lib/category-approval"
 import { MAX_STOCK_AVAILABLE, allowsAutoDelivery, maskStockItem } from "@/lib/delivery-stock-lines"
 import { decryptField, encryptField, hasEncryptionKey, hashField } from "@/lib/secret-box"
 import { withTransaction } from "@/lib/wallet"
@@ -32,6 +33,19 @@ export async function stockTableExistsIn(client: PoolClient) {
   return rows[0]?.ok === true
 }
 
+/** A tabela de lotes existe? (`false` até a migração 0015: antes dela todo item vale como aprovado.) */
+export async function batchTableExistsIn(client: Pick<PoolClient, "query">) {
+  const { rows } = await client.query<{ ok: boolean }>(`SELECT to_regclass('public.stock_batch') IS NOT NULL AS ok`)
+  return rows[0]?.ok === true
+}
+
+/** Item à venda: não vendido e sem lote ou de um lote aprovado (lote pendente, em quarentena ou recusado NÃO vende). */
+function sellableSql(hasBatches: boolean, alias = "delivery_stock_item") {
+  const base = `"${alias}"."orderId" IS NULL`
+  if (!hasBatches) return base
+  return `${base} AND ("${alias}"."batchId" IS NULL OR EXISTS (SELECT 1 FROM "stock_batch" b WHERE b."id" = "${alias}"."batchId" AND b."status" = 'aprovado'))`
+}
+
 /**
  * A entrega automática pode ser LIGADA num anúncio? Só com a chave de cifra configurada e a migração aplicada: sem
  * uma delas o estoque não pode existir com segurança, então a opção fica desligada em vez de prometer o que não entrega.
@@ -57,9 +71,10 @@ export async function availableStockInProduct(productId: number) {
 
 /** Iguala o estoque da variante ao número de itens disponíveis. A variante já deve estar travada por quem chama. */
 export async function syncStock(client: PoolClient, variantId: number) {
+  const batches = await batchTableExistsIn(client)
   await client.query(
     `UPDATE "product_variant"
-        SET "stock" = (SELECT count(*) FROM "delivery_stock_item" WHERE "variantId" = $1 AND "orderId" IS NULL)
+        SET "stock" = (SELECT count(*) FROM "delivery_stock_item" WHERE "variantId" = $1 AND ${sellableSql(batches)})
       WHERE "id" = $1`,
     [variantId],
   )
@@ -70,9 +85,10 @@ export async function syncStock(client: PoolClient, variantId: number) {
  * (`payload` vira nulo): quem chama o grava, cifrado para o pedido, em `order.deliveryPayload`. Devolve nulo se não há item.
  */
 export async function claimStockItem(client: PoolClient, variantId: number, orderId: number): Promise<string | null> {
+  const batches = await batchTableExistsIn(client)
   const { rows } = await client.query<{ id: number; payload: string }>(
     `SELECT "id", "payload" FROM "delivery_stock_item"
-      WHERE "variantId" = $1 AND "orderId" IS NULL
+      WHERE "variantId" = $1 AND ${sellableSql(batches)}
       ORDER BY "id" LIMIT 1
       FOR UPDATE SKIP LOCKED`,
     [variantId],
@@ -92,7 +108,7 @@ export async function claimStockItem(client: PoolClient, variantId: number, orde
  * Cadastra itens no estoque de um item do anúncio. Só o dono, só em anúncio de entrega automática e de categoria que
  * aceita isso, e só com a chave de cifra configurada. Repetidos (inclusive de itens já vendidos) são ignorados.
  */
-export async function addStockItems(sellerId: string, variantId: number, items: string[]) {
+export async function addStockItems(sellerId: string, variantId: number, items: string[], statement?: string) {
   if (!hasEncryptionKey()) {
     throw new StockError("O estoque automático ainda não está disponível: o armazenamento seguro dos itens não foi configurado.")
   }
@@ -121,23 +137,53 @@ export async function addStockItems(sellerId: string, variantId: number, items: 
       throw new StockError(`Cada item do anúncio comporta até ${MAX_STOCK_AVAILABLE.toLocaleString("pt-BR")} itens disponíveis (hoje há ${n}).`)
     }
 
+    // Categorias que exigem análise: o envio vira um lote PENDENTE e só entra à venda quando a moderação aprova.
+    // Sem a tabela de lotes (migração 0015 pendente) tudo entra como antes, sem lote.
+    let batchId: number | null = null
+    let review = false
+    if (await batchTableExistsIn(client)) {
+      review = await stockNeedsReview(sellerId, variant.categorySlug, client)
+      const batch = await client.query<{ id: number }>(
+        `INSERT INTO "stock_batch" ("variantId", "sellerId", "itemCount", "status", "statement")
+         VALUES ($1, $2, $3, $4, $5) RETURNING "id"`,
+        [variantId, sellerId, items.length, review ? "pendente" : "aprovado", (statement ?? "").trim().slice(0, 300) || null],
+      )
+      batchId = batch.rows[0].id
+    }
+
     const context = stockContext(variantId)
-    const inserted = await client.query(
-      `INSERT INTO "delivery_stock_item" ("variantId", "sellerId", "payload", "payloadHash", "mask")
-       SELECT $1, $2, t.payload, t.hash, t.mask FROM unnest($3::text[], $4::text[], $5::text[]) AS t(payload, hash, mask)
-       ON CONFLICT ("variantId", "payloadHash") DO NOTHING`,
-      [
-        variantId,
-        sellerId,
-        items.map((item) => encryptField(item, context)),
-        items.map((item) => hashField(item, context)),
-        items.map(maskStockItem),
-      ],
-    )
+    // Sem a tabela de lotes a coluna batchId também não existe (mesma migração): o insert antigo, sem ela.
+    const values = [
+      variantId,
+      sellerId,
+      items.map((item) => encryptField(item, context)),
+      items.map((item) => hashField(item, context)),
+      items.map(maskStockItem),
+    ]
+    const inserted =
+      batchId === null
+        ? await client.query(
+            `INSERT INTO "delivery_stock_item" ("variantId", "sellerId", "payload", "payloadHash", "mask")
+             SELECT $1, $2, t.payload, t.hash, t.mask FROM unnest($3::text[], $4::text[], $5::text[]) AS t(payload, hash, mask)
+             ON CONFLICT ("variantId", "payloadHash") DO NOTHING`,
+            values,
+          )
+        : await client.query(
+            `INSERT INTO "delivery_stock_item" ("variantId", "sellerId", "payload", "payloadHash", "mask", "batchId")
+             SELECT $1, $2, t.payload, t.hash, t.mask, $6::integer FROM unnest($3::text[], $4::text[], $5::text[]) AS t(payload, hash, mask)
+             ON CONFLICT ("variantId", "payloadHash") DO NOTHING`,
+            [...values, batchId],
+          )
+
+    const added = inserted.rowCount ?? 0
+    if (batchId !== null) {
+      // O lote guarda só o que realmente entrou (repetidos foram ignorados); lote vazio some.
+      if (added === 0) await client.query(`DELETE FROM "stock_batch" WHERE "id" = $1`, [batchId])
+      else await client.query(`UPDATE "stock_batch" SET "itemCount" = $2 WHERE "id" = $1`, [batchId, added])
+    }
 
     await syncStock(client, variantId)
-    const added = inserted.rowCount ?? 0
-    return { added, ignored: items.length - added }
+    return { added, ignored: items.length - added, pendingReview: review && added > 0 }
   })
 }
 
@@ -162,11 +208,18 @@ export async function removeStockItem(sellerId: string, itemId: number) {
   })
 }
 
+export type StockBatchSummary = { id: number; itemCount: number; status: string; createdAt: Date; reviewNote: string | null }
+
 export type StockVariantSummary = {
   variantId: number
   label: string
+  /** itens à venda agora */
   available: number
+  /** itens cadastrados que ainda esperam a moderação (ou estão em quarentena) e por isso não vendem */
+  held: number
   sold: number
+  /** últimos envios e a situação de cada um (vazio antes da migração 0015) */
+  batches: StockBatchSummary[]
   /** só a máscara de cada item disponível, nunca o conteúdo */
   items: { id: number; mask: string }[]
 }
@@ -179,9 +232,11 @@ const MASKED_ITEMS_SHOWN = 200
  */
 export async function getProductStock(sellerId: string, productId: number): Promise<StockVariantSummary[] | null> {
   try {
-    const { rows } = await pool.query<{ id: number; label: string; available: number; sold: number }>(
+    const batches = await batchTableExistsIn(pool)
+    const { rows } = await pool.query<{ id: number; label: string; available: number; unsold: number; sold: number }>(
       `SELECT v."id", v."label",
-              (SELECT count(*)::int FROM "delivery_stock_item" i WHERE i."variantId" = v."id" AND i."orderId" IS NULL) AS available,
+              (SELECT count(*)::int FROM "delivery_stock_item" i WHERE i."variantId" = v."id" AND ${sellableSql(batches, "i")}) AS available,
+              (SELECT count(*)::int FROM "delivery_stock_item" i WHERE i."variantId" = v."id" AND i."orderId" IS NULL) AS unsold,
               (SELECT count(*)::int FROM "delivery_stock_item" i WHERE i."variantId" = v."id" AND i."orderId" IS NOT NULL) AS sold
          FROM "product_variant" v JOIN "product" p ON p."id" = v."productId"
         WHERE p."id" = $1 AND p."sellerId" = $2 AND v."active"
@@ -195,7 +250,21 @@ export async function getProductStock(sellerId: string, productId: number): Prom
         `SELECT "id", "mask" FROM "delivery_stock_item" WHERE "variantId" = $1 AND "orderId" IS NULL ORDER BY "id" LIMIT ${MASKED_ITEMS_SHOWN}`,
         [row.id],
       )
-      summaries.push({ variantId: row.id, label: row.label, available: row.available, sold: row.sold, items: masks.rows })
+      const recent = batches
+        ? await pool.query<StockBatchSummary>(
+            `SELECT "id", "itemCount", "status", "createdAt", "reviewNote" FROM "stock_batch" WHERE "variantId" = $1 ORDER BY "id" DESC LIMIT 5`,
+            [row.id],
+          )
+        : { rows: [] as StockBatchSummary[] }
+      summaries.push({
+        variantId: row.id,
+        label: row.label,
+        available: row.available,
+        held: row.unsold - row.available,
+        sold: row.sold,
+        batches: recent.rows,
+        items: masks.rows,
+      })
     }
     return summaries
   } catch (error) {

@@ -13,6 +13,8 @@ import {
   hoursForDeliveryTime,
 } from "@/lib/delivery"
 import { isValidAccountOrigin } from "@/lib/account-origin"
+import { sellerMayList } from "@/lib/category-approval"
+import { categoryRule } from "@/lib/category-rules"
 import { sanitizeAttributes } from "@/lib/game-attributes"
 import { MAX_DESCRIPTION, MAX_PRICE_CENTS, MAX_STOCK, MAX_TITLE, copyTitle } from "@/lib/listing-checks"
 import { parseToCents } from "@/lib/money"
@@ -25,7 +27,8 @@ import { allowsAutoDelivery } from "@/lib/delivery-stock-lines"
 import { autoDeliveryAvailable, availableStockInProduct } from "@/lib/delivery-stock"
 import type { ActionResult } from "@/app/actions/auth"
 
-const AUTO_CATEGORY_ERROR = "A entrega automática só está disponível para gift cards e contas."
+const AUTO_CATEGORY_ERROR = "Esta categoria não aceita entrega automática."
+const RESTRICTED_ERROR = "Esta categoria precisa de aprovação da moderação. Peça em “Categorias” no painel do vendedor."
 const AUTO_UNAVAILABLE_ERROR = "A entrega automática ainda não está disponível. Use a entrega manual por enquanto."
 
 const MAX_IMAGES = 5
@@ -56,7 +59,7 @@ function normalizeDelivery(deliveryType: string, deliveryTime: string) {
  * essa decisão, mesmo motivo de normalizeDelivery acima).
  */
 function normalizeAccountOrigin(categorySlug: string, accountOrigin: string | undefined) {
-  if (categorySlug !== "contas") return null
+  if (!categoryRule(categorySlug).declaresOrigin) return null
   const value = (accountOrigin ?? "").trim()
   return isValidAccountOrigin(value) ? value : null
 }
@@ -253,13 +256,15 @@ export async function createProduct(input: {
     return { ok: false, field: "game", error: `O nome do jogo pode ter até ${MAX_GAME} caracteres.` }
   if (!input.categorySlug || !getCategory(input.categorySlug))
     return { ok: false, field: "categorySlug", error: "Escolha a categoria do anúncio." }
+  if (!(await sellerMayList(userId, input.categorySlug)))
+    return { ok: false, field: "categorySlug", error: RESTRICTED_ERROR }
   if (input.description.trim().length < 20)
     return {
       ok: false,
       field: "description",
       error: "Descreva o que o comprador recebe com pelo menos 20 caracteres.",
     }
-  if (input.categorySlug === "contas" && !isValidAccountOrigin((input.accountOrigin ?? "").trim()))
+  if (categoryRule(input.categorySlug).declaresOrigin && !isValidAccountOrigin((input.accountOrigin ?? "").trim()))
     return {
       ok: false,
       field: "accountOrigin",
@@ -383,9 +388,11 @@ export async function updateProduct(input: {
     return { ok: false, field: "game", error: `O nome do jogo pode ter até ${MAX_GAME} caracteres.` }
   if (!getCategory(input.categorySlug))
     return { ok: false, field: "categorySlug", error: "Escolha a categoria do anúncio." }
+  if (input.categorySlug !== owned.categorySlug && !(await sellerMayList(userId, input.categorySlug)))
+    return { ok: false, field: "categorySlug", error: RESTRICTED_ERROR }
   if (!isAcceptableDeliveryTime(input.deliveryType, input.deliveryTime, owned.deliveryTime))
     return { ok: false, field: "deliveryTime", error: "Escolha um prazo de entrega da lista." }
-  if (input.categorySlug === "contas" && !isValidAccountOrigin((input.accountOrigin ?? "").trim()))
+  if (categoryRule(input.categorySlug).declaresOrigin && !isValidAccountOrigin((input.accountOrigin ?? "").trim()))
     return {
       ok: false,
       field: "accountOrigin",
@@ -562,6 +569,7 @@ export async function toggleProductStatus(productId: number): Promise<ActionResu
   if (next === "ativo") {
     const blocked = await accountBlock(userId, "reativar o anúncio")
     if (blocked) return blocked
+    if (!(await sellerMayList(userId, owned.categorySlug))) return { ok: false, error: RESTRICTED_ERROR }
   }
 
   await db
@@ -604,6 +612,7 @@ export async function duplicateProduct(productId: number): Promise<ActionResult 
 
   const blocked = await accountBlock(userId, "anunciar")
   if (blocked) return blocked
+  if (!(await sellerMayList(userId, source.categorySlug))) return { ok: false, error: RESTRICTED_ERROR }
 
   if (!(await hitRateLimit(`duplicate-product:${userId}`, 20, 60 * 60))) {
     return { ok: false, error: "Muitas cópias em pouco tempo. Tente de novo mais tarde." }

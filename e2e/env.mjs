@@ -27,4 +27,6 @@ export function e2eDatabaseUrl() {
 export const PASSWORD = "Senha1234"
 export const SELLER = { id: "e2e-vendedor", email: "vendedor@e2e.test", displayName: "LojaE2E", storeSlug: "loja-e2e" }
 export const BUYER = { id: "e2e-comprador", email: "comprador@e2e.test", displayName: "CompradorE2E" }
+export const MOD = { id: "e2e-moderador", email: "moderador@e2e.test", displayName: "ModE2E" }
+export const RECARGA = { slug: "recarga-free-fire-e2e", title: "Recarga Free Fire E2E", priceCents: 2000 }
 export const LISTING = { slug: "conta-valorant-e2e", title: "Conta Valorant E2E", priceCents: 5000, buyerFundsCents: 50_000 }

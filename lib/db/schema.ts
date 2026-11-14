@@ -278,6 +278,35 @@ export const productVariant = pgTable("product_variant", {
 ])
 
 /**
+ * Lote de estoque: cada envio de itens do vendedor (`addStock`) vira um lote com o próprio status. Em categorias que exigem
+ * análise (lib/category-rules.ts `stockReview`), o lote nasce `pendente` e só entra à venda quando a moderação o aprova;
+ * `quarentena` e `recusado` tiram o resto do lote da venda. Itens antigos (sem lote) valem como aprovados.
+ */
+export const stockBatch = pgTable("stock_batch", {
+  id: serial("id").primaryKey(),
+  variantId: integer("variantId")
+    .notNull()
+    .references(() => productVariant.id, { onDelete: "cascade" }),
+  sellerId: text("sellerId")
+    .notNull()
+    .references(() => user.id),
+  itemCount: integer("itemCount").notNull(),
+  /** pendente | aprovado | recusado | quarentena */
+  status: text("status").notNull().default("aprovado"),
+  /** Origem do estoque declarada pelo vendedor neste envio (texto livre, opcional). */
+  statement: text("statement"),
+  reviewedBy: text("reviewedBy").references(() => user.id),
+  reviewedAt: timestamp("reviewedAt"),
+  reviewNote: text("reviewNote"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+}, (t) => [
+  index("stock_batch_status_idx").on(t.status, t.id),
+  index("stock_batch_seller_idx").on(t.sellerId),
+  check("stock_batch_status_valid", sql`${t.status} in ('pendente', 'aprovado', 'recusado', 'quarentena')`),
+  check("stock_batch_count_positive", sql`${t.itemCount} > 0`),
+])
+
+/**
  * Estoque de entrega automática (docs/entrega-automatica.md): um código, chave ou login por linha, cifrado em repouso.
  * `payload` só existe enquanto o item está disponível: a compra MOVE o conteúdo para `order.deliveryPayload`
  * (cifrado de novo para o pedido) e zera esta coluna, então o segredo nunca fica em dois lugares. `orderId` nulo =
@@ -298,6 +327,8 @@ export const deliveryStockItem = pgTable("delivery_stock_item", {
   orderId: integer("orderId")
     .unique()
     .references(() => order.id),
+  /** Lote em que o item entrou; nulo = item anterior aos lotes (vale como aprovado). */
+  batchId: integer("batchId").references(() => stockBatch.id),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   soldAt: timestamp("soldAt"),
 }, (t) => [
@@ -626,3 +657,47 @@ export const report = pgTable(
     ),
   ],
 )
+
+/**
+ * Aprovação do vendedor numa categoria que exige análise da moderação (lib/category-rules.ts `restricted`): gift cards,
+ * recargas, assinaturas, keys e redes sociais. Uma linha por vendedor e categoria. `statement` é a declaração do vendedor
+ * (de onde vem o estoque); a Ellowin não a confere, só decide se libera. `stockReview` mantém a análise do estoque novo
+ * enquanto for verdadeiro (a moderação desliga para quem já provou confiança).
+ */
+export const sellerCategoryApproval = pgTable(
+  "seller_category_approval",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    categorySlug: text("categorySlug").notNull(),
+    /** pendente | aprovado | recusado */
+    status: text("status").notNull().default("pendente"),
+    statement: text("statement").notNull().default(""),
+    decisionNote: text("decisionNote"),
+    /** Id da pessoa da moderação, ou "migracao" para o que já vendia antes da análise existir. */
+    decidedBy: text("decidedBy"),
+    decidedAt: timestamp("decidedAt"),
+    stockReview: boolean("stockReview").notNull().default(true),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("seller_category_approval_user_category_idx").on(t.userId, t.categorySlug),
+    index("seller_category_approval_status_idx").on(t.status, t.id),
+    check("seller_category_approval_status_valid", sql`${t.status} in ('pendente', 'aprovado', 'recusado')`),
+  ],
+)
+
+/**
+ * Dados que o comprador informou ao pagar (ID do jogador numa recarga, servidor...). Tabela à parte, e não colunas de
+ * `order`, para os muitos `select()` de pedido nunca dependerem da migração. Só as duas partes e a moderação leem.
+ */
+export const orderBuyerInfo = pgTable("order_buyer_info", {
+  orderId: integer("orderId")
+    .primaryKey()
+    .references(() => order.id, { onDelete: "cascade" }),
+  info: jsonb("info").$type<Record<string, string>>().notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})

@@ -49,7 +49,7 @@ test.describe("interface (componentes de cliente)", () => {
     })
 
     test("o estoque do anúncio caiu com a compra", async ({ page }) => {
-      const [{ stock }] = await query<{ stock: number }>(`SELECT "stock" FROM "product_variant" LIMIT 1`)
+      const [{ stock }] = await query<{ stock: number }>(`SELECT v."stock" FROM "product_variant" v JOIN "product" p ON p."id" = v."productId" WHERE p."slug" = $1`, [LISTING.slug])
       expect(stock).toBe(4)
       await page.goto(`/produtos/${LISTING.slug}`)
       await expect(page.getByText("Saldo disponível: R$ 450,00")).toBeVisible()

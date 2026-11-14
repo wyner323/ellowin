@@ -19,7 +19,15 @@ export type ReconciliationReport = {
 }
 
 /** `optionalTable`: lê uma tabela de migração recente; se ela ainda não existe (42P01), a verificação é pulada em vez de falhar. */
-type Check = { key: string; description: string; sql: string; params?: unknown[]; optionalTable?: boolean }
+type Check = {
+  key: string
+  description: string
+  sql: string
+  params?: unknown[]
+  optionalTable?: boolean
+  /** só roda com ("with") ou sem ("without") a tabela de lotes de estoque (migração 0015) */
+  batches?: "with" | "without"
+}
 
 /**
  * Pedidos de demonstração (dados semeados em 2026-07/08, antes do escrow existir)
@@ -148,9 +156,11 @@ const CHECKS: Check[] = [
   },
   {
     // Entrega automática: o estoque do item do anúncio é derivado; se divergir dos itens disponíveis, a vitrine mente.
+    // Antes da migração 0015 (sem lotes) todo item não vendido está disponível.
     key: "estoque_automatico_divergente",
     description: "Item de anúncio de entrega automática com estoque diferente do número de itens disponíveis",
     optionalTable: true,
+    batches: "without",
     sql: `SELECT v."id" AS "itemDoAnuncio", v."stock" AS "estoque", d.n AS "disponiveis"
             FROM "product_variant" v
             JOIN "product" p ON p."id" = v."productId"
@@ -160,12 +170,43 @@ const CHECKS: Check[] = [
            WHERE p."deliveryType" = 'automatica' AND v."stock" <> d.n
            LIMIT 20`,
   },
+  {
+    // Com lotes: só vende o item de um lote aprovado (ou antigo, sem lote); pendente, em quarentena e recusado não contam.
+    key: "estoque_automatico_divergente",
+    description: "Item de anúncio de entrega automática com estoque diferente do número de itens disponíveis",
+    optionalTable: true,
+    batches: "with",
+    sql: `SELECT v."id" AS "itemDoAnuncio", v."stock" AS "estoque", d.n AS "disponiveis"
+            FROM "product_variant" v
+            JOIN "product" p ON p."id" = v."productId"
+            CROSS JOIN LATERAL (
+              SELECT count(*)::int AS n FROM "delivery_stock_item" i
+               WHERE i."variantId" = v."id" AND i."orderId" IS NULL
+                 AND (i."batchId" IS NULL OR EXISTS (SELECT 1 FROM "stock_batch" b WHERE b."id" = i."batchId" AND b."status" = 'aprovado'))
+            ) d
+           WHERE p."deliveryType" = 'automatica' AND v."stock" <> d.n
+           LIMIT 20`,
+  },
+  {
+    // Um item vendido depois de o lote ter sido recusado seria entrega de algo reprovado pela moderação: precisa aparecer.
+    key: "estoque_vendido_de_lote_recusado",
+    description: "Item de estoque vendido depois de o lote ter sido recusado pela moderação",
+    optionalTable: true,
+    batches: "with",
+    sql: `SELECT i."id" AS "itemDoEstoque", i."batchId" AS "lote", i."orderId" AS "pedido"
+            FROM "delivery_stock_item" i JOIN "stock_batch" b ON b."id" = i."batchId"
+           WHERE i."orderId" IS NOT NULL AND b."status" = 'recusado' AND i."soldAt" > b."reviewedAt"
+           LIMIT 20`,
+  },
 ]
 
 export async function runWalletReconciliation(): Promise<ReconciliationReport> {
   const findings: Finding[] = []
+  const hasBatches = (await pool.query<{ ok: boolean }>(`SELECT to_regclass('public.stock_batch') IS NOT NULL AS ok`)).rows[0]?.ok === true
 
   for (const check of CHECKS) {
+    if (check.batches === "with" && !hasBatches) continue
+    if (check.batches === "without" && hasBatches) continue
     let rows: Record<string, unknown>[]
     try {
       rows = (await pool.query(check.sql, check.params)).rows

@@ -5,18 +5,14 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   AlignLeft,
-  Coins,
-  Gift,
   Handshake,
   ImageIcon,
   Loader2,
   Package,
   Plus,
-  Rocket,
   SlidersHorizontal,
   Trash2,
   Truck,
-  UserRound,
   Zap,
 } from "lucide-react"
 import { createProduct, updateProduct, type VariantInput } from "@/app/actions/products"
@@ -24,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ChoiceCards, Field, FormSection, type ChoiceOption } from "@/components/seller/form-kit"
+import { categoryIcon } from "@/components/category-art"
 import { GameProductPicker, type PickerSelection } from "@/components/seller/game-product-picker"
 import { ListingChecklist, ListingPreview } from "@/components/seller/listing-preview"
 import { ProductImageUploader } from "@/components/seller/product-image-uploader"
@@ -33,6 +30,8 @@ import {
   INSTANT_DELIVERY_TIME,
 } from "@/lib/delivery"
 import { ACCOUNT_ORIGIN_OPTIONS } from "@/lib/account-origin"
+import { categories } from "@/lib/catalog"
+import { categoryRule } from "@/lib/category-rules"
 import { allowsAutoDelivery } from "@/lib/delivery-stock-lines"
 import { attributeFieldsFor } from "@/lib/game-attributes"
 import {
@@ -45,12 +44,7 @@ import {
 } from "@/lib/listing-checks"
 import { formatCents, parseToCents, splitOrderAmount } from "@/lib/money"
 
-const CATEGORIES: ChoiceOption[] = [
-  { value: "contas", label: "Contas de jogos", description: "Perfis prontos para jogar", icon: UserRound },
-  { value: "moedas", label: "Moedas e itens", description: "Gold, skins, créditos, itens", icon: Coins },
-  { value: "gift-cards", label: "Gift cards", description: "Cartões e assinaturas", icon: Gift },
-  { value: "boosting", label: "Boosting e serviços", description: "Elo, coaching, missões", icon: Rocket },
-]
+const CATEGORY_OPTIONS: ChoiceOption[] = categories.map((c) => ({ value: c.slug, label: c.name, description: c.tagline, icon: categoryIcon(c.slug) }))
 
 type Row = VariantInput & { id?: number }
 
@@ -67,8 +61,11 @@ export function ProductForm({
   product,
   defaultGame,
   autoDelivery = false,
+  sellableCategories,
 }: {
   defaultGame?: string
+  /** categorias em que este vendedor pode anunciar agora (as restritas só depois de aprovadas); sem a lista, todas */
+  sellableCategories?: string[]
   /** a entrega automática pode ser ligada agora (chave de cifra e tabela do estoque presentes) */
   autoDelivery?: boolean
   product?: {
@@ -143,7 +140,13 @@ export function ProductForm({
     setPickerResolved(true)
   }
 
-  // Automática: só em gift cards e contas, e só quando a plataforma pode guardar o estoque (um anúncio que já é
+  // Categorias oferecidas: as que o vendedor pode usar (e a atual do anúncio, para uma edição nunca esconder a escolha feita).
+  const categoryOptions = CATEGORY_OPTIONS.filter(
+    (o) => sellableCategories === undefined || sellableCategories.includes(o.value) || o.value === product?.categorySlug,
+  )
+  const hiddenCategories = CATEGORY_OPTIONS.length - categoryOptions.length
+
+  // Automática: só nas categorias que entregam um item por venda (lib/category-rules.ts), e só quando a plataforma pode guardar o estoque (um anúncio que já é
   // automático continua mostrando a opção, para o vendedor poder voltar para manual).
   const wasAutomatic = product?.deliveryType === "automatica"
   const categoryAllowsAuto = allowsAutoDelivery(categorySlug)
@@ -223,6 +226,7 @@ export function ProductForm({
       <div className="mx-auto w-full max-w-3xl">
         <GameProductPicker
           defaultGame={defaultGame}
+          sellableCategories={sellableCategories}
           onSelect={applyPickerSelection}
           onManual={() => setPickerResolved(true)}
         />
@@ -278,7 +282,7 @@ export function ProductForm({
             done("title") &&
             done("category") &&
             done("description") &&
-            (categorySlug !== "contas" || done("origin")) &&
+            (!categoryRule(categorySlug).declaresOrigin || done("origin")) &&
             (attributeFields.every((f) => !f.required) || done("attributes"))
           }
           action={
@@ -315,11 +319,20 @@ export function ProductForm({
               legend="Categoria do anúncio"
               value={categorySlug}
               onChange={changeCategory}
-              options={CATEGORIES}
+              options={categoryOptions}
               columns={2}
               disabled={pending}
               compact
             />
+            {hiddenCategories > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Há categorias que precisam de aprovação da moderação.{" "}
+                <Link href="/painel/vendedor/categorias" className="underline underline-offset-4 hover:text-primary">
+                  Ver e pedir aprovação
+                </Link>
+                .
+              </p>
+            ) : null}
           </div>
 
           <Field label="Jogo ou plataforma" htmlFor="game">
@@ -370,7 +383,7 @@ export function ProductForm({
             </div>
           ) : null}
 
-          {categorySlug === "contas" ? (
+          {categoryRule(categorySlug).declaresOrigin ? (
             <div className="flex flex-col gap-2 rounded-xl border border-gold/30 bg-gold/5 p-4">
               <span className="text-sm leading-none font-medium">Procedência da conta</span>
               <p className="text-xs leading-relaxed text-muted-foreground">

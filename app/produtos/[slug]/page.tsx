@@ -35,6 +35,7 @@ import { findGameBySlug, slugifyGame } from "@/lib/product-catalog"
 import { buildProductJsonLd, serializeJsonLd } from "@/lib/product-jsonld"
 import { countsAsView, recordProductView } from "@/lib/product-views"
 import { breadcrumbJsonLd, productSeo } from "@/lib/seo"
+import { buyerFieldsFor } from "@/lib/buyer-info"
 import { getFavoriteState } from "@/lib/favorites"
 import { sealState, sealText } from "@/lib/seller-seal"
 import { getSession } from "@/lib/session"
@@ -301,6 +302,7 @@ export default async function ProductPage({
                     isAuthenticated={Boolean(viewerId)}
                     isOwnProduct={viewerId === item.seller.id}
                     availableCents={walletSummary.availableCents}
+                    buyerFields={await buyerFieldsFor(item.categorySlug)}
                   />
                   <BuyerProtection />
                 </>

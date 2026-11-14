@@ -1,3 +1,4 @@
+import { categoryRule } from "@/lib/category-rules"
 import { parseToCents } from "@/lib/money"
 
 /**
@@ -59,7 +60,7 @@ export function listingChecks(draft: ListingDraft, imageCount: number): ListingC
     { key: "category", label: "Categoria escolhida", ok: Boolean(draft.categorySlug), required: true },
   ]
 
-  if (draft.categorySlug === "contas") {
+  if (categoryRule(draft.categorySlug).declaresOrigin) {
     checks.push({
       key: "origin",
       label: "Procedência da conta informada",

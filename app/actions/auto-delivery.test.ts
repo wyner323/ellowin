@@ -84,7 +84,19 @@ beforeEach(async () => {
   await addUser("buyer2")
   await addUser("unverified", { seller: true, emailVerified: false })
   for (const id of ["buyer", "buyer2"]) await withTransaction((c) => creditAvailable(c, id, 100_000, "deposito", "Depósito de teste"))
+  // Gift cards exigem aprovação do vendedor; aqui os vendedores já estão aprovados e SEM análise de estoque, para estes testes
+  // cobrirem só a entrega (a análise de categoria e de lote tem o próprio arquivo: category-approval.test.ts).
+  for (const id of ["seller", "other"]) await approve(id, "gift-cards", { stockReview: false })
 })
+
+async function approve(userId: string, categorySlug: string, { stockReview = true }: { stockReview?: boolean } = {}) {
+  await t.query(
+    `INSERT INTO "seller_category_approval" ("userId", "categorySlug", "status", "statement", "decidedBy", "decidedAt", "stockReview")
+     VALUES ($1, $2, 'aprovado', 'teste', 'teste', now(), $3)
+     ON CONFLICT ("userId", "categorySlug") DO UPDATE SET "status" = 'aprovado', "stockReview" = EXCLUDED."stockReview"`,
+    [userId, categorySlug, stockReview],
+  )
+}
 
 async function addUser(id: string, { seller = false, emailVerified = true } = {}) {
   await t.query(`INSERT INTO "user" ("id", "name", "email", "emailVerified") VALUES ($1, $1, $1 || '@teste.dev', $2)`, [id, emailVerified])
@@ -398,7 +410,7 @@ describe("regras do anúncio", () => {
   it("recusa entrega automática em categoria que não aceita", async () => {
     holder.userId = "seller"
     const r = await createProduct(input({ categorySlug: "moedas", game: "Roblox" }) as Parameters<typeof createProduct>[0])
-    expect(r).toMatchObject({ ok: false, field: "deliveryType", error: expect.stringContaining("gift cards e contas") })
+    expect(r).toMatchObject({ ok: false, field: "deliveryType", error: expect.stringContaining("não aceita entrega automática") })
   })
 
   it("sem a chave de cifra a opção fica desligada (não promete o que não entrega)", async () => {

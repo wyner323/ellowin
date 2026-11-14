@@ -71,6 +71,14 @@ beforeEach(async () => {
   )
   await addUser("ana", { seller: "aprovado" })
   await addUser("bia", { seller: "aprovado" })
+  // Gift cards exigem aprovação do vendedor (a análise de categoria tem o próprio arquivo de teste).
+  for (const id of ["ana", "bia"]) {
+    await t.query(
+      `INSERT INTO "seller_category_approval" ("userId", "categorySlug", "status", "statement", "decidedBy", "decidedAt", "stockReview")
+       VALUES ($1, 'gift-cards', 'aprovado', 'teste', 'teste', now(), false)`,
+      [id],
+    )
+  }
   await addUser("cadu") // usuário comum, nunca virou vendedor
   await addUser("pendente", { seller: "em_andamento" })
   await addUser("sem-email", { seller: "aprovado", emailVerified: false })

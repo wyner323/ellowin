@@ -55,6 +55,18 @@ export default async function AdminLayout({
             >
               Entrega automática
             </Link>
+            <Link
+              href="/admin/categorias"
+              className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Categorias
+            </Link>
+            <Link
+              href="/admin/estoque"
+              className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Estoque
+            </Link>
             {staff.role === "admin" ? (
               <Link
                 href="/admin/conferencia"

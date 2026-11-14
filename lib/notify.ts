@@ -4,13 +4,16 @@ import { eq, sql } from "drizzle-orm"
 import { db, pool } from "@/lib/db"
 import { isUndefinedTable } from "@/lib/db-errors"
 import { minSellingPrice } from "@/lib/favorites"
+import { getCategory } from "@/lib/catalog"
 import { notificationLog, order, product, productQuestion, productVariant, user } from "@/lib/db/schema"
 import { actionTemplate, sendMail } from "@/lib/email"
 import {
+  composeCategoryDecisionMessage,
   composeLowStockMessage,
   composeOrderMessages,
   composePriceDropMessage,
   composeQuestionMessage,
+  composeStockDecisionMessage,
   type Message,
   type OrderNotifyKind,
 } from "@/lib/notification-messages"
@@ -261,5 +264,57 @@ export function notifyPriceChange(productId: number) {
         composePriceDropMessage({ productTitle: item.title, productSlug: item.slug, fromCents: drop.baselineCents, toCents: min }),
       )
     }
+  })
+}
+
+/** Decisão da moderação sobre o pedido de uma categoria: avisa o vendedor (uma vez por decisão). */
+export function notifyCategoryDecision(input: { userId: string; categorySlug: string; decision: "aprovado" | "recusado"; note: string | null; approvalId: number; decidedAt: Date }) {
+  schedule(async () => {
+    const categoryName = getCategory(input.categorySlug)?.name ?? input.categorySlug
+    await deliver(
+      input.userId,
+      "category_decision",
+      `category:${input.approvalId}:${input.decision}:${input.decidedAt.getTime()}`,
+      composeCategoryDecisionMessage({ categoryName, decision: input.decision, note: input.note }),
+    )
+  })
+}
+
+/** Decisão da moderação sobre um lote de estoque: avisa o vendedor (uma vez por decisão). */
+export function notifyStockDecision(batchId: number) {
+  schedule(async () => {
+    const { rows } = await pool.query<{
+      sellerId: string
+      productId: number
+      productTitle: string
+      variantLabel: string
+      itemCount: number
+      status: "aprovado" | "recusado" | "quarentena" | "pendente"
+      reviewNote: string | null
+      reviewedAt: Date | null
+    }>(
+      `SELECT b."sellerId", p."id" AS "productId", p."title" AS "productTitle", v."label" AS "variantLabel",
+              b."itemCount", b."status", b."reviewNote", b."reviewedAt"
+         FROM "stock_batch" b
+         JOIN "product_variant" v ON v."id" = b."variantId"
+         JOIN "product" p ON p."id" = v."productId"
+        WHERE b."id" = $1`,
+      [batchId],
+    )
+    const row = rows[0]
+    if (!row || row.status === "pendente") return
+    await deliver(
+      row.sellerId,
+      "stock_decision",
+      `batch:${batchId}:${row.status}:${row.reviewedAt ? new Date(row.reviewedAt).getTime() : 0}`,
+      composeStockDecisionMessage({
+        productId: row.productId,
+        productTitle: row.productTitle,
+        variantLabel: row.variantLabel,
+        itemCount: row.itemCount,
+        decision: row.status,
+        note: row.reviewNote,
+      }),
+    )
   })
 }

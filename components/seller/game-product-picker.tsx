@@ -1,15 +1,23 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import {
   ArrowLeft,
+  BookOpen,
   ChevronRight,
   Coins,
   Gamepad2,
   Gift,
+  KeyRound,
+  Lock,
+  Package,
   Rocket,
   Search,
+  Share2,
+  Sparkles,
   UserRound,
+  Zap,
   type LucideIcon,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -33,11 +41,17 @@ export type PickerSelection = {
   deliveryTime: string
 }
 
-const KIND_META: Record<ProductKindId, { icon: LucideIcon; description: string }> = {
-  conta: { icon: UserRound, description: "Perfil pronto para jogar, com os dados de acesso" },
-  moeda_ou_itens: { icon: Coins, description: "Moedas, gold, skins e itens do jogo" },
-  boost_ou_servico: { icon: Rocket, description: "Elo, coaching, missões e outros serviços" },
-  gift_card_ou_assinatura: { icon: Gift, description: "Cartões, códigos e assinaturas" },
+const KIND_ICON: Record<ProductKindId, LucideIcon> = {
+  conta: UserRound,
+  moeda_ou_itens: Coins,
+  itens: Package,
+  gift_card: Gift,
+  recarga: Zap,
+  assinatura: Sparkles,
+  key_de_jogo: KeyRound,
+  rede_social: Share2,
+  curso: BookOpen,
+  boost_ou_servico: Rocket,
 }
 
 /**
@@ -48,10 +62,13 @@ const KIND_META: Record<ProductKindId, { icon: LucideIcon; description: string }
  */
 export function GameProductPicker({
   defaultGame,
+  sellableCategories,
   onSelect,
   onManual,
 }: {
   defaultGame?: string
+  /** Categorias que este vendedor pode anunciar agora; as demais aparecem travadas com o caminho para pedir aprovação. Sem a lista, todas valem. */
+  sellableCategories?: string[]
   onSelect: (selection: PickerSelection) => void
   onManual: () => void
 }) {
@@ -167,8 +184,26 @@ export function GameProductPicker({
 
       <div className="grid gap-2.5 sm:grid-cols-2">
         {kinds.map((kind) => {
-          const meta = KIND_META[kind.id]
-          const Icon = meta.icon
+          const Icon = KIND_ICON[kind.id]
+          const locked = sellableCategories !== undefined && !sellableCategories.includes(kind.categorySlug)
+          if (locked) {
+            return (
+              <Link
+                key={kind.id}
+                href="/painel/vendedor/categorias"
+                className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-background p-3.5 text-left transition-colors hover:border-primary"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground" aria-hidden="true">
+                  <Lock className="size-5" />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-sm font-medium">{kind.label}</span>
+                  <span className="text-xs text-muted-foreground">Precisa de aprovação da moderação. Pedir aprovação</span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              </Link>
+            )
+          }
           return (
             <button
               key={kind.id}
@@ -193,7 +228,7 @@ export function GameProductPicker({
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-sm font-medium">{kind.label}</span>
-                <span className="text-xs text-muted-foreground">{meta.description}</span>
+                <span className="text-xs text-muted-foreground">{kind.description}</span>
               </span>
               <ChevronRight
                 className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"

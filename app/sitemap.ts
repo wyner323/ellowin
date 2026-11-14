@@ -1,10 +1,11 @@
 import type { MetadataRoute } from "next"
 import { eq } from "drizzle-orm"
-import { categories } from "@/lib/catalog"
+import { HEADER_CATEGORY_SLUGS, categories } from "@/lib/catalog"
 import { db } from "@/lib/db"
 import { product } from "@/lib/db/schema"
 import { getGameSeo } from "@/lib/game-seo"
 import { getGameListingCounts } from "@/lib/marketplace"
+import { getCategoryStats } from "@/lib/market-stats"
 import { GAMES } from "@/lib/product-catalog"
 import { SITE_URL } from "@/lib/site"
 
@@ -35,7 +36,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/termos`, changeFrequency: "yearly", priority: 0.3 },
   ]
 
-  const categoryPages: MetadataRoute.Sitemap = categories.map((c) => ({
+  // As quatro categorias originais sempre entram; as recentes só quando já têm anúncio (a página vazia sai com noindex).
+  const categoryStats = await getCategoryStats()
+  const categoryPages: MetadataRoute.Sitemap = categories
+    .filter((c) => HEADER_CATEGORY_SLUGS.includes(c.slug) || (categoryStats[c.slug]?.count ?? 0) > 0)
+    .map((c) => ({
     url: `${SITE_URL}/catalogo/${c.slug}`,
     changeFrequency: "daily",
     priority: 0.7,

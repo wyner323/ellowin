@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Search, ShieldCheck } from 'lucide-react'
 import { eq } from 'drizzle-orm'
-import { categories } from '@/lib/catalog'
+import { HEADER_CATEGORY_SLUGS, categories } from '@/lib/catalog'
 import { db } from '@/lib/db'
 import { sellerApplication, user as userTable } from '@/lib/db/schema'
 import { getStaff } from '@/lib/roles'
@@ -135,15 +135,20 @@ export async function SiteHeader() {
         >
           Jogos
         </Link>
-        {categories.map((category) => (
-          <Link
-            key={category.slug}
-            href={`/catalogo/${category.slug}`}
-            className="text-sm text-muted-foreground transition-colors hover:text-primary"
-          >
-            {category.name}
-          </Link>
-        ))}
+        {categories
+          .filter((category) => HEADER_CATEGORY_SLUGS.includes(category.slug))
+          .map((category) => (
+            <Link
+              key={category.slug}
+              href={`/catalogo/${category.slug}`}
+              className="text-sm text-muted-foreground transition-colors hover:text-primary"
+            >
+              {category.name}
+            </Link>
+          ))}
+        <Link href="/catalogo" className="text-sm text-muted-foreground transition-colors hover:text-primary">
+          Todas as categorias
+        </Link>
         <Link
           href="/vender"
           className="ml-auto text-sm font-medium text-primary hover:underline"

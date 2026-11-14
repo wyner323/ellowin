@@ -64,6 +64,7 @@ import ProductPage from "@/app/produtos/[slug]/page"
 import LojaPage from "@/app/loja/[slug]/page"
 import BuscaPage from "@/app/busca/page"
 import CatalogPage from "@/app/catalogo/[slug]/page"
+import CatalogoIndexPage from "@/app/catalogo/page"
 import JogosPage from "@/app/jogos/page"
 import JogoPage from "@/app/jogos/[slug]/page"
 import AjudaPage from "@/app/ajuda/page"
@@ -99,6 +100,9 @@ import AdminDenunciasPage from "@/app/admin/denuncias/page"
 import AdminDenunciaPage from "@/app/admin/denuncias/[id]/page"
 import AdminConferenciaPage from "@/app/admin/conferencia/page"
 import AdminEntregaAutomaticaPage from "@/app/admin/entrega-automatica/page"
+import AdminCategoriasPage from "@/app/admin/categorias/page"
+import AdminEstoquePage from "@/app/admin/estoque/page"
+import PainelCategoriasPage from "@/app/painel/vendedor/categorias/page"
 import AdminUsuariosPage from "@/app/admin/usuarios/page"
 
 let t: TestDb
@@ -176,6 +180,8 @@ const screens: Screen[] = [
   { name: "busca vazia", as: null, render: () => BuscaPage(sp({})) },
   { name: "categoria", as: null, render: () => CatalogPage({ ...params({ slug: "contas" }), ...sp({}) }) },
   { name: "índice de jogos", as: null, render: () => JogosPage() },
+  { name: "todas as categorias", as: null, render: () => CatalogoIndexPage() },
+  { name: "categoria nova (sem anúncio)", as: null, render: () => CatalogPage({ ...params({ slug: "recargas" }), ...sp({}) }) },
   { name: "jogo", as: null, render: () => JogoPage({ ...params({ slug: "valorant" }), ...sp({}) }) },
   { name: "ajuda", as: null, render: () => AjudaPage() },
   { name: "termos", as: null, render: () => TermosPage() },
@@ -207,6 +213,7 @@ const screens: Screen[] = [
   { name: "painel: avaliações recebidas", as: "ana", render: () => PainelAvaliacoesPage(sp({})) },
   { name: "painel: editar em lote", as: "ana", render: () => PainelLotePage(sp({})) },
   { name: "painel: vendas", as: "ana", render: () => PainelVendasPage(sp({})) },
+  { name: "painel: categorias", as: "ana", render: () => PainelCategoriasPage() },
   // moderação (dentro do layout, que traz o <main>)
   { name: "moderação: fila de disputas", as: "adm", admin: true, render: () => AdminDisputasPage(sp({})) },
   { name: "moderação: caso de disputa", as: "adm", admin: true, render: () => AdminDisputaPage(params({ id: String(ids.dispute) })) },
@@ -215,6 +222,8 @@ const screens: Screen[] = [
   { name: "moderação: conferência", as: "adm", admin: true, render: () => AdminConferenciaPage() },
   { name: "moderação: entrega automática", as: "adm", admin: true, render: () => AdminEntregaAutomaticaPage() },
   { name: "moderação: cargos", as: "adm", admin: true, render: () => AdminUsuariosPage() },
+  { name: "moderação: categorias dos vendedores", as: "adm", admin: true, render: () => AdminCategoriasPage() },
+  { name: "moderação: estoque para análise", as: "adm", admin: true, render: () => AdminEstoquePage() },
 ]
 
 async function htmlOf(screen: Screen) {

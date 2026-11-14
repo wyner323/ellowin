@@ -19,7 +19,7 @@ async function requireApprovedSeller(userId: string) {
 }
 
 /** `text` é o que o vendedor colou: um item por linha. O conteúdo nunca volta na resposta nem vai para log. */
-export async function addStock(variantId: number, text: string): Promise<ActionResult> {
+export async function addStock(variantId: number, text: string, statement?: string): Promise<ActionResult> {
   const userId = await getUserId()
   if (!Number.isInteger(variantId) || variantId < 1 || typeof text !== "string") return { ok: false, error: "Pedido inválido." }
   if (!(await requireApprovedSeller(userId))) return { ok: false, error: "Apenas vendedores aprovados podem cadastrar itens." }
@@ -39,12 +39,12 @@ export async function addStock(variantId: number, text: string): Promise<ActionR
   if (parsed.items.length === 0) return { ok: false, field: "items", error: "Informe ao menos um item, um por linha." }
 
   try {
-    const { added, ignored } = await addStockItems(userId, variantId, parsed.items)
+    const { added, ignored, pendingReview } = await addStockItems(userId, variantId, parsed.items, typeof statement === "string" ? statement : undefined)
     const skipped = ignored + parsed.duplicates
     revalidatePath("/painel/vendedor/produtos")
     revalidatePath("/painel/vendedor/produtos/[id]/estoque", "page")
     revalidatePath("/painel/vendedor")
-    const base = `${added} ${added === 1 ? "item cadastrado" : "itens cadastrados"}.`
+    const base = `${added} ${added === 1 ? "item cadastrado" : "itens cadastrados"}${pendingReview ? " e enviado para análise da moderação: só entra à venda depois de aprovado" : ""}.`
     return { ok: true, message: skipped > 0 ? `${base} ${skipped} repetido${skipped === 1 ? "" : "s"} ${skipped === 1 ? "foi ignorado" : "foram ignorados"}.` : base }
   } catch (error) {
     if (error instanceof StockError) return { ok: false, error: error.message }

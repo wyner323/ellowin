@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { Download, Users } from "lucide-react"
+import { categories } from "@/lib/catalog"
 import { eq } from "drizzle-orm"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
@@ -31,12 +32,7 @@ export const metadata: Metadata = {
   description: "Receita, pedidos, visitas e conversão da sua loja, com comparação com o período anterior.",
 }
 
-const CATEGORY_LABEL: Record<string, string> = {
-  contas: "Contas de jogos",
-  moedas: "Moedas e gold",
-  "gift-cards": "Gift cards",
-  boosting: "Boosting e serviços",
-}
+const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(categories.map((c) => [c.slug, c.name]))
 
 /** Preço contra a mediana de anúncios parecidos, dito em palavras (nunca só uma cor). */
 function marketText(p: ProductRow): string {

@@ -14,6 +14,9 @@ import {
 import { claimStockItem, stockTableExistsIn, syncStock } from "@/lib/delivery-stock"
 import { getOrderMessages } from "@/lib/orders"
 import { originPurchaseNote } from "@/lib/account-origin"
+import { buyerInfoTableExistsIn } from "@/lib/buyer-info"
+import { sellerMayList } from "@/lib/category-approval"
+import { categoryRule, describeBuyerInfo, sanitizeBuyerInfo } from "@/lib/category-rules"
 import { hoursForDeliveryTime } from "@/lib/delivery"
 import { AUTO_RELEASE_DAYS, formatCents, splitOrderAmount } from "@/lib/money"
 import { notifyLowStock, notifyOrder } from "@/lib/notify"
@@ -52,10 +55,14 @@ const MAX_BUYER_CANCELS_PER_HOUR = 10
  * compras simultâneas do último item. `expectedPriceCents` é só a confirmação
  * do preço que o comprador VIU na tela: se o vendedor reajustou o item entre a
  * página carregar e o clique, a compra é recusada em vez de cobrar mais caro.
+ *
+ * `buyerInfo` são os dados que a categoria pede ao comprador (ID do jogador numa recarga...): só as chaves da categoria entram,
+ * limpas e com tamanho máximo, e um campo obrigatório vazio recusa a compra. Ficam em `order_buyer_info` e no chat do pedido.
  */
 export async function purchase(
   variantId: number,
   expectedPriceCents: number,
+  buyerInfo?: Record<string, string>,
 ): Promise<ActionResult & { orderId?: number }> {
   const buyerId = await getUserId()
 
@@ -111,6 +118,14 @@ export async function purchase(
       if (variant.stock < 1) throw new PurchaseError("Item esgotado.")
       if (variant.sellerId === buyerId)
         throw new PurchaseError("Você não pode comprar o seu próprio anúncio.")
+      // Categoria restrita: o vendedor precisa estar aprovado NESTE momento (uma aprovação revogada pausa os anúncios, e aqui
+      // a compra confere de novo, no caso de o anúncio ter sido reativado por outro caminho).
+      if (!(await sellerMayList(variant.sellerId, variant.categorySlug, client)))
+        throw new PurchaseError("Este item não está mais disponível.")
+      // Dados do comprador (recarga, moeda, item, boost). Sem a tabela (migração 0015 pendente) a compra segue sem pedir nada.
+      const wantsBuyerInfo = categoryRule(variant.categorySlug).buyerFields.length > 0 && (await buyerInfoTableExistsIn(client))
+      const cleanInfo = wantsBuyerInfo ? sanitizeBuyerInfo(variant.categorySlug, buyerInfo) : null
+      if (cleanInfo?.missing) throw new PurchaseError(`Informe: ${cleanInfo.missing.label}.`)
       if (variant.priceCents !== expectedPriceCents)
         throw new PriceChangedError(
           `O preço deste item mudou para ${formatCents(variant.priceCents)}. Confira o novo valor e compre de novo.`,
@@ -149,9 +164,19 @@ export async function purchase(
 
       // Conta de jogo: o que o vendedor declarou sobre a procedência na hora em que o comprador pagou fica registrado no
       // pedido (mensagem do sistema), mesmo que ele edite o anúncio depois. É declaração, a Ellowin não confere.
-      const originNote = variant.categorySlug === "contas" ? originPurchaseNote(variant.accountOrigin) : null
+      const originNote = categoryRule(variant.categorySlug).declaresOrigin ? originPurchaseNote(variant.accountOrigin) : null
       if (originNote) {
         await client.query(`INSERT INTO "order_message" ("orderId", "authorRole", "body") VALUES ($1, 'system', $2)`, [newOrderId, originNote])
+      }
+
+      // O que o comprador informou fica no pedido (para o vendedor entregar) e no chat, como registro das duas partes.
+      if (cleanInfo && Object.keys(cleanInfo.info).length > 0) {
+        await client.query(`INSERT INTO "order_buyer_info" ("orderId", "info") VALUES ($1, $2::jsonb)`, [newOrderId, JSON.stringify(cleanInfo.info)])
+        const lines = describeBuyerInfo(variant.categorySlug, cleanInfo.info).map((l) => `${l.label}: ${l.value}`)
+        await client.query(`INSERT INTO "order_message" ("orderId", "authorRole", "body") VALUES ($1, 'system', $2)`, [
+          newOrderId,
+          `Dados informados pelo comprador na compra. ${lines.join(". ")}.`,
+        ])
       }
 
       await moveToEscrow(

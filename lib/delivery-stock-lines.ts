@@ -1,13 +1,15 @@
+import { CATEGORY_RULE_SLUGS, categoryRule } from "@/lib/category-rules"
+
 /**
  * Regras puras do estoque de entrega automática: o que o vendedor cola na caixa de texto (um item por linha), os
  * limites e a máscara que o painel mostra no lugar do conteúdo. Sem banco, para a tela e os testes.
  */
 
-/** Categorias em que a entrega automática faz sentido: um código ou login por venda. */
-export const AUTO_DELIVERY_CATEGORIES = ["gift-cards", "contas"] as const
+/** Categorias em que a entrega automática faz sentido: um código, chave, link ou login por venda (definido em lib/category-rules.ts). */
+export const AUTO_DELIVERY_CATEGORIES = CATEGORY_RULE_SLUGS.filter((slug) => categoryRule(slug).autoDelivery)
 
 export function allowsAutoDelivery(categorySlug: string) {
-  return (AUTO_DELIVERY_CATEGORIES as readonly string[]).includes(categorySlug)
+  return categoryRule(categorySlug).autoDelivery
 }
 
 export const MAX_STOCK_BATCH = 500

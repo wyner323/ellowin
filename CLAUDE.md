@@ -241,8 +241,8 @@ Listing quality: `listingQuality()` (`lib/listing-quality.ts`, pure) scores a pu
 
 ### Automatic delivery (stock of encrypted items)
 
-Design and decisions in `docs/entrega-automatica.md`. A listing with `deliveryType = "automatica"` (only categories `gift-cards` and `contas`, `allowsAutoDelivery` in `lib/delivery-stock-lines.ts`; any approved
-seller, no sales gate) sells items from `delivery_stock_item` (migration 0011): one code/key/login per row, `payload` encrypted with `stock:<variantId>` as AAD, `payloadHash` an HMAC (`hashField`, needs the key) that
+Design and decisions in `docs/entrega-automatica.md`. A listing with `deliveryType = "automatica"` (only categories whose rule in `lib/category-rules.ts` has `autoDelivery`: gift cards, accounts, subscriptions, keys, social accounts and courses; `allowsAutoDelivery` in `lib/delivery-stock-lines.ts` reads it; any approved
+seller, no sales gate, EXCEPT the restricted categories below) sells items from `delivery_stock_item` (migration 0011): one code/key/login per row, `payload` encrypted with `stock:<variantId>` as AAD, `payloadHash` an HMAC (`hashField`, needs the key) that
 refuses the same item twice, even after it was sold, and `mask` the only thing the panel ever shows. `purchase` (`app/actions/orders.ts`) claims the oldest available item INSIDE the same transaction that moves the money
 (`claimStockItem`, `FOR UPDATE SKIP LOCKED`), moves the content to `order.deliveryPayload` re-encrypted for `order:<id>` (the stock row's `payload` becomes NULL: the secret never lives in two places; a CHECK ties
 `payload IS NULL` to `orderId IS NOT NULL`) and writes the order already as `entregue` with the usual `autoReleaseAt`. No item to claim → `PurchaseError("Item esgotado.")`, whatever `stock` says: selling what cannot be
@@ -298,10 +298,24 @@ The origin of an account listing is a DECLARATION by the seller (`lib/account-or
 `sealState` (`lib/seller-seal.ts`) gives the seal only to a seller with NO recovered-account flag AND at least one completed sale, and the text carries the number of sales ("… em N vendas concluídas"); a seller with no completed sale is "Vendedor novo", with no seal
 (zero records proves nothing). `getSellerAccountFlagSummary` returns `completedSales` for that. An `entregue` order of a `contas` listing shows the buyer `AccountSecurityChecklist` (change password, e-mails, 2FA, sessions, only then confirm).
 
+### Categories: one rules registry, seller approval, stock review, buyer data
+
+Ten categories (`lib/catalog.ts`: contas, moedas, itens, gift-cards, recargas, assinaturas, keys, redes-sociais, cursos, boosting). **Everything that differs between them lives in `lib/category-rules.ts`** (pure, read by server, screens and tests): `restricted`
+(the seller needs the moderation's approval in THAT category), `autoDelivery`, `declaresOrigin` (account provenance: contas and redes-sociais), `stockReview`, `buyerFields` and the rules text the seller accepts. A new category = an entry in `catalog.ts` + one in `category-rules.ts`
+(+ a product kind in `lib/product-catalog.ts`; `lib/category-rules.test.ts` fails when any of the three is missing or when a text promises what the system does not do: "verificado", "garantia", "validado"...). A category without art shows an icon (`components/category-art.tsx`); the header bar only
+lists `HEADER_CATEGORY_SLUGS` (the rest are in `/catalogo`, the mobile menu and the footer); a category page with no listing is `noindex` and out of the sitemap until it has one.
+**Restricted** (gift-cards, recargas, assinaturas, keys, redes-sociais): `seller_category_approval` (migration 0015, `lib/category-approval.ts`, `app/actions/category-approval.ts`). The seller asks at `/painel/vendedor/categorias` with a statement (where the stock comes from: a declaration, Ellowin does not check it);
+staff decide at `/admin/categorias`. `sellerMayList` gates `createProduct`, a category change in `updateProduct`, reactivating, `duplicateProduct` AND `purchase` (inside its transaction); refusing or revoking pauses the seller's active listings in that category. Until the migration creates the table,
+`gift-cards` stays open (`LEGACY_OPEN_CATEGORIES`, so the deploy does not stop existing sales) and the new restricted categories stay CLOSED; the migration approves whoever already had gift-card listings. **Stock review** (`stock_batch`, `lib/stock-review.ts`, `app/actions/stock-review.ts`, `/admin/estoque`): in a category with `stockReview`
+every `addStock` send becomes a batch that is `pendente` while the seller's `stockReview` flag (staff switch it per seller) is on; only items of an `aprovado` batch (or with no batch) are sellable (`sellableSql` in `lib/delivery-stock.ts`, used by `syncStock`, `claimStockItem`, the reconcile check and the panel).
+Staff see the MASK of the items, never the code; refuse deletes the unsold items of the batch, quarantine pulls the rest out of sale, approve puts them back; sold items never change. Lock order is the purchase's: variant row first, then the batch. `app/actions/concurrency.pg.test.ts` runs quarantine against parallel purchases on a real Postgres.
+**Buyer data**: `buyerFields` (e.g. recargas, moedas, itens: "ID ou apelido no jogo", optional server) are asked in the buy box (`VariantPicker`), cleaned by `sanitizeBuyerInfo` (only the category's keys, length-capped, never trusted from the browser), stored in `order_buyer_info` (a table of its own, like the other recent migrations) and written to the order chat; `getOrderBuyerInfo` feeds the order page for the two parties and staff.
+Tests that mock `@/lib/notify` and reach `reviewStockBatch`/`decideCategoryApproval` need `notifyStockDecision`/`notifyCategoryDecision`; tests that buy or list in `gift-cards` need the seller approved (`seller_category_approval` row) now that the migration is part of the test database.
+
 ### Wallet reconciliation
 
-`lib/reconcile.ts` (read-only, 12 SQL checks: balance vs ledger, held vs active orders, every order settled exactly once, total money =
-deposits − withdrawals − fees, no negatives, and the two stock checks: a sold stock item points at a delivered order of the same variant; an automatic variant's `stock` equals its available items; those two are skipped when
+`lib/reconcile.ts` (read-only, 13 SQL checks with the 0015 tables: balance vs ledger, held vs active orders, every order settled exactly once, total money =
+deposits − withdrawals − fees, no negatives, and the two stock checks: a sold stock item points at a delivered order of the same variant; an automatic variant's `stock` equals its SELLABLE items (approved batches); a stock item is never sold after its batch was refused; the stock checks are skipped when
 the 0011 table does not exist yet) runs at the end of every `/api/cron/sla` call and on `/admin/conferencia` (admin only). If
 anything fails, `lib/reconcile-alert.ts` logs it and emails the admins at most once a day per set of problems. Orders 1–5 are legacy
 demo seed (seller credited with no buyer debit) and are accounted for by `LEGACY_SEED_ORDER_IDS`; any new inconsistency is real.
